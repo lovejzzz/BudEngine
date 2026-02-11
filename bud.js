@@ -1,11 +1,26 @@
 /**
- * BUD ENGINE v3.10
+ * BUD ENGINE v4.1
  * A 2D web game engine designed for AI-human collaboration
  * 
  * Philosophy: AI can write, TEST, and iterate on games independently.
  * Killer feature: AI Testing API + auto-playtest bot
  * 
  * Architecture: Single-file, no build tools, runs in browser
+ * 
+ * v4.1 LIVING ECOSYSTEM - Creatures, Food Chains, Self-Sustaining Life:
+ * - Three creature types: Worms (🪱 soil decomposers), Fish (🐟 aquatic herbivores), Bugs (🐛 surface herbivores)
+ * - Creatures are MATERIALS in the grid - they move, eat, reproduce, and die organically
+ * - Soil fertility system: worms enrich soil by eating decay, plants deplete fertility
+ * - Global O2/CO2 balance: plants produce oxygen, creatures consume it, affects fire spread
+ * - Food chain dynamics: creatures eat plants/decay, populations rise and fall naturally
+ * - Creature behavior: movement patterns (worms wiggle in dirt, fish swim in water, bugs walk on surfaces)
+ * - Reproduction: well-fed creatures split (low probability, population capped at ~200)
+ * - Death conditions: starvation, wrong environment, temperature extremes, low oxygen
+ * - Acoustic ecology: worm rumbles (30-60Hz), fish splashes (200-400Hz), bug clicks (800-1500Hz)
+ * - Performance: creatures simulate every 3 frames, population cap prevents slowdown
+ * - Ecosystem state API: engine.test.getEcosystemState() includes creature counts, O2/CO2, soil fertility
+ * - Self-sustaining: a well-balanced world runs indefinitely with natural population cycles
+ * - The aquarium experience: mesmerizing to watch life emerge and persist
  * 
  * v3.10 PROCEDURAL WORLD GENERATION - Infinite Unique Worlds:
  * - Seeded random number generator (Mulberry32) for deterministic generation
@@ -4283,7 +4298,31 @@ class TestingAPI {
             ambientTemp: physics.ambientTemp + '°C',
             
             // Geological events config
-            geologicalEvents: physics.geologicalEvents
+            geologicalEvents: physics.geologicalEvents,
+            
+            // v4.1: Ecosystem balance
+            atmosphere: {
+                oxygen: physics.oxygenLevel ? physics.oxygenLevel.toFixed(1) : '0',
+                co2: physics.co2Level ? physics.co2Level.toFixed(1) : '0',
+                balance: physics.oxygenLevel && physics.co2Level ? 
+                    (physics.oxygenLevel / (physics.oxygenLevel + physics.co2Level) * 100).toFixed(0) + '% O2' : 'N/A'
+            },
+            
+            // v4.1: Creature populations
+            creatures: {
+                worm: physics.creaturePopulation ? physics.creaturePopulation.worm : 0,
+                fish: physics.creaturePopulation ? physics.creaturePopulation.fish : 0,
+                bug: physics.creaturePopulation ? physics.creaturePopulation.bug : 0,
+                total: physics.totalCreatures || 0,
+                max: physics.maxCreatures || 200,
+                births: physics.creatureBirths || { worm: 0, fish: 0, bug: 0 },
+                deaths: physics.creatureDeaths || { worm: 0, fish: 0, bug: 0 }
+            },
+            
+            // v4.1: Soil fertility (average)
+            soilFertility: physics.fertilityGrid ? 
+                (physics.fertilityGrid.reduce((a, b) => a + b, 0) / physics.fertilityGrid.length).toFixed(3) : 
+                'N/A'
         };
     }
 
@@ -5761,9 +5800,36 @@ class PixelPhysics {
         this.temperatureGrid = new Float32Array(this.gridWidth * this.gridHeight);
         this.lifetimeGrid = new Float32Array(this.gridWidth * this.gridHeight);
         
-        // Initialize all cells to ambient temperature
+        // v4.1: Soil fertility system
+        this.fertilityGrid = new Float32Array(this.gridWidth * this.gridHeight);
+        
+        // v4.1: O2/CO2 balance (global counters)
+        this.oxygenLevel = 500;
+        this.co2Level = 100;
+        
+        // v4.1: Creature population tracking
+        this.creaturePopulation = {
+            worm: 0,
+            fish: 0,
+            bug: 0
+        };
+        this.creatureBirths = {
+            worm: 0,
+            fish: 0,
+            bug: 0
+        };
+        this.creatureDeaths = {
+            worm: 0,
+            fish: 0,
+            bug: 0
+        };
+        this.totalCreatures = 0;
+        this.maxCreatures = 200;
+        
+        // Initialize all cells to ambient temperature and default fertility
         for (let i = 0; i < this.temperatureGrid.length; i++) {
             this.temperatureGrid[i] = this.ambientTemp;
+            this.fertilityGrid[i] = 0.5; // Default fertility 0.5
         }
         
         // v3.2: Initialize chunking system
@@ -6881,6 +6947,148 @@ class PixelPhysics {
             lifetime: [3.0, 8.0], // Converts to dirt over time
             produces: 'dirt'
         });
+
+        // ========== CREATURES (v4.1) ==========
+
+        // WORM (lives in dirt, eats decay, enriches soil)
+        this.material('worm', {
+            state: 'solid',
+            density: 600,
+            temperature: 20,
+            meltingPoint: null,
+            boilingPoint: null,
+            ignitionPoint: 150,
+            thermalConductivity: 0.4,
+            specificHeat: 3.0,
+            flammability: 0.3,
+            hardness: 0.1,
+            electricConductivity: 0,
+            pH: 7,
+            reactivity: 0,
+            solubility: null,
+            color: ['#d4836b', '#c47a63'],
+            immovable: false,
+            organic: true,
+            living: true,
+            creature: true,
+            combustionProducts: ['smoke'],
+            combustionEnergy: 4,
+            // Acoustic properties
+            speedOfSound: 1100,
+            acousticImpedance: 0.66,
+            absorptionCoeff: 0.35,
+            youngsModulus: 0.3e9,
+            resonanceFreq: 40,
+            dampening: 0.8,
+            brightness: 0.1,
+            impactSound: 'thud',
+            flowSound: null,
+            ambientSound: null,
+            phaseChangeSound: null,
+            // Creature properties
+            creatureType: 'worm',
+            moveSpeed: 0.3,
+            eatsFood: ['decay'],
+            needsEnvironment: ['dirt'],
+            minTemp: 5,
+            maxTemp: 35,
+            deathForm: 'decay',
+            consumesO2: true
+        });
+
+        // FISH (lives in water, eats plants)
+        this.material('fish', {
+            state: 'liquid', // Behaves like liquid (swims)
+            density: 1050,
+            temperature: 20,
+            meltingPoint: null,
+            boilingPoint: null,
+            ignitionPoint: 180,
+            thermalConductivity: 0.5,
+            specificHeat: 3.5,
+            flammability: 0.2,
+            hardness: 0.1,
+            electricConductivity: 0,
+            pH: 7,
+            reactivity: 0,
+            solubility: null,
+            color: ['#ff9933', '#ffaa44'],
+            immovable: false,
+            organic: true,
+            living: true,
+            creature: true,
+            combustionProducts: ['smoke'],
+            combustionEnergy: 3,
+            // Acoustic properties
+            speedOfSound: 1400,
+            acousticImpedance: 1.47,
+            absorptionCoeff: 0.25,
+            youngsModulus: 0.4e9,
+            resonanceFreq: 250,
+            dampening: 0.7,
+            brightness: 0.2,
+            impactSound: 'splash',
+            flowSound: null,
+            ambientSound: null,
+            phaseChangeSound: null,
+            // Creature properties
+            creatureType: 'fish',
+            moveSpeed: 0.5,
+            eatsFood: ['plant', 'vegetation'],
+            needsEnvironment: ['water'],
+            minTemp: 0,
+            maxTemp: 30,
+            deathForm: 'decay',
+            consumesO2: true,
+            viscosity: 0.6
+        });
+
+        // BUG (walks on surfaces, eats plants)
+        this.material('bug', {
+            state: 'solid',
+            density: 550,
+            temperature: 20,
+            meltingPoint: null,
+            boilingPoint: null,
+            ignitionPoint: 140,
+            thermalConductivity: 0.3,
+            specificHeat: 2.8,
+            flammability: 0.4,
+            hardness: 0.2,
+            electricConductivity: 0,
+            pH: 7,
+            reactivity: 0,
+            solubility: null,
+            color: ['#336633', '#2d5c2d'],
+            immovable: false,
+            organic: true,
+            living: true,
+            creature: true,
+            combustionProducts: ['smoke'],
+            combustionEnergy: 3,
+            // Acoustic properties
+            speedOfSound: 950,
+            acousticImpedance: 0.52,
+            absorptionCoeff: 0.30,
+            youngsModulus: 0.25e9,
+            resonanceFreq: 1000,
+            dampening: 0.75,
+            brightness: 0.25,
+            impactSound: 'click',
+            flowSound: null,
+            ambientSound: null,
+            phaseChangeSound: null,
+            // Creature properties
+            creatureType: 'bug',
+            moveSpeed: 0.4,
+            eatsFood: ['plant', 'vegetation'],
+            needsSurface: true,
+            minTemp: 5,
+            maxTemp: 40,
+            deathForm: 'decay',
+            diesInWater: true,
+            consumesO2: true
+        });
     }
 
     /**
@@ -7536,6 +7744,14 @@ class PixelPhysics {
         
         this.frameCount++;
         
+        // v4.1: Reset creature population counters every 60 frames
+        if (this.frameCount % 60 === 0) {
+            this.creaturePopulation.worm = 0;
+            this.creaturePopulation.fish = 0;
+            this.creaturePopulation.bug = 0;
+            this.totalCreatures = 0;
+        }
+        
         // v3.9: Update seasonal cycle and weather
         this.updateSeasons(dt);
         this.applyWeather();
@@ -7639,6 +7855,19 @@ class PixelPhysics {
                         // v3.6: Biology simulation for living materials
                         if (mat.living) {
                             this.simulateBiology(x, y, mat, idx);
+                        }
+                        
+                        // v4.1: Count creatures (every 60 frames)
+                        if (mat.creature && this.frameCount % 60 === 0) {
+                            if (mat.creatureType === 'worm') this.creaturePopulation.worm++;
+                            else if (mat.creatureType === 'fish') this.creaturePopulation.fish++;
+                            else if (mat.creatureType === 'bug') this.creaturePopulation.bug++;
+                            this.totalCreatures++;
+                        }
+                        
+                        // v4.1: Creature simulation (every few frames for performance)
+                        if (mat.creature && this.frameCount % 3 === 0) {
+                            this.simulateCreature(x, y, mat, idx);
                         }
                         
                         // v3.9: Ecosystem simulation (enhanced biology)
@@ -8076,6 +8305,10 @@ class PixelPhysics {
         
         // 2. OXYGEN PRODUCTION - Living plants convert CO2 to oxygen
         if (mat.producesOxygen && Math.random() < 0.005) {
+            // v4.1: Update global O2/CO2 levels
+            this.oxygenLevel = Math.min(1000, this.oxygenLevel + 0.2);
+            this.co2Level = Math.max(0, this.co2Level - 0.2);
+            
             const neighbors = [
                 [x - 1, y], [x + 1, y],
                 [x, y - 1], [x, y + 1]
@@ -8098,7 +8331,17 @@ class PixelPhysics {
         }
         
         // 3. GROWTH/REPRODUCTION - Spread to adjacent cells
-        if (Math.random() < mat.growthRate) {
+        // v4.1: Growth rate affected by soil fertility
+        let fertility = 1.0;
+        if (this.fertilityGrid && mat.needsDirt) {
+            fertility = this.fertilityGrid[idx] || 0.5;
+            // Block growth if fertility too low
+            if (fertility < 0.1) return;
+        }
+        
+        const effectiveGrowthRate = mat.growthRate * fertility;
+        
+        if (Math.random() < effectiveGrowthRate) {
             const neighbors = [
                 [x - 1, y], [x + 1, y],
                 [x, y - 1], [x, y + 1],
@@ -8130,6 +8373,22 @@ class PixelPhysics {
                     if (targetTempOk && targetWaterOk && targetLightOk && targetDirtOk && targetDarkOk) {
                         this.grid[nidx] = this.getMaterialId(mat.name);
                         this.temperatureGrid[nidx] = mat.temperature;
+                        
+                        // v4.1: Decrease fertility when plant grows
+                        if (this.fertilityGrid && mat.needsDirt) {
+                            // Find dirt below and decrease its fertility
+                            for (let dy = 0; dy < 3; dy++) {
+                                const checkY = ny + dy;
+                                if (!this.inBounds(nx, checkY)) continue;
+                                const checkIdx = this.index(nx, checkY);
+                                const checkId = this.grid[checkIdx];
+                                const checkMat = this.getMaterial(checkId);
+                                if (checkMat && checkMat.name === 'dirt') {
+                                    this.fertilityGrid[checkIdx] = Math.max(0, this.fertilityGrid[checkIdx] - 0.05);
+                                }
+                            }
+                        }
+                        
                         this.activateChunk(nx, ny);
                         break; // Only grow one cell per frame
                     }
@@ -8183,6 +8442,281 @@ class PixelPhysics {
                 }
             }
         }
+    }
+
+    /**
+     * v4.1: Simulate creatures (worms, fish, bugs)
+     * @private
+     */
+    simulateCreature(x, y, mat, idx) {
+        if (!mat.creature) return;
+        
+        const temp = this.temperatureGrid[idx];
+        const creatureType = mat.creatureType;
+        
+        // Use lifetime grid to store creature state:
+        // Bits 0-15: hunger counter (0-65535)
+        // Bits 16-23: direction (0-7)
+        // Bit 24-31: movement timer
+        
+        let state = this.lifetimeGrid[idx];
+        if (state === 0) {
+            // Initialize new creature
+            state = (Math.floor(Math.random() * 8) << 16); // Random initial direction
+            this.lifetimeGrid[idx] = state;
+        }
+        
+        const hunger = Math.floor(state) & 0xFFFF;
+        const direction = (Math.floor(state) >> 16) & 0xFF;
+        const moveTimer = (Math.floor(state) >> 24) & 0xFF;
+        
+        // 1. DEATH CONDITIONS
+        const tempOk = temp >= mat.minTemp && temp <= mat.maxTemp;
+        
+        // Check environment
+        let envOk = true;
+        if (mat.needsEnvironment) {
+            envOk = false;
+            for (const envMat of mat.needsEnvironment) {
+                if (this.hasNearbyMaterial(x, y, envMat, 1)) {
+                    envOk = true;
+                    break;
+                }
+            }
+        }
+        
+        // Bug dies in water
+        if (mat.diesInWater && this.hasNearbyMaterial(x, y, 'water', 1)) {
+            this.grid[idx] = this.getMaterialId('decay');
+            this.creatureDeaths[creatureType]++;
+            this.totalCreatures--;
+            return;
+        }
+        
+        // Die if temperature or environment bad
+        if (!tempOk || !envOk) {
+            if (Math.random() < 0.02) {
+                this.grid[idx] = this.getMaterialId('decay');
+                this.creatureDeaths[creatureType]++;
+                this.totalCreatures--;
+                this.activateChunk(x, y);
+                return;
+            }
+        }
+        
+        // Die of starvation (if hunger is 0 for too long)
+        if (hunger === 0 && Math.random() < 0.001) {
+            this.grid[idx] = this.getMaterialId('decay');
+            this.creatureDeaths[creatureType]++;
+            this.totalCreatures--;
+            this.activateChunk(x, y);
+            return;
+        }
+        
+        // 2. CONSUME O2
+        if (mat.consumesO2 && Math.random() < 0.01) {
+            this.oxygenLevel = Math.max(0, this.oxygenLevel - 0.1);
+            this.co2Level += 0.1;
+            
+            // Die faster in low O2
+            if (this.oxygenLevel < 50 && Math.random() < 0.005) {
+                this.grid[idx] = this.getMaterialId('decay');
+                this.creatureDeaths[creatureType]++;
+                this.totalCreatures--;
+                return;
+            }
+        }
+        
+        // 3. EATING
+        if (mat.eatsFood && Math.random() < 0.05) {
+            const neighbors = [
+                [x - 1, y], [x + 1, y],
+                [x, y - 1], [x, y + 1]
+            ];
+            
+            for (const [nx, ny] of neighbors) {
+                if (!this.inBounds(nx, ny)) continue;
+                
+                const nidx = this.index(nx, ny);
+                const nid = this.grid[nidx];
+                const nmat = this.getMaterial(nid);
+                
+                if (nmat && mat.eatsFood.includes(nmat.name)) {
+                    // Eat the food
+                    this.grid[nidx] = 0;
+                    
+                    // Increase hunger counter
+                    const newHunger = Math.min(hunger + 100, 65535);
+                    this.lifetimeGrid[idx] = newHunger | (direction << 16) | (moveTimer << 24);
+                    
+                    // Worms eating decay enriches nearby dirt
+                    if (creatureType === 'worm' && nmat.name === 'decay') {
+                        for (let dy = -2; dy <= 2; dy++) {
+                            for (let dx = -2; dx <= 2; dx++) {
+                                const fx = x + dx;
+                                const fy = y + dy;
+                                if (!this.inBounds(fx, fy)) continue;
+                                
+                                const fidx = this.index(fx, fy);
+                                const fid = this.grid[fidx];
+                                const fmat = this.getMaterial(fid);
+                                if (fmat && fmat.name === 'dirt') {
+                                    this.fertilityGrid[fidx] = Math.min(1.0, this.fertilityGrid[fidx] + 0.1);
+                                }
+                            }
+                        }
+                        
+                        // Play worm eating sound
+                        if (this.acoustics && this.acoustics.enabled) {
+                            this.acoustics.playCreatureSound('worm', 'eat');
+                        }
+                    }
+                    
+                    // Play eating sounds
+                    if (creatureType === 'fish' && this.acoustics && this.acoustics.enabled) {
+                        this.acoustics.playCreatureSound('fish', 'eat');
+                    }
+                    if (creatureType === 'bug' && this.acoustics && this.acoustics.enabled) {
+                        this.acoustics.playCreatureSound('bug', 'eat');
+                    }
+                    
+                    this.activateChunk(nx, ny);
+                    break;
+                }
+            }
+        }
+        
+        // 4. REPRODUCTION
+        if (hunger > 30000 && Math.random() < 0.0005 && this.totalCreatures < this.maxCreatures) {
+            const neighbors = [
+                [x - 1, y], [x + 1, y],
+                [x, y - 1], [x, y + 1]
+            ];
+            
+            for (const [nx, ny] of neighbors) {
+                if (!this.inBounds(nx, ny)) continue;
+                
+                const nidx = this.index(nx, ny);
+                const nid = this.grid[nidx];
+                
+                // Can reproduce into empty space or appropriate environment
+                let canReproduce = false;
+                if (nid === 0) canReproduce = true;
+                if (creatureType === 'worm' && this.getMaterial(nid)?.name === 'dirt') canReproduce = true;
+                
+                if (canReproduce) {
+                    this.grid[nidx] = this.getMaterialId(mat.name);
+                    this.temperatureGrid[nidx] = mat.temperature;
+                    this.lifetimeGrid[nidx] = 0; // Will initialize on next frame
+                    
+                    // Reduce parent hunger
+                    const newHunger = Math.max(0, hunger - 20000);
+                    this.lifetimeGrid[idx] = newHunger | (direction << 16) | (moveTimer << 24);
+                    
+                    this.creatureBirths[creatureType]++;
+                    this.totalCreatures++;
+                    this.activateChunk(nx, ny);
+                    break;
+                }
+            }
+        }
+        
+        // 5. MOVEMENT
+        if (Math.random() < mat.moveSpeed) {
+            // Decrement hunger slowly
+            const newHunger = Math.max(0, hunger - 1);
+            
+            // Change direction sometimes
+            let newDirection = direction;
+            if (Math.random() < 0.1) {
+                newDirection = Math.floor(Math.random() * 8);
+            }
+            
+            // Calculate movement direction
+            const dx = [0, 1, 1, 1, 0, -1, -1, -1][newDirection];
+            const dy = [-1, -1, 0, 1, 1, 1, 0, -1][newDirection];
+            
+            const nx = x + dx;
+            const ny = y + dy;
+            
+            if (this.inBounds(nx, ny)) {
+                const nidx = this.index(nx, ny);
+                const nid = this.grid[nidx];
+                const nmat = this.getMaterial(nid);
+                
+                // Check if can move to target cell
+                let canMove = false;
+                
+                if (creatureType === 'worm') {
+                    // Worms can move through dirt and into empty space
+                    if (nid === 0 || (nmat && nmat.name === 'dirt')) {
+                        canMove = true;
+                    }
+                } else if (creatureType === 'fish') {
+                    // Fish can move through water
+                    if (nmat && nmat.name === 'water') {
+                        canMove = true;
+                    }
+                } else if (creatureType === 'bug') {
+                    // Bugs walk on surfaces (move into air above solid)
+                    if (nid === 0) {
+                        // Check if there's a solid below
+                        const belowIdx = this.index(nx, ny + 1);
+                        if (this.inBounds(nx, ny + 1)) {
+                            const belowId = this.grid[belowIdx];
+                            const belowMat = this.getMaterial(belowId);
+                            if (belowMat && belowMat.state === 'solid') {
+                                canMove = true;
+                            }
+                        }
+                    }
+                }
+                
+                if (canMove) {
+                    // Move creature
+                    this.grid[nidx] = this.grid[idx];
+                    this.temperatureGrid[nidx] = this.temperatureGrid[idx];
+                    this.lifetimeGrid[nidx] = newHunger | (newDirection << 16) | (moveTimer << 24);
+                    
+                    this.grid[idx] = 0;
+                    this.temperatureGrid[idx] = this.ambientTemp;
+                    this.lifetimeGrid[idx] = 0;
+                    
+                    this.activateChunk(x, y);
+                    this.activateChunk(nx, ny);
+                } else {
+                    // Bounce - reverse direction
+                    newDirection = (newDirection + 4) % 8;
+                    this.lifetimeGrid[idx] = newHunger | (newDirection << 16) | (moveTimer << 24);
+                }
+            } else {
+                // Hit boundary - reverse direction
+                newDirection = (newDirection + 4) % 8;
+                this.lifetimeGrid[idx] = newHunger | (newDirection << 16) | (moveTimer << 24);
+            }
+        }
+    }
+
+    /**
+     * v4.1: Check if material is nearby
+     * @private
+     */
+    hasNearbyMaterial(x, y, materialName, radius) {
+        for (let dy = -radius; dy <= radius; dy++) {
+            for (let dx = -radius; dx <= radius; dx++) {
+                const nx = x + dx;
+                const ny = y + dy;
+                if (!this.inBounds(nx, ny)) continue;
+                
+                const nidx = this.index(nx, ny);
+                const nid = this.grid[nidx];
+                const nmat = this.getMaterial(nid);
+                if (nmat && nmat.name === materialName) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /**
@@ -8412,7 +8946,7 @@ class PixelPhysics {
             }
             
             // SOIL BUILDING: decay + dirt = richer soil (boost nearby plant growth)
-            if (mat.name === 'decay') {
+            if (mat.name === 'decay' && Math.random() < 0.01 * this.timeScale) {
                 const neighbors = [
                     [x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]
                 ];
@@ -8424,10 +8958,9 @@ class PixelPhysics {
                     const nid = this.grid[nidx];
                     const nmat = this.getMaterial(nid);
                     
-                    // Enrich nearby dirt (no visual change, but conceptually better soil)
-                    if (nmat && nmat.name === 'dirt') {
-                        // Could add a "richSoil" material in future, for now just note it
-                        // This affects nearby plant growth rates positively
+                    // v4.1: Enrich nearby dirt fertility
+                    if (nmat && nmat.name === 'dirt' && this.fertilityGrid) {
+                        this.fertilityGrid[nidx] = Math.min(1.0, this.fertilityGrid[nidx] + 0.02);
                     }
                 }
             }
@@ -8815,6 +9348,21 @@ class PixelPhysics {
                     let g = parseInt(hex.slice(2, 4), 16);
                     let b = parseInt(hex.slice(4, 6), 16);
                     const a = hex.length === 8 ? parseInt(hex.slice(6, 8), 16) : 255;
+                    
+                    // v4.1: Soil fertility visualization - fertile dirt is greener, depleted is grayer
+                    if (mat.name === 'dirt' && this.fertilityGrid) {
+                        const fertility = this.fertilityGrid[idx];
+                        if (fertility > 0.7) {
+                            // High fertility - add green tint
+                            g = Math.min(255, g + Math.floor((fertility - 0.7) * 100));
+                        } else if (fertility < 0.3) {
+                            // Low fertility - make grayer
+                            const grayness = (0.3 - fertility) * 0.5;
+                            r = Math.floor(r + (128 - r) * grayness);
+                            g = Math.floor(g + (128 - g) * grayness);
+                            b = Math.floor(b + (128 - b) * grayness);
+                        }
+                    }
                     
                     // v3.5: Apply lighting directly during render (multiply material color with light)
                     if (this.lighting) {
@@ -10859,6 +11407,67 @@ class AcousticEngine {
         
         const avgDist = totalDist / rays;
         return Math.min(1, avgDist / 200); // Normalize to 0-1
+    }
+
+    /**
+     * v4.1: Play creature sound
+     * @param {string} creatureType - Type of creature ('worm'|'fish'|'bug')
+     * @param {string} action - Action type ('eat'|'move'|'chirp')
+     */
+    playCreatureSound(creatureType, action) {
+        if (!this.enabled || !this.ctx) return;
+        
+        const now = this.ctx.currentTime;
+        const volume = this.masterVolume * 0.15;
+        
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        const filter = this.ctx.createBiquadFilter();
+        
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.masterGain);
+        
+        if (creatureType === 'worm') {
+            // Very low frequency rumble when eating
+            if (action === 'eat') {
+                filter.type = 'lowpass';
+                filter.frequency.value = 100;
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(40, now);
+                osc.frequency.exponentialRampToValueAtTime(35, now + 0.1);
+                gain.gain.setValueAtTime(volume * 0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            }
+        } else if (creatureType === 'fish') {
+            // Gentle water splash/bubble sounds
+            if (action === 'eat') {
+                filter.type = 'bandpass';
+                filter.frequency.value = 300;
+                filter.Q.value = 2;
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(250, now);
+                osc.frequency.exponentialRampToValueAtTime(350, now + 0.05);
+                gain.gain.setValueAtTime(volume * 0.5, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+                osc.start(now);
+                osc.stop(now + 0.08);
+            }
+        } else if (creatureType === 'bug') {
+            // Tiny clicking/chirping
+            if (action === 'eat') {
+                filter.type = 'highpass';
+                filter.frequency.value = 800;
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(1200, now);
+                gain.gain.setValueAtTime(volume * 0.4, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.02);
+                osc.start(now);
+                osc.stop(now + 0.02);
+            }
+        }
     }
 }
 
