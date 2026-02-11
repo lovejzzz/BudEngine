@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Touch Test</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body, html { width: 100%; height: 100%; overflow: hidden; background: #111; position: fixed; touch-action: none; }
+canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+#info { position: fixed; top: 10px; left: 10px; color: #0f0; font: 14px monospace; z-index: 10; background: rgba(0,0,0,0.8); padding: 10px; pointer-events: none; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="info">Touch anywhere</div>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const info = document.getElementById('info');
+
+// Set canvas size
+const w = canvas.clientWidth || window.innerWidth;
+const h = canvas.clientHeight || window.innerHeight;
+canvas.width = w;
+canvas.height = h;
+
+info.textContent = `canvas: ${canvas.width}x${canvas.height}\nclientW: ${canvas.clientWidth}\ninnerW: ${window.innerWidth}\nDPR: ${window.devicePixelRatio}\nrect: ${JSON.stringify(canvas.getBoundingClientRect())}`;
+
+// Fill dark
+ctx.fillStyle = '#111';
+ctx.fillRect(0, 0, w, h);
+
+// Draw crosshairs at center
+ctx.strokeStyle = '#333';
+ctx.beginPath();
+ctx.moveTo(w/2, 0); ctx.lineTo(w/2, h);
+ctx.moveTo(0, h/2); ctx.lineTo(w, h/2);
+ctx.stroke();
+
+function handleTouch(e) {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const touch = e.touches ? e.touches[0] : (e.changedTouches ? e.changedTouches[0] : e);
+    if (!touch) return;
+    
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const x = (touch.clientX - rect.left) * scaleX;
+    const y = (touch.clientY - rect.top) * scaleY;
+    
+    // Draw red dot directly at mapped position
+    ctx.fillStyle = 'red';
+    ctx.beginPath();
+    ctx.arc(x, y, 8, 0, Math.PI * 2);
+    ctx.fill();
+    
+    info.textContent = `touch: ${Math.round(touch.clientX)},${Math.round(touch.clientY)}\nrect: ${Math.round(rect.left)},${Math.round(rect.top)} ${Math.round(rect.width)}x${Math.round(rect.height)}\ncanvas: ${canvas.width}x${canvas.height}\nscale: ${scaleX.toFixed(3)},${scaleY.toFixed(3)}\nmapped: ${Math.round(x)},${Math.round(y)}\nDPR: ${window.devicePixelRatio}`;
+}
+
+canvas.addEventListener('touchstart', handleTouch, { passive: false });
+canvas.addEventListener('touchmove', handleTouch, { passive: false });
+canvas.addEventListener('mousedown', handleTouch);
+canvas.addEventListener('mousemove', (e) => { if (e.buttons) handleTouch(e); });
+</script>
+</body>
+</html>
