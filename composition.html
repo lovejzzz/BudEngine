@@ -86,6 +86,21 @@
             align-items: center;
         }
 
+        #ecosystem-hud {
+            font-size: 12px;
+            color: rgba(255,255,255,0.7);
+            margin-top: 8px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .eco-stat {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+
         .score-item {
             display: flex;
             gap: 5px;
@@ -377,6 +392,24 @@
                         </div>
                     </div>
                 </div>
+                <div id="ecosystem-hud">
+                    <div class="eco-stat">
+                        <span>🪱</span>
+                        <span id="worm-count">0</span>
+                    </div>
+                    <div class="eco-stat">
+                        <span>🐟</span>
+                        <span id="fish-count">0</span>
+                    </div>
+                    <div class="eco-stat">
+                        <span>🐛</span>
+                        <span id="bug-count">0</span>
+                    </div>
+                    <div class="eco-stat">
+                        <span>O₂</span>
+                        <span id="o2-level">0%</span>
+                    </div>
+                </div>
             </div>
 
             <!-- Sound Toggle -->
@@ -435,6 +468,10 @@
                         <span>🎵</span>
                         <span>Conduct</span>
                     </button>
+                    <button class="mode-btn" id="garden-btn">
+                        <span>🌿</span>
+                        <span>Garden</span>
+                    </button>
                 </div>
             </div>
 
@@ -445,7 +482,7 @@
         </div>
     </div>
 
-    <script src="bud.js?v=45"></script>
+    <script src="bud.js?v=46"></script>
     <script>
         // The Composition v4.0
         // Your instrument is the Earth
@@ -521,11 +558,24 @@
         document.querySelectorAll('.mode-btn').forEach(btn => {
             btn.onclick = () => {
                 const mode = btn.dataset.mode;
-                engine.composition.setMode(mode);
-                document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
+                if (mode) {
+                    engine.composition.setMode(mode);
+                    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                }
             };
         });
+
+        // Garden button
+        document.getElementById('garden-btn').onclick = () => {
+            // Clear world and load garden scenario
+            engine.physics.clearWorld();
+            if (engine.composition.loadScenario) {
+                engine.composition.loadScenario('garden');
+            } else if (engine.test && engine.test.loadScenario) {
+                engine.test.loadScenario('garden');
+            }
+        };
 
         // Sound toggle
         const soundToggle = document.getElementById('sound-toggle');
@@ -675,6 +725,22 @@
             }
         }
 
+        // Update ecosystem HUD every second
+        function updateEcosystemHUD() {
+            if (engine.test && engine.test.getEcosystemState) {
+                const eco = engine.test.getEcosystemState();
+                document.getElementById('worm-count').textContent = eco.creatures.worm || 0;
+                document.getElementById('fish-count').textContent = eco.creatures.fish || 0;
+                document.getElementById('bug-count').textContent = eco.creatures.bug || 0;
+                
+                // O2 level as percentage (0-100)
+                const o2Pct = Math.round((eco.oxygen / eco.maxOxygen) * 100);
+                document.getElementById('o2-level').textContent = o2Pct + '%';
+            }
+        }
+        
+        setInterval(updateEcosystemHUD, 1000);
+
         // Game scene
         engine.scene('main', {
             init() {
@@ -751,8 +817,8 @@
             }
         }, { once: true });
 
-        console.log('[The Composition v4.0] Loaded - Build the world, compose music');
+        console.log('[The Composition v4.1.5] Loaded - Build the world, compose music');
     </script>
-<div id="version-stamp" style="position:fixed;bottom:5px;right:10px;color:rgba(255,255,255,0.5);font:10px monospace;z-index:9999;pointer-events:none;">v4.0</div>
+<div id="version-stamp" style="position:fixed;bottom:5px;right:10px;color:rgba(255,255,255,0.5);font:10px monospace;z-index:9999;pointer-events:none;">v4.1</div>
 </body>
 </html>

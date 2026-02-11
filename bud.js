@@ -4126,33 +4126,59 @@ class TestingAPI {
                 break;
             
             case 'garden':
+                // Bottom 30% dirt
                 this.engine.physics.fill(0, h*0.7, w, h, 'dirt');
-                this.engine.physics.fill(w*0.25, h*0.65, w*0.28, h, 'water');
-                this.engine.physics.fill(w*0.72, h*0.65, w*0.75, h, 'water');
-                this.engine.physics.fill(w*0.05, h*0.6, w*0.15, h*0.7, 'stone');
-                this.engine.physics.fill(w*0.85, h*0.55, w*0.95, h*0.68, 'stone');
                 
+                // Water pool (right side, 20% width)
+                const poolX = w * 0.78;
+                const poolW = w * 0.2;
+                this.engine.physics.fill(poolX, h*0.6, poolX + poolW, h*0.7, 'water');
+                
+                // Stone walls to contain water
+                this.engine.physics.fill(poolX - 8, h*0.6, poolX, h*0.7, 'stone');
+                this.engine.physics.fill(poolX, h*0.695, poolX + poolW, h*0.7, 'stone');
+                
+                // Scatter plants on dirt surface
+                for (let i = 0; i < 30; i++) {
+                    const px = Math.random() * w * 0.75; // Left 75% only
+                    this.engine.physics.circle(px, h*0.69, 3, 'plant');
+                }
+                
+                // Add decay cells inside dirt (decomposition)
                 const cs = this.engine.physics.cellSize;
-                for (let gx = 0; gx < this.engine.physics.gridWidth; gx++) {
-                    for (let gy = Math.floor((h*0.7)/cs); gy < this.engine.physics.gridHeight; gy++) {
-                        const idx = this.engine.physics.index(gx, gy);
-                        if (this.engine.physics.grid[idx] === this.engine.physics.getMaterialId('dirt')) {
-                            this.engine.physics.temperatureGrid[idx] = 25;
-                        }
-                    }
+                for (let i = 0; i < 50; i++) {
+                    const dx = Math.random() * w;
+                    const dy = h*0.75 + Math.random() * (h*0.2);
+                    this.engine.physics.circle(dx, dy, 2, 'decay');
                 }
                 
-                for (let i = 0; i < 20; i++) {
-                    this.engine.physics.circle(Math.random() * w, h*0.68 + Math.random() * (h*0.08), 3, 'plant');
+                // Spawn creatures using the smart placement helper
+                // Worms in dirt (deep)
+                for (let i = 0; i < 15; i++) {
+                    const wx = Math.random() * w;
+                    const wy = h*0.8 + Math.random() * (h*0.15);
+                    this.engine.physics.spawnCreature('worm', wx, wy);
                 }
-                for (let i = 0; i < 12; i++) {
-                    this.engine.physics.circle(Math.random() * w, h*0.68 + Math.random() * (h*0.08), 8, 'vegetation');
-                }
+                
+                // Fish in water pool
                 for (let i = 0; i < 8; i++) {
-                    this.engine.physics.circle(w*0.05 + Math.random() * (w*0.1), h*0.65 + Math.random() * (h*0.05), 5, 'fungus');
+                    const fx = poolX + Math.random() * poolW * 0.8;
+                    const fy = h*0.63 + Math.random() * (h*0.05);
+                    this.engine.physics.spawnCreature('fish', fx, fy);
                 }
+                
+                // Bugs on dirt surface
                 for (let i = 0; i < 8; i++) {
-                    this.engine.physics.circle(w*0.85 + Math.random() * (w*0.1), h*0.63 + Math.random() * (h*0.05), 5, 'fungus');
+                    const bx = Math.random() * w * 0.75;
+                    const by = h*0.69;
+                    this.engine.physics.spawnCreature('bug', bx, by);
+                }
+                
+                // Activate all chunks
+                for (let gx = 0; gx < this.engine.physics.gridWidth; gx += this.engine.physics.chunkSize) {
+                    for (let gy = 0; gy < this.engine.physics.gridHeight; gy += this.engine.physics.chunkSize) {
+                        this.engine.physics.activateChunk(gx, gy);
+                    }
                 }
                 break;
             
@@ -7610,6 +7636,79 @@ class PixelPhysics {
     }
 
     /**
+     * Spawn a creature intelligently near a target location
+     * @param {string} type - Creature type ('worm', 'fish', 'bug')
+     * @param {number} pixelX - Target world x coordinate (pixel units)
+     * @param {number} pixelY - Target world y coordinate (pixel units)
+     * @returns {boolean} True if placed successfully, false otherwise
+     */
+    spawnCreature(type, pixelX, pixelY) {
+        const targetGx = Math.floor(pixelX / this.cellSize);
+        const targetGy = Math.floor(pixelY / this.cellSize);
+        const searchRadius = 5; // grid cells
+        
+        let bestGx = null;
+        let bestGy = null;
+        let bestDist = Infinity;
+        
+        // Search for appropriate habitat within radius
+        for (let dy = -searchRadius; dy <= searchRadius; dy++) {
+            for (let dx = -searchRadius; dx <= searchRadius; dx++) {
+                const gx = targetGx + dx;
+                const gy = targetGy + dy;
+                
+                if (!this.inBounds(gx, gy)) continue;
+                
+                const idx = this.index(gx, gy);
+                const id = this.grid[idx];
+                const mat = this.getMaterial(id);
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                
+                let isValid = false;
+                
+                if (type === 'worm') {
+                    // Worms need dirt
+                    if (mat && mat.name === 'dirt') {
+                        isValid = true;
+                    }
+                } else if (type === 'fish') {
+                    // Fish need water
+                    if (mat && mat.name === 'water') {
+                        isValid = true;
+                    }
+                } else if (type === 'bug') {
+                    // Bugs need air with solid below
+                    if (id === 0) {
+                        const belowIdx = this.index(gx, gy + 1);
+                        if (this.inBounds(gx, gy + 1)) {
+                            const belowId = this.grid[belowIdx];
+                            const belowMat = this.getMaterial(belowId);
+                            if (belowMat && belowMat.state === 'solid') {
+                                isValid = true;
+                            }
+                        }
+                    }
+                }
+                
+                if (isValid && dist < bestDist) {
+                    bestGx = gx;
+                    bestGy = gy;
+                    bestDist = dist;
+                }
+            }
+        }
+        
+        if (bestGx !== null && bestGy !== null) {
+            // Place creature
+            this.set(bestGx * this.cellSize, bestGy * this.cellSize, type);
+            this.activateChunk(bestGx, bestGy);
+            return true;
+        }
+        
+        return false;
+    }
+
+    /**
      * Create an explosion that destroys materials and scatters debris
      * @param {number} x - World x coordinate
      * @param {number} y - World y coordinate
@@ -8591,8 +8690,8 @@ class PixelPhysics {
         }
         
         // 4. REPRODUCTION
-        // Realistic: high hunger threshold, very low chance, strict population cap
-        if (hunger > 40000 && Math.random() < 0.0001 && this.totalCreatures < this.maxCreatures) {
+        // Realistic: moderate hunger threshold, very low chance, strict population cap
+        if (hunger > 15000 && Math.random() < 0.0001 && this.totalCreatures < this.maxCreatures) {
             const neighbors = [
                 [x - 1, y], [x + 1, y],
                 [x, y - 1], [x, y + 1]
@@ -8637,7 +8736,17 @@ class PixelPhysics {
             // Change direction sometimes
             let newDirection = direction;
             if (Math.random() < 0.1) {
-                newDirection = Math.floor(Math.random() * 8);
+                // Bugs ONLY move horizontally (left=6 or right=2)
+                if (creatureType === 'bug') {
+                    newDirection = Math.random() < 0.5 ? 2 : 6;
+                } else {
+                    newDirection = Math.floor(Math.random() * 8);
+                }
+            }
+            
+            // Override bug direction to horizontal only
+            if (creatureType === 'bug' && direction !== 2 && direction !== 6) {
+                newDirection = Math.random() < 0.5 ? 2 : 6;
             }
             
             // Calculate movement direction
@@ -8666,15 +8775,31 @@ class PixelPhysics {
                         canMove = true;
                     }
                 } else if (creatureType === 'bug') {
-                    // Bugs walk on surfaces (move into air above solid)
+                    // Bugs walk on surfaces (horizontal movement only)
                     if (nid === 0) {
-                        // Check if there's a solid below
+                        // Check if there's a solid below target cell
                         const belowIdx = this.index(nx, ny + 1);
                         if (this.inBounds(nx, ny + 1)) {
                             const belowId = this.grid[belowIdx];
                             const belowMat = this.getMaterial(belowId);
                             if (belowMat && belowMat.state === 'solid') {
                                 canMove = true;
+                            } else {
+                                // No solid below - try to climb 1-cell step
+                                const stepIdx = this.index(nx, ny - 1);
+                                if (this.inBounds(nx, ny - 1)) {
+                                    const stepId = this.grid[stepIdx];
+                                    if (stepId === 0) {
+                                        // Check if step location has solid below
+                                        const stepBelowIdx = this.index(nx, ny);
+                                        const stepBelowId = this.grid[stepBelowIdx];
+                                        const stepBelowMat = this.getMaterial(stepBelowId);
+                                        if (stepBelowMat && stepBelowMat.state === 'solid') {
+                                            // Can climb - adjust target
+                                            canMove = true;
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
