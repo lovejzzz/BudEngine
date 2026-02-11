@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BudEngine v2.7 - Asset System Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #0a0a14;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: monospace;
+            color: #00ffcc;
+        }
+        canvas {
+            border: 2px solid #00ffcc;
+            box-shadow: 0 0 20px rgba(0, 255, 204, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <script src="bud.js"></script>
+    <script>
+        // ===== GENERATE TEST SPRITES =====
+        // We'll create simple colored sprite sheets as data URIs
+        
+        function generateTestSheet(name, cols, rows, frameSize, colors) {
+            const canvas = document.createElement('canvas');
+            canvas.width = cols * frameSize;
+            canvas.height = rows * frameSize;
+            const ctx = canvas.getContext('2d');
+            
+            let frameIndex = 0;
+            for (let row = 0; row < rows; row++) {
+                for (let col = 0; col < cols; col++) {
+                    const x = col * frameSize;
+                    const y = row * frameSize;
+                    const color = colors[frameIndex % colors.length];
+                    
+                    // Draw frame background
+                    ctx.fillStyle = color;
+                    ctx.fillRect(x, y, frameSize, frameSize);
+                    
+                    // Draw frame border
+                    ctx.strokeStyle = '#000';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(x, y, frameSize, frameSize);
+                    
+                    // Draw frame number
+                    ctx.fillStyle = '#000';
+                    ctx.font = 'bold 12px monospace';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(frameIndex.toString(), x + frameSize/2, y + frameSize/2);
+                    
+                    frameIndex++;
+                }
+            }
+            
+            return canvas.toDataURL();
+        }
+        
+        // Generate test sprite sheets
+        const playerSheet = generateTestSheet('player', 4, 1, 32, ['#00ffcc', '#00ddaa', '#00bb88', '#00ffcc']);
+        const enemySheet = generateTestSheet('enemy', 4, 2, 32, ['#ff0066', '#dd0055', '#bb0044', '#ff0066', '#ff3388', '#dd2266', '#bb1144', '#ff3388']);
+        const coinSheet = generateTestSheet('coin', 8, 1, 24, ['#ffcc00', '#ffdd00', '#ffee00', '#ffff00', '#ffee00', '#ffdd00', '#ffcc00', '#ffbb00']);
+        
+        // Generate a simple single sprite
+        const playerStatic = (() => {
+            const canvas = document.createElement('canvas');
+            canvas.width = 32;
+            canvas.height = 32;
+            const ctx = canvas.getContext('2d');
+            
+            // Draw a simple character
+            ctx.fillStyle = '#00ffcc';
+            ctx.fillRect(8, 4, 16, 8); // head
+            ctx.fillRect(10, 12, 12, 12); // body
+            ctx.fillRect(6, 12, 4, 12); // left arm
+            ctx.fillRect(22, 12, 4, 12); // right arm
+            ctx.fillRect(10, 24, 5, 8); // left leg
+            ctx.fillRect(17, 24, 5, 8); // right leg
+            
+            return canvas.toDataURL();
+        })();
+        
+        // ===== CREATE ENGINE AND TEST =====
+        
+        const engine = new BudEngine({
+            width: 1280,
+            height: 720,
+            backgroundColor: '#0a0a14'
+        });
+        
+        // Track loaded assets for display
+        let assetsLoaded = false;
+        let testPhase = 'loading';
+        
+        // Define main scene
+        engine.scene('main', {
+            enter() {
+                console.log('[Test] Entering main scene');
+                
+                // Load assets with built-in loading screen
+                engine.assets.loadWithScreen({
+                    // Single image
+                    playerStatic: playerStatic,
+                    
+                    // Sprite sheets
+                    player: {
+                        src: playerSheet,
+                        frameWidth: 32,
+                        frameHeight: 32
+                    },
+                    enemy: {
+                        src: enemySheet,
+                        frameWidth: 32,
+                        frameHeight: 32
+                    },
+                    coin: {
+                        src: coinSheet,
+                        frameWidth: 24,
+                        frameHeight: 24
+                    }
+                }).then(() => {
+                    console.log('[Test] Assets loaded!');
+                    assetsLoaded = true;
+                    
+                    // Create animations
+                    engine.assets.animation('playerRun', {
+                        sheet: 'player',
+                        frames: [0, 1, 2, 3],
+                        fps: 8,
+                        loop: true
+                    });
+                    
+                    engine.assets.animation('enemyIdle', {
+                        sheet: 'enemy',
+                        frames: [0, 1, 2, 3],
+                        fps: 4,
+                        loop: true
+                    });
+                    
+                    engine.assets.animation('enemyAttack', {
+                        sheet: 'enemy',
+                        frames: [4, 5, 6, 7],
+                        fps: 10,
+                        loop: true
+                    });
+                    
+                    engine.assets.animation('coinSpin', {
+                        sheet: 'coin',
+                        frames: [0, 1, 2, 3, 4, 5, 6, 7],
+                        fps: 12,
+                        loop: true
+                    });
+                    
+                    // Setup scene entities
+                    this.setupEntities();
+                    
+                    testPhase = 'display';
+                });
+            },
+            
+            setupEntities() {
+                // Title text entity (using procedural art)
+                engine.spawn('title', {
+                    x: 640,
+                    y: 50,
+                    sprite: engine.art.text('ASSET SYSTEM TEST', { 
+                        fontSize: 32, 
+                        color: '#00ffcc',
+                        glow: true
+                    })
+                });
+                
+                // Instructions
+                engine.spawn('instructions', {
+                    x: 640,
+                    y: 100,
+                    sprite: engine.art.text('Press SPACE to cycle test phases', {
+                        fontSize: 16,
+                        color: '#00ffcc'
+                    })
+                });
+                
+                // Static sprite test
+                engine.spawn('static-label', {
+                    x: 150,
+                    y: 180,
+                    sprite: engine.art.text('Static Sprite:', { fontSize: 14, color: '#fff' })
+                });
+                
+                engine.spawn('static-player', {
+                    x: 200,
+                    y: 250,
+                    sprite: engine.assets.get('playerStatic')
+                });
+                
+                // Sprite frame test
+                engine.spawn('frame-label', {
+                    x: 360,
+                    y: 180,
+                    sprite: engine.art.text('Sprite Frames:', { fontSize: 14, color: '#fff' })
+                });
+                
+                for (let i = 0; i < 4; i++) {
+                    engine.spawn('player-frame', {
+                        x: 350 + i * 50,
+                        y: 250,
+                        spriteFrame: engine.assets.frame('player', i)
+                    });
+                }
+                
+                // Animation test - Player
+                engine.spawn('anim-label', {
+                    x: 650,
+                    y: 180,
+                    sprite: engine.art.text('Animations:', { fontSize: 14, color: '#fff' })
+                });
+                
+                const playerAnim = engine.spawn('animated-player', {
+                    x: 650,
+                    y: 250,
+                    animation: engine.assets.getAnimation('playerRun')
+                });
+                
+                // Animation test - Enemy idle
+                const enemyIdle = engine.spawn('animated-enemy-idle', {
+                    x: 750,
+                    y: 250,
+                    animation: engine.assets.getAnimation('enemyIdle')
+                });
+                
+                // Animation test - Enemy attack
+                const enemyAttack = engine.spawn('animated-enemy-attack', {
+                    x: 850,
+                    y: 250,
+                    animation: engine.assets.getAnimation('enemyAttack')
+                });
+                
+                // Animation test - Coins
+                for (let i = 0; i < 5; i++) {
+                    engine.spawn('coin', {
+                        x: 950 + i * 40,
+                        y: 250,
+                        animation: engine.assets.getAnimation('coinSpin')
+                    });
+                }
+                
+                // Frame grid display
+                engine.spawn('grid-label', {
+                    x: 200,
+                    y: 350,
+                    sprite: engine.art.text('All Enemy Frames (8 frames):', { fontSize: 14, color: '#fff' })
+                });
+                
+                for (let i = 0; i < 8; i++) {
+                    engine.spawn('enemy-frame', {
+                        x: 100 + (i % 4) * 50,
+                        y: 400 + Math.floor(i / 4) * 50,
+                        spriteFrame: engine.assets.frame('enemy', i)
+                    });
+                }
+                
+                // Moving entities test
+                engine.spawn('moving-label', {
+                    x: 640,
+                    y: 520,
+                    sprite: engine.art.text('Moving Animated Sprites:', { fontSize: 14, color: '#fff' })
+                });
+                
+                // Create some moving animated sprites
+                for (let i = 0; i < 3; i++) {
+                    const mover = engine.spawn('mover', {
+                        x: 200 + i * 200,
+                        y: 580,
+                        velocity: { x: 100 + i * 30, y: 0 },
+                        animation: engine.assets.getAnimation('playerRun'),
+                        bounds: { minX: 50, maxX: 1230 }
+                    });
+                    
+                    mover.update = function(dt) {
+                        // Bounce at edges
+                        if (this.x < this.bounds.minX || this.x > this.bounds.maxX) {
+                            this.velocity.x *= -1;
+                        }
+                    };
+                }
+                
+                // Asset info display
+                const assetCount = engine.assets.assets.size;
+                const sheetCount = engine.assets.sheets.size;
+                const animCount = engine.assets.animations.size;
+                
+                engine.spawn('info', {
+                    x: 640,
+                    y: 680,
+                    sprite: engine.art.text(
+                        `Assets: ${assetCount} | Sheets: ${sheetCount} | Animations: ${animCount}`,
+                        { fontSize: 12, color: '#888' }
+                    )
+                });
+            },
+            
+            update(dt) {
+                // Press space to reload
+                if (engine.input.keyPressed(' ')) {
+                    console.log('[Test] Reloading scene...');
+                    engine.goTo('main', { type: 'fade', duration: 0.3 });
+                }
+            },
+            
+            draw(ctx) {
+                // Draw some debug info
+                ctx.fillStyle = '#00ffcc';
+                ctx.font = '12px monospace';
+                ctx.textAlign = 'left';
+                ctx.fillText(`Phase: ${testPhase}`, 10, 20);
+                ctx.fillText(`FPS: ${engine.fps}`, 10, 35);
+                ctx.fillText(`Entities: ${engine.entityCount}`, 10, 50);
+            }
+        });
+        
+        // Start the engine
+        engine.goTo('main');
+        engine.start();
+        
+        console.log('[Test] BudEngine v2.7 Asset System Test Started');
+        console.log('[Test] Available assets:', Array.from(engine.assets.assets.keys()));
+    </script>
+</body>
+</html>
