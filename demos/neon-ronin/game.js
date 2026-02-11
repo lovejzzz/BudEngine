@@ -493,6 +493,9 @@ function createMeleeRusher(x, y) {
             this.health -= amount;
             engine.sound.play('hit');
             
+            // Damage number
+            createDamageNumber(this.x, this.y, amount);
+            
             // Hit feedback
             engine.freezeFrame(2); // Smaller freeze for enemy hits
             this.flash = 1.0;
@@ -631,6 +634,9 @@ function createRangedEnemy(x, y) {
         takeDamage(amount) {
             this.health -= amount;
             engine.sound.play('hit');
+            
+            // Damage number
+            createDamageNumber(this.x, this.y, amount);
             
             // Hit feedback
             engine.freezeFrame(2);
@@ -795,6 +801,108 @@ function createWeaponUpgrade(x, y) {
     });
 }
 
+// ===== DAMAGE NUMBERS =====
+
+function createDamageNumber(x, y, damage) {
+    engine.spawn('damage-number', {
+        x, y: y - 20,
+        lifetime: 1.0,
+        damage: Math.round(damage),
+        velocity: { x: engine.random(-20, 20), y: -80 },
+        tags: ['effect'],
+        layer: 100,
+        alpha: 1.0,
+        
+        sprite: (ctx, entity) => {
+            ctx.font = 'bold 20px monospace';
+            ctx.fillStyle = '#ffff00';
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 3;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            // Outline
+            ctx.strokeText(entity.damage.toString(), 0, 0);
+            // Fill
+            ctx.fillText(entity.damage.toString(), 0, 0);
+        },
+        
+        update(dt) {
+            this.lifetime -= dt;
+            this.alpha = this.lifetime / 1.0;
+            this.y += this.velocity.y * dt;
+            this.velocity.y += 200 * dt; // Gravity
+            
+            if (this.lifetime <= 0) {
+                engine.destroy(this);
+            }
+        }
+    });
+}
+
+// ===== DECORATIONS =====
+
+function createPillar(x, y, color = '#1a1a2e') {
+    const pillarSprite = engine.art.tile({
+        size: 32,
+        color: color,
+        pattern: 'grid'
+    });
+    
+    engine.spawn('pillar', {
+        x, y,
+        sprite: (ctx, entity) => {
+            // Ambient glow
+            const pulse = Math.sin(engine.time * 2 + entity.x) * 0.3 + 0.7;
+            ctx.shadowBlur = 20 * pulse;
+            ctx.shadowColor = '#00ffcc';
+            ctx.drawImage(pillarSprite, -pillarSprite.width / 2, -pillarSprite.height / 2);
+        },
+        collider: { type: 'aabb', width: 32, height: 32 },
+        tags: ['wall', 'solid', 'decoration'],
+        layer: -1
+    });
+}
+
+function createNeonLight(x, y, color = '#00ffcc') {
+    engine.spawn('light', {
+        x, y,
+        sprite: (ctx, entity) => {
+            const pulse = Math.sin(engine.time * 5 + entity.x) * 0.4 + 0.6;
+            const flicker = Math.random() < 0.95 ? 1 : 0.3; // Occasional flicker
+            
+            ctx.shadowBlur = 40 * pulse * flicker;
+            ctx.shadowColor = color;
+            ctx.fillStyle = color;
+            ctx.globalAlpha = pulse * flicker;
+            ctx.beginPath();
+            ctx.arc(0, 0, 8, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1;
+        },
+        tags: ['decoration'],
+        layer: 5
+    });
+}
+
+function createDebris(x, y) {
+    const size = engine.random(8, 16);
+    const color = engine.choose(['#0d0d16', '#1a1a2e', '#16162a']);
+    const shape = engine.choose(['square', 'diamond', 'triangle']);
+    
+    engine.spawn('debris', {
+        x, y,
+        sprite: engine.art.character({
+            size: size,
+            color: color,
+            body: shape
+        }),
+        rotation: engine.random(0, Math.PI * 2),
+        tags: ['decoration'],
+        layer: -2
+    });
+}
+
 // ===== ROOM SYSTEM =====
 
 function createRoom(roomName) {
@@ -808,13 +916,28 @@ function createRoom(roomName) {
         map.door(29, 10, 'right');
         createDoorTrigger(29 * 32, 10 * 32, 'room2', 'left');
         
+        // Decorations - pillars and lights
+        createPillar(300, 300);
+        createPillar(700, 300);
+        createNeonLight(150, 150, '#00ffcc');
+        createNeonLight(850, 150, '#00ffcc');
+        createNeonLight(500, 550, '#00ff88');
+        
+        // Scatter debris
+        for (let i = 0; i < 15; i++) {
+            createDebris(
+                engine.random(100, 900),
+                engine.random(100, 580)
+            );
+        }
+        
         // Spawn enemies
         createMeleeRusher(200, 200);
         createMeleeRusher(600, 400);
         createRangedEnemy(800, 300);
         
     } else if (roomName === 'room2') {
-        // Combat room
+        // Combat room - more intense
         map.room(0, 0, 35, 25, 'floor', 'wall');
         
         // Door back to room1
@@ -825,6 +948,25 @@ function createRoom(roomName) {
         map.door(34, 12, 'right');
         createDoorTrigger(34 * 32, 12 * 32, 'room3', 'left');
         
+        // More decorations - red theme for combat
+        createPillar(350, 250);
+        createPillar(350, 550);
+        createPillar(950, 250);
+        createPillar(950, 550);
+        createNeonLight(200, 200, '#ff3333');
+        createNeonLight(1000, 200, '#ff3333');
+        createNeonLight(600, 400, '#ff8800');
+        createNeonLight(200, 700, '#ff3333');
+        createNeonLight(1000, 700, '#ff3333');
+        
+        // Debris
+        for (let i = 0; i < 20; i++) {
+            createDebris(
+                engine.random(100, 1050),
+                engine.random(100, 750)
+            );
+        }
+        
         // More enemies
         createMeleeRusher(300, 300);
         createMeleeRusher(700, 300);
@@ -832,16 +974,35 @@ function createRoom(roomName) {
         createRangedEnemy(900, 400);
         
     } else if (roomName === 'room3') {
-        // Pre-boss room
+        // Pre-boss room - ominous
         map.room(0, 0, 30, 30, 'floor', 'wall');
         
         // Door back to room2
         map.door(0, 15, 'left');
         createDoorTrigger(0, 15 * 32, 'room2', 'right');
         
-        // Door to boss room
+        // Door to boss room (ominous purple glow)
         map.door(29, 15, 'right');
         createDoorTrigger(29 * 32, 15 * 32, 'boss-room', 'left');
+        
+        // Purple/magenta theme for ominous feeling
+        createPillar(300, 300);
+        createPillar(600, 300);
+        createPillar(300, 700);
+        createPillar(600, 700);
+        createNeonLight(450, 450, '#ff00ff');
+        createNeonLight(200, 200, '#8800ff');
+        createNeonLight(700, 200, '#8800ff');
+        createNeonLight(200, 850, '#8800ff');
+        createNeonLight(700, 850, '#8800ff');
+        
+        // More debris
+        for (let i = 0; i < 25; i++) {
+            createDebris(
+                engine.random(100, 860),
+                engine.random(100, 860)
+            );
+        }
         
         // Mixed enemies
         createMeleeRusher(400, 300);
@@ -850,14 +1011,42 @@ function createRoom(roomName) {
         createRangedEnemy(200, 450);
         
     } else if (roomName === 'boss-room') {
-        // Boss arena
+        // Boss arena - dramatic circular arena
         map.room(0, 0, 40, 30, 'floor', 'wall');
         
         // Door back (locked until boss defeated)
         map.door(0, 15, 'left');
         
-        // Spawn boss (for now, just multiple enemies - will upgrade to proper boss later)
-        createBoss(640, 400);
+        // Ring of pillars around boss spawn
+        const centerX = 640;
+        const centerY = 400;
+        const ringRadius = 200;
+        for (let i = 0; i < 8; i++) {
+            const angle = (i / 8) * Math.PI * 2;
+            const px = centerX + Math.cos(angle) * ringRadius;
+            const py = centerY + Math.sin(angle) * ringRadius;
+            createPillar(px, py, '#0d0d16');
+        }
+        
+        // Dramatic purple lights in corners
+        createNeonLight(150, 150, '#ff00ff');
+        createNeonLight(1150, 150, '#ff00ff');
+        createNeonLight(150, 850, '#ff00ff');
+        createNeonLight(1150, 850, '#ff00ff');
+        
+        // Central spotlight for boss
+        createNeonLight(centerX, centerY - 150, '#ff00ff');
+        
+        // Less debris - clean arena
+        for (let i = 0; i < 10; i++) {
+            createDebris(
+                engine.random(100, 1180),
+                engine.random(100, 860)
+            );
+        }
+        
+        // Spawn boss
+        createBoss(centerX, centerY);
     }
 }
 
@@ -975,6 +1164,41 @@ function createBoss(x, y) {
         takeDamage(amount) {
             this.health -= amount;
             engine.sound.play('hit');
+            
+            // Damage number - larger for boss
+            const dmgNum = engine.spawn('damage-number', {
+                x: this.x,
+                y: this.y - 40,
+                lifetime: 1.2,
+                damage: Math.round(amount),
+                velocity: { x: engine.random(-30, 30), y: -100 },
+                tags: ['effect'],
+                layer: 100,
+                alpha: 1.0,
+                
+                sprite: (ctx, entity) => {
+                    ctx.font = 'bold 28px monospace'; // Bigger for boss
+                    ctx.fillStyle = '#ff00ff';
+                    ctx.strokeStyle = '#000000';
+                    ctx.lineWidth = 4;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    
+                    ctx.strokeText(entity.damage.toString(), 0, 0);
+                    ctx.fillText(entity.damage.toString(), 0, 0);
+                },
+                
+                update(dt) {
+                    this.lifetime -= dt;
+                    this.alpha = this.lifetime / 1.2;
+                    this.y += this.velocity.y * dt;
+                    this.velocity.y += 200 * dt;
+                    
+                    if (this.lifetime <= 0) {
+                        engine.destroy(this);
+                    }
+                }
+            });
             
             // Boss hit feedback - more dramatic
             engine.cameraShake(5);
@@ -1138,27 +1362,77 @@ function setupCollisions() {
     engine.onCollision('player', 'upgrade', (player, pickup) => {
         engine.sound.play('powerup');
         engine.screenFlash('#ffff00', 0.4, 0.3);
+        engine.slowMo(0.5, 0.3); // Brief slow-mo for dramatic effect
+        
+        // Determine upgrade text
+        let upgradeText = '';
         
         // Apply upgrade
         if (pickup.upgradeType === 'damage') {
             CONFIG.MELEE_DAMAGE += 10;
             CONFIG.RANGED_DAMAGE += 5;
             game.playerData.upgrades.push('damage');
+            upgradeText = 'DAMAGE +';
         } else if (pickup.upgradeType === 'speed') {
             player.speed += 30;
             game.playerData.upgrades.push('speed');
+            upgradeText = 'SPEED +';
         } else if (pickup.upgradeType === 'energy') {
             player.maxEnergy += 20;
             player.energy = player.maxEnergy;
             game.playerData.upgrades.push('energy');
+            upgradeText = 'ENERGY +';
         }
         
+        // Spawn notification
+        engine.spawn('upgrade-notification', {
+            x: player.x,
+            y: player.y - 50,
+            text: upgradeText,
+            lifetime: 2.0,
+            velocity: { x: 0, y: -30 },
+            tags: ['effect'],
+            layer: 150,
+            alpha: 1.0,
+            scale: 0.5,
+            
+            sprite: (ctx, entity) => {
+                ctx.font = 'bold 32px monospace';
+                ctx.fillStyle = '#ffff00';
+                ctx.strokeStyle = '#000000';
+                ctx.lineWidth = 5;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = '#ffff00';
+                
+                ctx.strokeText(entity.text, 0, 0);
+                ctx.fillText(entity.text, 0, 0);
+            },
+            
+            update(dt) {
+                this.lifetime -= dt;
+                this.y += this.velocity.y * dt;
+                
+                // Scale up then fade
+                if (this.lifetime > 1.5) {
+                    this.scale = Math.min(1.2, this.scale + dt * 3);
+                } else {
+                    this.alpha = this.lifetime / 1.5;
+                }
+                
+                if (this.lifetime <= 0) {
+                    engine.destroy(this);
+                }
+            }
+        });
+        
         engine.particles.emit(pickup.x, pickup.y, {
-            count: 25,
+            count: 30,
             color: ['#ffff00', '#ffaa00', '#ffffff'],
-            speed: [100, 200],
-            life: [0.6, 1],
-            size: [4, 8]
+            speed: [120, 250],
+            life: [0.8, 1.4],
+            size: [4, 10]
         });
         
         engine.destroy(pickup);

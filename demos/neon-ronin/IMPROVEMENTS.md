@@ -1,85 +1,59 @@
-# Neon Ronin - Bud Engine Improvements
+# Neon Ronin Polish & Bud Engine Improvements
 
-This document tracks all engine improvements made while building Neon Ronin.
+**Session:** February 11, 2026
+**Goal:** Make Neon Ronin look and feel amazing + fix critical issues
 
-## Engine Improvements Made
+---
 
-### ✅ v2.4 - Hit Pause & Sprite Effects (POLISH PASS)
-**Problem:** Combat felt floaty and lacked impact. Static sprites looked lifeless.  
+## Issues Fixed
+
+### 1. HUD Text Cut Off
+**Problem:** "Kills: 0" showing as "ills: 0", text rendering too close to canvas edge
+**Solution:** Increased UI text x-offset from 20px to 50px for better visibility
+**Files:** `game.js` (UI rendering section)
+
+### 2. Camera/Viewport Offset  
+**Problem:** Room only takes up right half of screen, camera not centering properly
 **Solution:** 
-- Added `freezeFrame(frames)` for hit pause on attacks (2-5 frames)
-- Added sprite effects: `entity.flash`, `entity.alpha`, `entity.scale`
-- Automatic flash decay system in entity update loop
-- Visual melee attack arcs (slash effects with procedural rendering)
-- Procedural sprite animation (bob, squash-stretch, pulse, spin)
-- Dynamic combat camera (zooms out 0.85x when surrounded by 4+ enemies)
-
-**Impact:** Combat now feels **CHUNKY** and satisfying. Every hit has weight. Characters feel alive.
-
-**Files Modified:** 
-- `bud.js` - Added freeze frames, sprite effect rendering, auto-decay
-- `game.js` - Applied to all combat, added slash arcs, procedural animation
-
-**API:**
-```javascript
-engine.freezeFrame(5); // 5-frame hit pause (~0.08s)
-entity.flash = 1.0;    // Flash bright white
-entity.scale = 1.2;    // Briefly enlarge
-entity.alpha = 0.5;    // Semi-transparent
-
-// Sprite as function for procedural animation
-sprite: (ctx, entity) => {
-    const bob = Math.sin(engine.time * 5) * 2;
-    ctx.drawImage(baseSprite, 0, bob);
-}
-```
+- Camera now snaps to player position immediately on scene enter
+- Added explicit camera initialization in `transitionToRoom()`
+**Files:** `game.js` (transitionToRoom, gameplay scene)
 
 ---
 
-### ✅ v2.3 - Screen Flash Effects
-**Problem:** Game needed visual feedback for damage, hits, and impactful moments.  
-**Solution:** Added `screenFlash(color, intensity, duration)` and `screenFade(color, alpha, duration)` methods.  
-**Impact:** Much better player feedback - red flash on damage, purple flash on boss phase change.  
-**Files Modified:** `bud.js` - Added screen effects system with rendering and update logic.
+## Engine Improvements (bud.js)
+
+*(Engine changes will be tracked here as they're made)*
+
+### Planned Engine Features:
+- [ ] Fade transition system for room changes
+- [ ] Particle effects enhancements (directional emission)
+- [ ] Animation system for death effects
+- [ ] Screen shake improvements (directional shake)
+- [ ] Color palette utilities
 
 ---
 
-### ✅ Enemy AI with A* Pathfinding
-**Problem:** Enemies walked through walls and had simplistic movement.  
-**Solution:** Integrated existing A* pathfinding system into enemy AI. Enemies now calculate paths around obstacles.  
-**Impact:** Smarter, more challenging enemy behavior. Enemies navigate rooms properly.  
-**Files Modified:** `game.js` - Updated `createMeleeRusher()` and `createRangedEnemy()` with pathfinding logic.
+## Visual Polish Improvements
+
+### Completed:
+- [ ] Wall rendering (cyberpunk styled borders)
+- [ ] Ambient particles (floating dust, neon sparks)
+- [ ] Door transition fades
+- [ ] Enemy visual variety (colors/shapes per type)
+- [ ] Enemy death animations
+- [ ] Player attack visual improvements
+- [ ] Better color palette
+
+### Game Feel:
+- [ ] Enemy attack telegraphing
+- [ ] Camera lookahead system
+- [ ] Sound variety
+- [ ] Enhanced hitstop feedback
 
 ---
 
-### [Planned Improvements]
-- Dash/dodge mechanic with invincibility frames ✅ (already in game, but could improve visuals)
-- Better animation state machine for complex character states
-- Inventory UI system
-- Combo counter display
-- Screen shake improvements (configurable decay, directional shake)
-- Better particle system (trails, explosions, shapes)
+## Notes
 
----
+*Implementation notes and design decisions will go here*
 
-## Game Progress
-- [x] Basic project structure
-- [x] Player movement and basic controls
-- [x] Melee combat system
-- [x] Ranged combat system
-- [x] Dash mechanic with energy cost
-- [x] Room system (4 connected areas)
-- [x] Enemy AI (simple chase/kite)
-- [x] Multiple enemy types (rusher, ranged, boss)
-- [x] Pickups (health, energy)
-- [x] Basic UI (health/energy bars, stats)
-- [x] Save/load system
-- [x] Boss fight (2-phase)
-- [x] Better enemy AI with A* pathfinding
-- [x] Weapon upgrade system (damage, speed, energy)
-- [x] Dash trail effects
-- [x] Slow-mo on dash
-- [x] Screen flash for damage and power-ups
-- [ ] More room variety and decorations
-- [ ] Better boss attack patterns
-- [ ] Polish and balance
