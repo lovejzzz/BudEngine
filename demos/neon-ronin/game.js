@@ -139,6 +139,14 @@ function createPlayer(x, y) {
             const mouseWorld = engine.input.mouseWorld;
             this.rotation = Math.atan2(mouseWorld.y - this.y, mouseWorld.x - this.x);
             
+            // Camera lookahead - offset camera in direction player is facing
+            if (!engine.camera.lookahead) engine.camera.lookahead = { x: 0, y: 0 };
+            const lookaheadDist = 80;
+            const targetLookaheadX = Math.cos(this.rotation) * lookaheadDist;
+            const targetLookaheadY = Math.sin(this.rotation) * lookaheadDist;
+            engine.camera.lookahead.x += (targetLookaheadX - engine.camera.lookahead.x) * dt * 2;
+            engine.camera.lookahead.y += (targetLookaheadY - engine.camera.lookahead.y) * dt * 2;
+            
             // Dash (Space key)
             if (engine.input.keyPressed(' ') && this.dashCooldown <= 0 && this.energy >= CONFIG.DASH_COST) {
                 this.energy -= CONFIG.DASH_COST;
@@ -253,7 +261,7 @@ function createPlayer(x, y) {
 }
 
 function performMeleeAttack(player) {
-    engine.sound.play('slash'); // Use slash sound for melee
+    engine.sound.play('hit'); // Melee sound
     
     // Create visual slash arc
     const slashAngle = player.rotation;
@@ -261,58 +269,75 @@ function performMeleeAttack(player) {
     const slashX = player.x + Math.cos(slashAngle) * slashDist;
     const slashY = player.y + Math.sin(slashAngle) * slashDist;
     
-    // Spawn slash effect entity
+    // Spawn enhanced slash effect entity
     engine.spawn('slash-effect', {
         x: slashX,
         y: slashY,
         rotation: slashAngle,
-        lifetime: 0.15,
-        startAngle: slashAngle - Math.PI / 3,
-        endAngle: slashAngle + Math.PI / 3,
-        radius: 50,
+        lifetime: 0.2,
+        startAngle: slashAngle - Math.PI / 2.5,
+        endAngle: slashAngle + Math.PI / 2.5,
+        radius: 55,
         alpha: 1.0,
         layer: 10,
         tags: ['effect'],
         
         sprite: (ctx, entity) => {
-            // Draw arc slash
-            const progress = 1 - (entity.lifetime / 0.15);
-            const arcStart = entity.startAngle + progress * (entity.endAngle - entity.startAngle);
+            // Draw arc slash with multiple layers for depth
+            const progress = 1 - (entity.lifetime / 0.2);
+            const arcEnd = entity.startAngle + progress * (entity.endAngle - entity.startAngle);
             
-            ctx.strokeStyle = '#00ffff';
-            ctx.lineWidth = 6;
+            // Outer glow trail
+            ctx.globalAlpha = entity.alpha * 0.4;
+            ctx.strokeStyle = '#00ffcc';
+            ctx.lineWidth = 12;
             ctx.lineCap = 'round';
-            ctx.shadowBlur = 15;
+            ctx.shadowBlur = 25;
             ctx.shadowColor = '#00ffcc';
             
             ctx.beginPath();
-            ctx.arc(0, 0, entity.radius, entity.startAngle, arcStart, false);
+            ctx.arc(0, 0, entity.radius, entity.startAngle, arcEnd, false);
             ctx.stroke();
             
-            // Inner glow
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 2;
+            // Main slash
+            ctx.globalAlpha = entity.alpha;
+            ctx.strokeStyle = '#00ffff';
+            ctx.lineWidth = 7;
+            ctx.shadowBlur = 20;
+            
             ctx.beginPath();
-            ctx.arc(0, 0, entity.radius, entity.startAngle, arcStart, false);
+            ctx.arc(0, 0, entity.radius, entity.startAngle, arcEnd, false);
             ctx.stroke();
+            
+            // Inner bright core
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 3;
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#ffffff';
+            
+            ctx.beginPath();
+            ctx.arc(0, 0, entity.radius, entity.startAngle, arcEnd, false);
+            ctx.stroke();
+            
+            ctx.globalAlpha = 1;
         },
         
         update(dt) {
             this.lifetime -= dt;
-            this.alpha = this.lifetime / 0.15;
+            this.alpha = this.lifetime / 0.2;
             if (this.lifetime <= 0) {
                 engine.destroy(this);
             }
         }
     });
     
-    // Particles
+    // Enhanced slash particles
     engine.particles.emit(slashX, slashY, {
-        count: 12,
+        count: 18,
         color: ['#00ffcc', '#00ffff', '#ffffff'],
-        speed: [80, 180],
-        life: [0.2, 0.4],
-        size: [4, 8]
+        speed: [100, 220],
+        life: [0.3, 0.6],
+        size: [3, 7]
     });
     
     // Check for enemies in range
@@ -352,6 +377,59 @@ function shootProjectile(player) {
     const x = player.x + Math.cos(angle) * spawnDist;
     const y = player.y + Math.sin(angle) * spawnDist;
     
+    // Muzzle flash effect
+    engine.spawn('muzzle-flash', {
+        x, y,
+        rotation: angle,
+        lifetime: 0.08,
+        alpha: 1.0,
+        scale: 1,
+        layer: 15,
+        tags: ['effect'],
+        
+        sprite: (ctx, entity) => {
+            const progress = 1 - (entity.lifetime / 0.08);
+            const size = 20 * (1 + progress * 0.5);
+            
+            // Outer glow
+            ctx.globalAlpha = entity.alpha * 0.6;
+            ctx.fillStyle = '#00ffff';
+            ctx.shadowBlur = 30;
+            ctx.shadowColor = '#00ffff';
+            
+            // Star-shaped flash
+            ctx.beginPath();
+            for (let i = 0; i < 8; i++) {
+                const a = (i / 8) * Math.PI * 2;
+                const r = i % 2 === 0 ? size : size * 0.4;
+                const px = Math.cos(a) * r;
+                const py = Math.sin(a) * r;
+                if (i === 0) ctx.moveTo(px, py);
+                else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+            ctx.fill();
+            
+            // Bright center
+            ctx.globalAlpha = entity.alpha;
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(0, 0, size * 0.3, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.globalAlpha = 1;
+        },
+        
+        update(dt) {
+            this.lifetime -= dt;
+            this.alpha = this.lifetime / 0.08;
+            this.scale = 1 + (1 - this.alpha) * 0.3;
+            if (this.lifetime <= 0) {
+                engine.destroy(this);
+            }
+        }
+    });
+    
     const bulletSprite = engine.art.particle({
         size: 6,
         color: '#00ffff',
@@ -378,14 +456,14 @@ function shootProjectile(player) {
                 engine.destroy(this);
             }
             
-            // Trail
+            // Enhanced trail
             if (engine.frame % 2 === 0) {
                 engine.particles.emit(this.x, this.y, {
-                    count: 1,
-                    color: ['#00ffff'],
-                    speed: [0, 10],
-                    life: [0.2, 0.3],
-                    size: [2, 4]
+                    count: 2,
+                    color: ['#00ffff', '#ffffff'],
+                    speed: [0, 15],
+                    life: [0.2, 0.4],
+                    size: [2, 5]
                 });
             }
         }
@@ -394,16 +472,25 @@ function shootProjectile(player) {
 
 // ===== ENEMY SYSTEM =====
 
-function createMeleeRusher(x, y) {
+function createMeleeRusher(x, y, variant = 0) {
+    // Visual variety - 3 variants
+    const variants = [
+        { color: '#ff3333', body: 'diamond', size: 14 }, // Red diamond (default)
+        { color: '#ff6633', body: 'hexagon', size: 13 }, // Orange hexagon
+        { color: '#ff3366', body: 'triangle', size: 15 }  // Pink triangle
+    ];
+    
+    const v = variants[variant % variants.length];
     const baseSprite = engine.art.enemy({
-        size: 14,
-        color: '#ff3333',
-        body: 'diamond',
+        size: v.size,
+        color: v.color,
+        body: v.body,
         glow: true
     });
     
     const enemy = engine.spawn('enemy', {
         x, y,
+        deathColor: v.color, // Store for death effect
         sprite: (ctx, entity) => {
             // Animated breathing/pulsing
             const pulse = Math.sin(engine.time * 4) * 0.08 + 1;
@@ -426,6 +513,11 @@ function createMeleeRusher(x, y) {
         update(dt) {
             this.attackCooldown -= dt;
             this.pathfindCooldown -= dt;
+            
+            // Attack telegraphing - flash red before attacking
+            if (this.attackCooldown > 0 && this.attackCooldown < 0.3) {
+                this.flash = 0.6 * (0.3 - this.attackCooldown) / 0.3;
+            }
             
             const player = engine.findOne('player');
             if (!player) return;
@@ -522,16 +614,25 @@ function createMeleeRusher(x, y) {
     return enemy;
 }
 
-function createRangedEnemy(x, y) {
+function createRangedEnemy(x, y, variant = 0) {
+    // Visual variety - 3 variants
+    const variants = [
+        { color: '#ff8800', body: 'hexagon', size: 14 },    // Orange hexagon (default)
+        { color: '#ffaa00', body: 'star', size: 13 },       // Yellow star
+        { color: '#ff6600', body: 'diamond', size: 12 }     // Red-orange diamond
+    ];
+    
+    const v = variants[variant % variants.length];
     const baseSprite = engine.art.enemy({
-        size: 14,
-        color: '#ff8800',
-        body: 'hexagon',
+        size: v.size,
+        color: v.color,
+        body: v.body,
         glow: true
     });
     
     const enemy = engine.spawn('enemy', {
         x, y,
+        deathColor: v.color, // Store for death effect
         sprite: (ctx, entity) => {
             // Spinning animation
             const spin = engine.time * 2;
@@ -556,6 +657,11 @@ function createRangedEnemy(x, y) {
         update(dt) {
             this.shootCooldown -= dt;
             this.pathfindCooldown -= dt;
+            
+            // Attack telegraphing - flash orange before shooting
+            if (this.shootCooldown > 0 && this.shootCooldown < 0.4) {
+                this.flash = 0.5 * (0.4 - this.shootCooldown) / 0.4;
+            }
             
             const player = engine.findOne('player');
             if (!player) return;
@@ -701,16 +807,70 @@ function shootEnemyProjectile(enemy, target) {
 function enemyDeath(enemy) {
     game.playerData.kills++;
     
+    // Get enemy's color for death effect
+    const enemyColor = enemy.deathColor || '#ff3333';
+    
+    // Create dramatic death animation entity
+    engine.spawn('death-effect', {
+        x: enemy.x,
+        y: enemy.y,
+        lifetime: 0.6,
+        rotation: enemy.rotation || 0,
+        rotationSpeed: engine.random(5, 10) * (Math.random() < 0.5 ? 1 : -1),
+        scale: 1,
+        alpha: 1,
+        baseColor: enemyColor,
+        layer: 15,
+        tags: ['effect'],
+        
+        sprite: (ctx, entity) => {
+            // Expanding ring effect
+            const progress = 1 - (entity.lifetime / 0.6);
+            const ringRadius = progress * 40;
+            
+            ctx.strokeStyle = entity.baseColor;
+            ctx.lineWidth = 6 * (1 - progress);
+            ctx.globalAlpha = entity.alpha;
+            
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = entity.baseColor;
+            
+            ctx.beginPath();
+            ctx.arc(0, 0, ringRadius, 0, Math.PI * 2);
+            ctx.stroke();
+            
+            // Inner glow
+            ctx.fillStyle = entity.baseColor;
+            ctx.globalAlpha = entity.alpha * 0.5;
+            ctx.beginPath();
+            ctx.arc(0, 0, ringRadius * 0.5, 0, Math.PI * 2);
+            ctx.fill();
+        },
+        
+        update(dt) {
+            this.lifetime -= dt;
+            this.rotation += this.rotationSpeed * dt;
+            this.scale = 1 + (1 - this.lifetime / 0.6) * 0.5;
+            this.alpha = this.lifetime / 0.6;
+            
+            if (this.lifetime <= 0) {
+                engine.destroy(this);
+            }
+        }
+    });
+    
+    // Explosion particles
     engine.particles.emit(enemy.x, enemy.y, {
-        count: 20,
-        color: ['#ff3333', '#ff8800', '#ffff00'],
-        speed: [100, 200],
-        life: [0.5, 1],
-        size: [3, 6]
+        count: 30,
+        color: [enemyColor, engine.art.lightenColor(enemyColor, 40), '#ffff00'],
+        speed: [120, 250],
+        life: [0.5, 1.2],
+        size: [4, 8]
     });
     
     engine.sound.play('explode');
     engine.cameraShake(5);
+    engine.freezeFrame(3); // Brief pause on death
     
     // Chance to drop pickup
     const roll = Math.random();
@@ -988,10 +1148,10 @@ function createRoom(roomName) {
             );
         }
         
-        // Spawn enemies
-        createMeleeRusher(200, 200);
-        createMeleeRusher(600, 400);
-        createRangedEnemy(800, 300);
+        // Spawn enemies with visual variety
+        createMeleeRusher(200, 200, 0);
+        createMeleeRusher(600, 400, 1);
+        createRangedEnemy(800, 300, 0);
         
     } else if (roomName === 'room2') {
         // Combat room - more intense
@@ -1030,11 +1190,11 @@ function createRoom(roomName) {
             );
         }
         
-        // More enemies
-        createMeleeRusher(300, 300);
-        createMeleeRusher(700, 300);
-        createRangedEnemy(500, 500);
-        createRangedEnemy(900, 400);
+        // More enemies with variety
+        createMeleeRusher(300, 300, 0);
+        createMeleeRusher(700, 300, 2);
+        createRangedEnemy(500, 500, 1);
+        createRangedEnemy(900, 400, 2);
         
     } else if (roomName === 'room3') {
         // Pre-boss room - ominous
@@ -1073,11 +1233,11 @@ function createRoom(roomName) {
             );
         }
         
-        // Mixed enemies
-        createMeleeRusher(400, 300);
-        createMeleeRusher(400, 600);
-        createRangedEnemy(700, 450);
-        createRangedEnemy(200, 450);
+        // Mixed enemies with variety
+        createMeleeRusher(400, 300, 1);
+        createMeleeRusher(400, 600, 2);
+        createRangedEnemy(700, 450, 0);
+        createRangedEnemy(200, 450, 2);
         
     } else if (roomName === 'boss-room') {
         // Boss arena - dramatic circular arena
@@ -1094,7 +1254,7 @@ function createRoom(roomName) {
             const angle = (i / 8) * Math.PI * 2;
             const px = centerX + Math.cos(angle) * ringRadius;
             const py = centerY + Math.sin(angle) * ringRadius;
-            createPillar(px, py, '#0d0d16');
+            createPillar(px, py, '#0d0d16', '#ff00ff');
         }
         
         // Dramatic purple lights in corners
@@ -1105,6 +1265,12 @@ function createRoom(roomName) {
         
         // Central spotlight for boss
         createNeonLight(centerX, centerY - 150, '#ff00ff');
+        
+        // Ambient particles - intense purple (boss arena)
+        createAmbientParticleEmitter(centerX - 300, centerY, 'purple');
+        createAmbientParticleEmitter(centerX + 300, centerY, 'purple');
+        createAmbientParticleEmitter(centerX, centerY - 200, 'purple');
+        createAmbientParticleEmitter(centerX, centerY + 200, 'purple');
         
         // Less debris - clean arena
         for (let i = 0; i < 10; i++) {
@@ -1741,6 +1907,7 @@ engine.scene('gameplay', {
             // FIXED: Snap camera to player immediately
             engine.camera.x = player.x;
             engine.camera.y = player.y;
+            engine.camera.lookahead = { x: 0, y: 0 };
             engine.cameraFollow(player, 0.1);
             
             setupGameUI();
@@ -1749,6 +1916,13 @@ engine.scene('gameplay', {
     },
     
     update(dt) {
+        // Apply camera lookahead
+        const player = engine.findOne('player');
+        if (player && engine.camera.lookahead) {
+            engine.camera.x += engine.camera.lookahead.x * 0.3;
+            engine.camera.y += engine.camera.lookahead.y * 0.3;
+        }
+        
         // Save game (S key)
         if (engine.input.keyPressed('p')) {
             saveGame();
