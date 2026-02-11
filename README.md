@@ -2,7 +2,7 @@
 
 **A 2D web game engine designed for AI-human collaboration**
 
-![Version](https://img.shields.io/badge/version-0.1.0-blue)
+![Version](https://img.shields.io/badge/version-1.5.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Size](https://img.shields.io/badge/size-~50KB-orange)
 
@@ -11,6 +11,16 @@
 Bud Engine is built so an AI developer can write, **TEST**, and iterate on games independently before handing polished results to a human. The killer feature is the **AI Testing API + Auto-Playtest Bot**.
 
 No more "I think this is balanced" — let the AI bot play 1000 runs and tell you exactly where your game breaks.
+
+## ✨ What's New in v1.5
+
+- ✅ **Fixed UI button click detection** - Canvas buttons now work reliably (timing issue resolved)
+- ✨ **Enhanced procedural art** - All sprites now have gradients, glow effects, and outlines
+- 🧱 **Enemy wall collision** - Enemies no longer walk through walls
+- 🎬 **Scene transitions** - Smooth fade in/out between scenes  
+- 🔧 **Improved collision resolution** - Entities no longer get stuck in walls
+- 💫 **Visual polish** - Player trail particles, wave announcements, better feel
+- 🎨 **New color helpers** - `lightenColor()` and `darkenColor()` for gradient generation
 
 ## ⚡ Features
 

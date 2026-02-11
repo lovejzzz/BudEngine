@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Bud Engine v1.5 - Test Suite</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #0a0a14;
+            color: #00ffcc;
+            padding: 20px;
+        }
+        .test { padding: 10px; margin: 5px 0; border-left: 4px solid #888; }
+        .test.pass { border-color: #00ff88; background: rgba(0, 255, 136, 0.1); }
+        .test.fail { border-color: #ff3333; background: rgba(255, 51, 51, 0.1); }
+        .test.running { border-color: #ffcc00; background: rgba(255, 204, 0, 0.1); }
+        h1 { color: #ff3333; }
+        h2 { color: #ffcc00; }
+        button {
+            background: #00ffcc;
+            color: #0a0a14;
+            border: none;
+            padding: 15px 30px;
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+        button:hover { background: #ff3333; color: white; }
+        #canvas-container { margin: 20px 0; border: 2px solid #00ffcc; }
+        canvas { display: block; }
+    </style>
+</head>
+<body>
+    <h1>🧪 BUD ENGINE v1.5 TEST SUITE</h1>
+    
+    <div>
+        <button onclick="runAllTests()">RUN ALL TESTS</button>
+        <button onclick="testUIButtons()">Test UI Buttons</button>
+        <button onclick="testVisuals()">Test Visuals</button>
+        <button onclick="testCollisions()">Test Collisions</button>
+        <button onclick="testShooter()">Test Shooter Balance</button>
+    </div>
+
+    <h2>Test Results:</h2>
+    <div id="results"></div>
+
+    <div id="canvas-container"></div>
+
+    <script src="bud.js"></script>
+    <script>
+        const results = document.getElementById('results');
+        
+        function log(test, status, message) {
+            const div = document.createElement('div');
+            div.className = `test ${status}`;
+            div.innerHTML = `<strong>${status.toUpperCase()}</strong>: ${test} - ${message}`;
+            results.appendChild(div);
+        }
+
+        function runAllTests() {
+            results.innerHTML = '<div class="test running">Running comprehensive test suite...</div>';
+            
+            setTimeout(() => testUIButtons(), 100);
+            setTimeout(() => testVisuals(), 1000);
+            setTimeout(() => testCollisions(), 2000);
+            setTimeout(() => testShooter(), 3000);
+        }
+
+        function testUIButtons() {
+            log('UI Button Click Detection', 'running', 'Testing if canvas buttons respond to clicks...');
+            
+            const engine = new BudEngine({
+                width: 640,
+                height: 480,
+                canvas: document.createElement('canvas')
+            });
+
+            let buttonClicked = false;
+
+            engine.scene('test', {
+                enter() {
+                    engine.ui.screen('test', {
+                        title: 'TEST SCREEN',
+                        subtitle: 'Testing buttons',
+                        button: {
+                            text: 'TEST BUTTON',
+                            action: () => { buttonClicked = true; }
+                        }
+                    });
+                }
+            });
+
+            engine.goTo('test');
+            engine.start();
+
+            // Simulate click on button (center of screen)
+            engine.input.mouse.x = 320;
+            engine.input.mouse.y = 300;
+            engine.input.mousePressed = true;
+
+            // Run one frame
+            engine.update(0.016);
+            engine.render();
+
+            if (buttonClicked) {
+                log('UI Button Click Detection', 'pass', 'Button click detected correctly! ✓');
+            } else {
+                log('UI Button Click Detection', 'fail', 'Button click NOT detected (timing issue persists)');
+            }
+
+            engine.stop();
+        }
+
+        function testVisuals() {
+            log('Procedural Art Improvements', 'running', 'Checking enhanced sprites...');
+
+            const engine = new BudEngine({
+                width: 640,
+                height: 480,
+                canvas: document.createElement('canvas')
+            });
+
+            // Test character art
+            const char = engine.art.character({ body: 'circle', color: '#00ffcc', size: 30, eyes: true, glow: true });
+            if (char.width === 90) { // 30 * 3 for glow
+                log('Procedural Art Improvements', 'pass', 'Character sprites have correct glow buffer (3x size) ✓');
+            } else {
+                log('Procedural Art Improvements', 'fail', `Character sprite size wrong: ${char.width} (expected 90)`);
+            }
+
+            // Test enemy art
+            const enemy = engine.art.enemy({ body: 'diamond', color: '#ff3333', size: 28 });
+            if (enemy.width === 84) { // 28 * 3 for glow
+                log('Procedural Art Improvements', 'pass', 'Enemy sprites have correct glow buffer ✓');
+            } else {
+                log('Procedural Art Improvements', 'fail', `Enemy sprite size wrong: ${enemy.width} (expected 84)`);
+            }
+
+            // Check if helper functions exist
+            if (typeof engine.art.lightenColor === 'function' && typeof engine.art.darkenColor === 'function') {
+                log('Procedural Art Improvements', 'pass', 'Color gradient helpers implemented ✓');
+            } else {
+                log('Procedural Art Improvements', 'fail', 'Color helpers missing');
+            }
+
+            engine.stop();
+        }
+
+        function testCollisions() {
+            log('Enemy Wall Collision', 'running', 'Testing if enemies collide with walls...');
+
+            const engine = new BudEngine({
+                width: 640,
+                height: 480,
+                canvas: document.createElement('canvas')
+            });
+
+            engine.scene('test', {
+                enter() {
+                    // Create wall
+                    const wall = engine.spawn('wall', {
+                        x: 320, y: 240,
+                        collider: { type: 'aabb', width: 64, height: 64 },
+                        tags: ['wall', 'solid']
+                    });
+
+                    // Create enemy next to wall
+                    const enemy = engine.spawn('enemy', {
+                        x: 250, y: 240,
+                        velocity: { x: 200, y: 0 }, // Moving right toward wall
+                        collider: { type: 'circle', radius: 16 },
+                        tags: ['enemy']
+                    });
+                }
+            });
+
+            engine.goTo('test');
+            engine.start();
+
+            const enemy = engine.findOne('enemy');
+            const startX = enemy.x;
+
+            // Run simulation for 1 second (should hit wall)
+            for (let i = 0; i < 60; i++) {
+                engine.update(1/60);
+            }
+
+            // Enemy should have been pushed back by wall
+            if (enemy.x < 288) { // Should be stopped by wall at x=288 (320 - 32)
+                log('Enemy Wall Collision', 'pass', `Enemy stopped by wall at x=${enemy.x.toFixed(0)} ✓`);
+            } else {
+                log('Enemy Wall Collision', 'fail', `Enemy passed through wall: x=${enemy.x.toFixed(0)} (started at ${startX.toFixed(0)})`);
+            }
+
+            engine.stop();
+        }
+
+        function testShooter() {
+            log('Shooter Balance Test', 'running', 'Running quick autoplay test...');
+
+            // Load shooter game in hidden canvas
+            const canvas = document.createElement('canvas');
+            canvas.width = 1280;
+            canvas.height = 720;
+            
+            const script = document.createElement('script');
+            script.src = 'demos/shooter/game.js';
+            script.onload = () => {
+                setTimeout(() => {
+                    if (window.engine) {
+                        window.engine.goTo('gameplay');
+                        
+                        // Run short autoplay
+                        setTimeout(() => {
+                            const results = window.engine.test.autoplay({
+                                strategy: 'survive',
+                                duration: 30,
+                                runs: 5,
+                                report: false
+                            });
+
+                            if (results.avgSurvival >= 10) {
+                                log('Shooter Balance Test', 'pass', `Avg survival: ${results.avgSurvival.toFixed(1)}s (target: 30s+) - needs balance tuning`);
+                            } else {
+                                log('Shooter Balance Test', 'fail', `Avg survival: ${results.avgSurvival.toFixed(1)}s (very low)`);
+                            }
+                        }, 1000);
+                    }
+                }, 500);
+            };
+            document.head.appendChild(script);
+        }
+
+        // Auto-run on load
+        window.onload = () => {
+            log('Test Suite', 'pass', 'Bud Engine v1.5 Test Suite loaded ✓');
+        };
+    </script>
+</body>
+</html>

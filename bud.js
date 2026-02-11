@@ -1,11 +1,20 @@
 /**
- * BUD ENGINE v0.1
+ * BUD ENGINE v1.5
  * A 2D web game engine designed for AI-human collaboration
  * 
  * Philosophy: AI can write, TEST, and iterate on games independently.
  * Killer feature: AI Testing API + auto-playtest bot
  * 
  * Architecture: Single-file, no build tools, runs in browser
+ * 
+ * v1.5 Improvements:
+ * - Fixed UI button click detection
+ * - Enhanced procedural art with glow/gradients/outlines
+ * - Enemy wall collision
+ * - Scene transitions (fade in/out)
+ * - Better collision resolution
+ * - Player trail particles
+ * - Wave announcements
  */
 
 class BudEngine {
