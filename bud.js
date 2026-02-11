@@ -7868,6 +7868,8 @@ class PixelPhysics {
                         // v4.1: Creature simulation (every few frames for performance)
                         if (mat.creature && this.frameCount % 3 === 0) {
                             this.simulateCreature(x, y, mat, idx);
+                            // Keep chunk alive while creatures exist in it
+                            this.activateChunk(x, y);
                         }
                         
                         // v3.9: Ecosystem simulation (enhanced biology)
