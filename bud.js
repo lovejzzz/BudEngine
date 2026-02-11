@@ -8589,7 +8589,8 @@ class PixelPhysics {
         }
         
         // 4. REPRODUCTION
-        if (hunger > 30000 && Math.random() < 0.0005 && this.totalCreatures < this.maxCreatures) {
+        // Realistic: high hunger threshold, very low chance, strict population cap
+        if (hunger > 40000 && Math.random() < 0.0001 && this.totalCreatures < this.maxCreatures) {
             const neighbors = [
                 [x - 1, y], [x + 1, y],
                 [x, y - 1], [x, y + 1]
@@ -8600,11 +8601,13 @@ class PixelPhysics {
                 
                 const nidx = this.index(nx, ny);
                 const nid = this.grid[nidx];
+                const nmatName = this.getMaterial(nid)?.name;
                 
-                // Can reproduce into empty space or appropriate environment
+                // Reproduce ONLY into appropriate environment
                 let canReproduce = false;
-                if (nid === 0) canReproduce = true;
-                if (creatureType === 'worm' && this.getMaterial(nid)?.name === 'dirt') canReproduce = true;
+                if (creatureType === 'worm' && (nmatName === 'dirt' || nid === 0)) canReproduce = true;
+                if (creatureType === 'fish' && nmatName === 'water') canReproduce = true;
+                if (creatureType === 'bug' && nid === 0) canReproduce = true;
                 
                 if (canReproduce) {
                     this.grid[nidx] = this.getMaterialId(mat.name);
