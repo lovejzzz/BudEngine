@@ -8865,17 +8865,7 @@ class PixelPhysics {
             0, 0, this.width, this.height
         );
         
-        // DEBUG: draw red border around physics render area
-        ctx.strokeStyle = 'red';
-        ctx.lineWidth = 3;
-        ctx.strokeRect(0, 0, this.width, this.height);
-        // DEBUG: draw green crosshair at center
-        ctx.strokeStyle = 'lime';
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(this.width/2, 0); ctx.lineTo(this.width/2, this.height);
-        ctx.moveTo(0, this.height/2); ctx.lineTo(this.width, this.height/2);
-        ctx.stroke();
+        // debug removed
         
         ctx.restore();
     }

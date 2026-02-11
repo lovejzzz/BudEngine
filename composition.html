@@ -445,7 +445,7 @@
         </div>
     </div>
 
-    <script src="bud.js?v=16"></script>
+    <script src="bud.js?v=18"></script>
     <script>
         // The Composition v4.0
         // Your instrument is the Earth
@@ -578,9 +578,6 @@
             // Gesture tracking for composition game
             engine.composition.onGestureStart(pos.x, pos.y);
 
-            // Show debug in HTML element (survives engine render loop)
-            document.getElementById('version-stamp').textContent = `B15 cw:${canvas.width}x${canvas.height} rw:${Math.round(canvas.getBoundingClientRect().width)}x${Math.round(canvas.getBoundingClientRect().height)} pw:${engine.physics.width}x${engine.physics.height} gw:${engine.physics.gridWidth}x${engine.physics.gridHeight} t:${Math.round(pos.x)},${Math.round(pos.y)}`;
-
             // Place material
             if (engine.composition.mode === 'creation') {
                 placeMaterial(pos.x, pos.y);
@@ -626,14 +623,10 @@
         }
 
         function placeMaterial(x, y) {
-            // Physics renders with drawImage scaling: grid (0..gridWidth) maps to canvas (0..physics.width)
-            // So: gridX = (canvasX / physics.width) * gridWidth
-            const p = engine.physics;
-            const gridX = Math.floor((x / p.width) * p.gridWidth);
-            const gridY = Math.floor((y / p.height) * p.gridHeight);
-
-            const radius = 3;
-            p.circle(gridX, gridY, radius, selectedMaterial);
+            // physics.circle() takes PIXEL coordinates (it divides by cellSize internally)
+            // x,y from getInputPos are already in canvas pixel space which matches physics.width
+            const radius = 8;
+            engine.physics.circle(x, y, radius, selectedMaterial);
         }
 
         // Touch events
@@ -757,6 +750,6 @@
 
         console.log('[The Composition v4.0] Loaded - Build the world, compose music');
     </script>
-<div id="version-stamp" style="position:fixed;bottom:5px;right:10px;color:rgba(255,255,255,0.5);font:10px monospace;z-index:9999;pointer-events:none;">BUILD 17</div>
+<div id="version-stamp" style="position:fixed;bottom:5px;right:10px;color:rgba(255,255,255,0.5);font:10px monospace;z-index:9999;pointer-events:none;">BUILD 18</div>
 </body>
 </html>
