@@ -29,6 +29,9 @@ class BudEngine {
         this.currentScene = null;
         this.scenes = {};
 
+        // Expose to window for testing/debugging
+        window.engine = this;
+        
         // Setup canvas
         this.canvas = this.config.canvas;
         this.ctx = this.canvas.getContext('2d');

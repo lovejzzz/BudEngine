@@ -59,6 +59,7 @@ engine.scene('gameplay', {
             maxHealth: 100,
             speed: 250,
             shootCooldown: 0,
+            damageCooldown: 3.0,
             score: 0,
             tags: ['player', 'friendly']
         });
@@ -108,9 +109,14 @@ engine.scene('gameplay', {
         });
 
         engine.onCollision('player', 'enemy', (player, enemy) => {
-            player.health -= 0.5;
-            if (player.health <= 0) {
-                gameOver();
+            if (!player.damageCooldown || player.damageCooldown <= 0) {
+                player.health -= 15;
+                player.damageCooldown = 1.0; // 1 second invincibility
+                engine.cameraShake(10);
+                engine.sound.play('hurt');
+                if (player.health <= 0) {
+                    gameOver();
+                }
             }
         });
 
@@ -159,6 +165,11 @@ engine.scene('gameplay', {
     update(dt) {
         const player = engine.findOne('player');
         if (!player) return;
+
+        // Damage cooldown
+        if (player.damageCooldown > 0) {
+            player.damageCooldown -= dt;
+        }
 
         // Player movement
         let moveX = 0;
@@ -279,7 +290,7 @@ function spawnWave() {
     ];
 
     // Spawn patrol drones
-    const droneCount = Math.min(2 + wave, 8);
+    const droneCount = Math.min(1 + wave, 6);
     for (let i = 0; i < droneCount; i++) {
         const pos = engine.choose(spawnPoints);
         spawnPatrolDrone(pos.x + engine.random(-50, 50), pos.y + engine.random(-50, 50));
