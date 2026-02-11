@@ -8461,8 +8461,9 @@ class PixelPhysics {
         
         let state = this.lifetimeGrid[idx];
         if (state === 0) {
-            // Initialize new creature
-            state = (Math.floor(Math.random() * 8) << 16); // Random initial direction
+            // Initialize new creature with starting hunger (grace period) and random direction
+            var initHunger = 5000; // Start with some energy so they don't starve instantly
+            state = initHunger | (Math.floor(Math.random() * 8) << 16);
             this.lifetimeGrid[idx] = state;
         }
         
@@ -8504,8 +8505,9 @@ class PixelPhysics {
             }
         }
         
-        // Die of starvation (if hunger is 0 for too long)
-        if (hunger === 0 && Math.random() < 0.001) {
+        // Die of starvation (only after creature has lived a while — moveTimer tracks age)
+        // New creatures get grace period; starvation only kicks in after some time with no food
+        if (hunger === 0 && moveTimer > 50 && Math.random() < 0.002) {
             this.grid[idx] = this.getMaterialId('decay');
             this.creatureDeaths[creatureType]++;
             this.totalCreatures--;
@@ -8673,12 +8675,19 @@ class PixelPhysics {
                 }
                 
                 if (canMove) {
+                    // Remember what was at the destination (to restore if creature was displacing it)
+                    // When creature leaves, restore appropriate material behind it
+                    var restoreMat = 0; // default: air
+                    if (creatureType === 'worm') restoreMat = this.getMaterialId('dirt');
+                    else if (creatureType === 'fish') restoreMat = this.getMaterialId('water');
+                    // bugs walk on air, so leave air behind
+                    
                     // Move creature
                     this.grid[nidx] = this.grid[idx];
                     this.temperatureGrid[nidx] = this.temperatureGrid[idx];
                     this.lifetimeGrid[nidx] = newHunger | (newDirection << 16) | (moveTimer << 24);
                     
-                    this.grid[idx] = 0;
+                    this.grid[idx] = restoreMat;
                     this.temperatureGrid[idx] = this.ambientTemp;
                     this.lifetimeGrid[idx] = 0;
                     
