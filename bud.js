@@ -4384,6 +4384,30 @@ class TestingAPI {
             a: data[3]
         };
     }
+
+    /**
+     * Get composition game state (for The Composition game)
+     * @returns {object|null} Composition state or null if not initialized
+     */
+    getCompositionState() {
+        if (!this.engine.composition) {
+            console.warn('[TestingAPI] Composition game not initialized');
+            return null;
+        }
+        return this.engine.composition.getState();
+    }
+
+    /**
+     * Set composition game mode
+     * @param {string} mode - Mode ('creation', 'listening', 'conducting')
+     */
+    setCompositionMode(mode) {
+        if (!this.engine.composition) {
+            console.warn('[TestingAPI] Composition game not initialized');
+            return;
+        }
+        this.engine.composition.setMode(mode);
+    }
 }
 
 // ===== ANIMATION SYSTEM (P1) =====
@@ -10831,8 +10855,697 @@ class AcousticEngine {
     }
 }
 
+/**
+ * @class CompositionGame
+ * "The Composition" - A god-sim music game
+ * Build the world = compose music
+ * Your instrument is the Earth itself
+ */
+class CompositionGame {
+    /**
+     * Create a new Composition game
+     * @param {BudEngine} engine - Engine instance
+     */
+    constructor(engine) {
+        this.engine = engine;
+        this.physics = engine.physics;
+        this.acoustics = engine.physics.acoustics;
+        
+        // Game state
+        this.mode = 'creation'; // 'creation', 'listening', 'conducting'
+        this.score = 0; // Overall musical score
+        this.harmony = 0; // Harmonic consonance (0-100)
+        this.complexity = 0; // Material variety (0-100)
+        this.rhythm = 0; // Rhythmic patterns (0-100)
+        this.dynamics = 0; // Volume variation (0-100)
+        this.texture = 0; // Sound diversity (0-100)
+        this.melody = 0; // Pitch patterns (0-100)
+        
+        // Epoch progression
+        this.epoch = 'genesis'; // 'genesis', 'formation', 'life', 'civilization', 'transcendence'
+        this.epochThresholds = {
+            genesis: 0,
+            formation: 100,
+            life: 500,
+            civilization: 1500,
+            transcendence: 3000
+        };
+        
+        // Tutorial state
+        this.tutorial = {
+            active: false,
+            step: 0,
+            completed: false,
+            steps: [
+                { message: 'Touch to place stone...', material: 'stone', placed: false },
+                { message: 'Now add water...', material: 'water', placed: false },
+                { message: 'Listen...', delay: 2, waited: false },
+                { message: 'Your composition begins.', final: true }
+            ]
+        };
+        
+        // Load tutorial state from localStorage
+        try {
+            const saved = localStorage.getItem('composition_tutorial');
+            if (saved === 'completed') {
+                this.tutorial.completed = true;
+            } else {
+                this.tutorial.active = true;
+            }
+        } catch (e) {
+            this.tutorial.active = true;
+        }
+        
+        // Musical analysis
+        this.analysis = {
+            activeMaterials: new Set(),
+            recentFrequencies: [], // Recent sound frequencies for melody tracking
+            volumeHistory: [], // For dynamics
+            soundTypes: new Set(), // For texture
+            lastUpdateTime: 0,
+            periodicEvents: new Map() // For rhythm detection
+        };
+        
+        // Conducting mode state
+        this.conducting = {
+            wind: { x: 0, y: 0 },
+            tempModifier: 0,
+            timeScaleTarget: 1
+        };
+        
+        // Touch gesture tracking
+        this.gesture = {
+            startX: 0,
+            startY: 0,
+            startTime: 0,
+            currentX: 0,
+            currentY: 0,
+            active: false,
+            type: null // 'tap', 'swipe', 'longpress'
+        };
+        
+        console.log('[CompositionGame v4.0] The Composition - Your instrument is the Earth');
+    }
+
+    /**
+     * Update game state (called each frame)
+     * @param {number} dt - Delta time
+     */
+    update(dt) {
+        // Update musical analysis
+        this.updateAnalysis(dt);
+        
+        // Calculate scores
+        this.calculateScores();
+        
+        // Check for epoch transitions
+        this.updateEpoch();
+        
+        // Update tutorial
+        if (this.tutorial.active && !this.tutorial.completed) {
+            this.updateTutorial();
+        }
+        
+        // Apply conducting mode effects
+        if (this.mode === 'conducting') {
+            this.applyConducting(dt);
+        }
+    }
+
+    /**
+     * Update musical analysis from world state
+     * @private
+     */
+    updateAnalysis(dt) {
+        const now = performance.now() / 1000;
+        if (now - this.analysis.lastUpdateTime < 0.1) return; // Update 10x/sec
+        this.analysis.lastUpdateTime = now;
+        
+        // Scan world for active materials
+        this.analysis.activeMaterials.clear();
+        if (this.physics.grid) {
+            for (let i = 0; i < this.physics.grid.length; i++) {
+                const matId = this.physics.grid[i];
+                if (matId > 0) {
+                    const mat = this.physics.materials.get(matId);
+                    if (mat) {
+                        this.analysis.activeMaterials.add(mat.name);
+                    }
+                }
+            }
+        }
+        
+        // Track volume history for dynamics
+        if (this.acoustics.enabled && this.acoustics.activeSounds.size > 0) {
+            const currentVolume = this.acoustics.activeSounds.size / this.acoustics.maxSources;
+            this.analysis.volumeHistory.push(currentVolume);
+            if (this.analysis.volumeHistory.length > 100) {
+                this.analysis.volumeHistory.shift();
+            }
+        }
+        
+        // Detect periodic events for rhythm
+        if (this.physics.worldAge > 0) {
+            const season = this.physics.season;
+            this.analysis.periodicEvents.set('season', season);
+        }
+    }
+
+    /**
+     * Calculate all musical scores
+     * @private
+     */
+    calculateScores() {
+        this.calculateHarmony();
+        this.calculateComplexity();
+        this.calculateRhythm();
+        this.calculateDynamics();
+        this.calculateTexture();
+        this.calculateMelody();
+        
+        // Overall score is weighted average
+        this.score = Math.floor(
+            this.harmony * 0.3 +
+            this.complexity * 0.2 +
+            this.rhythm * 0.15 +
+            this.dynamics * 0.15 +
+            this.texture * 0.1 +
+            this.melody * 0.1
+        );
+    }
+
+    /**
+     * Calculate harmonic score based on frequency relationships
+     * @private
+     */
+    calculateHarmony() {
+        if (!this.physics.grid) {
+            this.harmony = 0;
+            return;
+        }
+        
+        // Sample random positions to find frequency relationships
+        const samples = 50;
+        let consonantPairs = 0;
+        let totalPairs = 0;
+        
+        for (let i = 0; i < samples; i++) {
+            const x1 = Math.floor(Math.random() * this.physics.gridWidth);
+            const y1 = Math.floor(Math.random() * this.physics.gridHeight);
+            const x2 = Math.floor(Math.random() * this.physics.gridWidth);
+            const y2 = Math.floor(Math.random() * this.physics.gridHeight);
+            
+            const dist = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+            if (dist > 50 || dist < 5) continue; // Only check nearby materials
+            
+            const idx1 = y1 * this.physics.gridWidth + x1;
+            const idx2 = y2 * this.physics.gridWidth + x2;
+            const mat1 = this.physics.materials.get(this.physics.grid[idx1]);
+            const mat2 = this.physics.materials.get(this.physics.grid[idx2]);
+            
+            if (mat1 && mat2 && mat1.resonanceFreq && mat2.resonanceFreq) {
+                totalPairs++;
+                const ratio = mat1.resonanceFreq / mat2.resonanceFreq;
+                
+                // Check for consonant intervals (music theory)
+                if (this.isConsonant(ratio)) {
+                    consonantPairs++;
+                }
+            }
+        }
+        
+        this.harmony = totalPairs > 0 ? (consonantPairs / totalPairs) * 100 : 0;
+    }
+
+    /**
+     * Check if frequency ratio is consonant (music theory)
+     * @private
+     * @param {number} ratio - Frequency ratio
+     * @returns {boolean} True if consonant
+     */
+    isConsonant(ratio) {
+        const intervals = [
+            1.0,   // unison
+            2.0,   // octave
+            1.5,   // fifth (3:2)
+            1.333, // fourth (4:3)
+            1.25,  // major third (5:4)
+            1.2    // minor third (6:5)
+        ];
+        
+        // Check both directions
+        const normalized = ratio > 1 ? ratio : 1 / ratio;
+        
+        for (const interval of intervals) {
+            if (Math.abs(normalized - interval) < 0.1) {
+                return true;
+            }
+            // Check octave equivalents
+            if (Math.abs(normalized - interval * 2) < 0.1) {
+                return true;
+            }
+            if (Math.abs(normalized - interval / 2) < 0.1) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+
+    /**
+     * Calculate complexity score based on material variety
+     * @private
+     */
+    calculateComplexity() {
+        const uniqueMaterials = this.analysis.activeMaterials.size;
+        const totalMaterials = this.physics.materials.size;
+        
+        // More unique materials = higher complexity
+        this.complexity = Math.min(100, (uniqueMaterials / totalMaterials) * 200);
+    }
+
+    /**
+     * Calculate rhythm score based on periodic events
+     * @private
+     */
+    calculateRhythm() {
+        // Detect rhythmic patterns: seasons, flowing water, etc.
+        let rhythmicScore = 0;
+        
+        // Seasonal rhythm
+        if (this.physics.worldAge > 0) {
+            rhythmicScore += 20;
+        }
+        
+        // Water flow creates rhythm
+        if (this.analysis.activeMaterials.has('water')) {
+            rhythmicScore += 30;
+        }
+        
+        // Fire flicker creates rhythm
+        if (this.analysis.activeMaterials.has('fire')) {
+            rhythmicScore += 20;
+        }
+        
+        // Steam/gas movement creates rhythm
+        if (this.analysis.activeMaterials.has('steam') || this.analysis.activeMaterials.has('smoke')) {
+            rhythmicScore += 15;
+        }
+        
+        // Living materials create biological rhythms
+        if (this.analysis.activeMaterials.has('plant') || this.analysis.activeMaterials.has('vegetation')) {
+            rhythmicScore += 15;
+        }
+        
+        this.rhythm = Math.min(100, rhythmicScore);
+    }
+
+    /**
+     * Calculate dynamics score based on volume variation
+     * @private
+     */
+    calculateDynamics() {
+        if (this.analysis.volumeHistory.length < 10) {
+            this.dynamics = 0;
+            return;
+        }
+        
+        // Calculate variance in volume
+        const avg = this.analysis.volumeHistory.reduce((a, b) => a + b, 0) / this.analysis.volumeHistory.length;
+        const variance = this.analysis.volumeHistory.reduce((sum, v) => sum + (v - avg) ** 2, 0) / this.analysis.volumeHistory.length;
+        
+        // Higher variance = better dynamics (but not too high)
+        this.dynamics = Math.min(100, variance * 500);
+    }
+
+    /**
+     * Calculate texture score based on sound diversity
+     * @private
+     */
+    calculateTexture() {
+        // Count different sound types present
+        this.analysis.soundTypes.clear();
+        
+        for (const matName of this.analysis.activeMaterials) {
+            const matId = this.physics.materialIdMap.get(matName);
+            const mat = this.physics.materials.get(matId);
+            
+            if (mat) {
+                if (mat.impactSound) this.analysis.soundTypes.add('impact');
+                if (mat.flowSound) this.analysis.soundTypes.add('flow');
+                if (mat.ambientSound) this.analysis.soundTypes.add('ambient');
+            }
+        }
+        
+        // More sound types = richer texture
+        this.texture = (this.analysis.soundTypes.size / 3) * 100;
+    }
+
+    /**
+     * Calculate melody score based on pitch patterns
+     * @private
+     */
+    calculateMelody() {
+        // Track frequency changes over time
+        // For now, simple: materials with different resonance frequencies
+        const frequencies = [];
+        
+        for (const matName of this.analysis.activeMaterials) {
+            const matId = this.physics.materialIdMap.get(matName);
+            const mat = this.physics.materials.get(matId);
+            if (mat && mat.resonanceFreq) {
+                frequencies.push(mat.resonanceFreq);
+            }
+        }
+        
+        if (frequencies.length < 2) {
+            this.melody = 0;
+            return;
+        }
+        
+        // Sort frequencies
+        frequencies.sort((a, b) => a - b);
+        
+        // Check for rising/falling patterns
+        let melodicScore = 0;
+        for (let i = 1; i < frequencies.length; i++) {
+            const ratio = frequencies[i] / frequencies[i - 1];
+            if (ratio > 1.05 && ratio < 2.5) { // Meaningful pitch change
+                melodicScore += 20;
+            }
+        }
+        
+        this.melody = Math.min(100, melodicScore);
+    }
+
+    /**
+     * Update epoch based on score
+     * @private
+     */
+    updateEpoch() {
+        const oldEpoch = this.epoch;
+        
+        if (this.score >= this.epochThresholds.transcendence) {
+            this.epoch = 'transcendence';
+        } else if (this.score >= this.epochThresholds.civilization) {
+            this.epoch = 'civilization';
+        } else if (this.score >= this.epochThresholds.life) {
+            this.epoch = 'life';
+        } else if (this.score >= this.epochThresholds.formation) {
+            this.epoch = 'formation';
+        } else {
+            this.epoch = 'genesis';
+        }
+        
+        // Trigger transition effect if epoch changed
+        if (oldEpoch !== this.epoch) {
+            this.onEpochTransition(oldEpoch, this.epoch);
+        }
+    }
+
+    /**
+     * Handle epoch transition
+     * @private
+     */
+    onEpochTransition(from, to) {
+        console.log(`[CompositionGame] Epoch transition: ${from} → ${to}`);
+        
+        // Visual flash
+        if (this.engine.screenFlash) {
+            this.engine.screenFlash('#ffffff', 0.3, 0.5);
+        }
+        
+        // Play chord (if acoustics enabled)
+        if (this.acoustics.enabled && this.acoustics.ctx) {
+            this.playEpochChord(to);
+        }
+    }
+
+    /**
+     * Play a chord to mark epoch transition
+     * @private
+     */
+    playEpochChord(epoch) {
+        const chords = {
+            genesis: [100, 150, 200],           // Dark low chord
+            formation: [200, 300, 400],         // Building chord
+            life: [300, 450, 600],              // Growing chord
+            civilization: [400, 600, 800],      // Rich chord
+            transcendence: [500, 750, 1000, 1250] // Bright high chord
+        };
+        
+        const freqs = chords[epoch] || [200, 300, 400];
+        const now = this.acoustics.ctx.currentTime;
+        
+        for (const freq of freqs) {
+            const osc = this.acoustics.ctx.createOscillator();
+            const gain = this.acoustics.ctx.createGain();
+            
+            osc.type = 'sine';
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.1, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 1.5);
+            
+            osc.connect(gain);
+            gain.connect(this.acoustics.masterGain);
+            
+            osc.start(now);
+            osc.stop(now + 1.5);
+        }
+    }
+
+    /**
+     * Update tutorial state
+     * @private
+     */
+    updateTutorial() {
+        if (!this.tutorial.active || this.tutorial.completed) return;
+        
+        const step = this.tutorial.steps[this.tutorial.step];
+        if (!step) {
+            // Tutorial complete
+            this.tutorial.completed = true;
+            this.tutorial.active = false;
+            try {
+                localStorage.setItem('composition_tutorial', 'completed');
+            } catch (e) {}
+            return;
+        }
+        
+        // Check step conditions
+        if (step.material) {
+            // Check if material was placed
+            if (this.analysis.activeMaterials.has(step.material) && !step.placed) {
+                step.placed = true;
+                this.tutorial.step++;
+            }
+        } else if (step.delay) {
+            // Wait for delay
+            if (!step.startTime) {
+                step.startTime = performance.now();
+            } else if ((performance.now() - step.startTime) / 1000 > step.delay) {
+                step.waited = true;
+                this.tutorial.step++;
+            }
+        } else if (step.final) {
+            // Final message, wait a bit then complete
+            if (!step.startTime) {
+                step.startTime = performance.now();
+            } else if ((performance.now() - step.startTime) / 1000 > 3) {
+                this.tutorial.step++;
+            }
+        }
+    }
+
+    /**
+     * Apply conducting mode effects
+     * @private
+     */
+    applyConducting(dt) {
+        // Apply wind
+        this.physics.wind.x = this.conducting.wind.x;
+        this.physics.wind.y = this.conducting.wind.y;
+        
+        // Apply temperature modifier
+        if (this.physics.temperatureGrid) {
+            const modifier = this.conducting.tempModifier;
+            if (Math.abs(modifier) > 0.01) {
+                // Gradually modify ambient temperature
+                this.physics.ambientTemp += modifier * dt * 10;
+                this.physics.ambientTemp = Math.max(-50, Math.min(100, this.physics.ambientTemp));
+            }
+        }
+        
+        // Apply time scale
+        if (this.physics.timeScale !== this.conducting.timeScaleTarget) {
+            this.physics.timeScale += (this.conducting.timeScaleTarget - this.physics.timeScale) * dt * 2;
+        }
+        
+        // Decay conducting inputs
+        this.conducting.wind.x *= Math.pow(0.1, dt);
+        this.conducting.wind.y *= Math.pow(0.1, dt);
+        this.conducting.tempModifier *= Math.pow(0.1, dt);
+    }
+
+    /**
+     * Set game mode
+     * @param {string} mode - Mode ('creation', 'listening', 'conducting')
+     */
+    setMode(mode) {
+        if (['creation', 'listening', 'conducting'].includes(mode)) {
+            this.mode = mode;
+            console.log(`[CompositionGame] Mode: ${mode}`);
+        }
+    }
+
+    /**
+     * Handle touch/mouse gesture start
+     * @param {number} x - Screen X
+     * @param {number} y - Screen Y
+     */
+    onGestureStart(x, y) {
+        this.gesture.startX = x;
+        this.gesture.startY = y;
+        this.gesture.currentX = x;
+        this.gesture.currentY = y;
+        this.gesture.startTime = performance.now();
+        this.gesture.active = true;
+        this.gesture.type = null;
+    }
+
+    /**
+     * Handle touch/mouse gesture move
+     * @param {number} x - Screen X
+     * @param {number} y - Screen Y
+     */
+    onGestureMove(x, y) {
+        if (!this.gesture.active) return;
+        
+        this.gesture.currentX = x;
+        this.gesture.currentY = y;
+        
+        const dx = x - this.gesture.startX;
+        const dy = y - this.gesture.startY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        // Detect swipe
+        if (dist > 20 && this.mode === 'conducting') {
+            this.gesture.type = 'swipe';
+            
+            // Apply conducting gestures
+            if (Math.abs(dx) > Math.abs(dy)) {
+                // Horizontal swipe: wind
+                this.conducting.wind.x = Math.max(-1, Math.min(1, dx / 100));
+            } else {
+                // Vertical swipe: temperature
+                this.conducting.tempModifier = Math.max(-1, Math.min(1, -dy / 100));
+            }
+        }
+    }
+
+    /**
+     * Handle touch/mouse gesture end
+     * @param {number} x - Screen X
+     * @param {number} y - Screen Y
+     */
+    onGestureEnd(x, y) {
+        if (!this.gesture.active) return;
+        
+        const duration = (performance.now() - this.gesture.startTime) / 1000;
+        const dx = x - this.gesture.startX;
+        const dy = y - this.gesture.startY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        // Detect tap vs long press
+        if (dist < 10) {
+            if (duration > 0.5) {
+                this.gesture.type = 'longpress';
+                // Long press in conducting mode: spawn rain/snow
+                if (this.mode === 'conducting') {
+                    this.spawnWeather(x, y);
+                }
+            } else {
+                this.gesture.type = 'tap';
+                // Tap in conducting mode: geological event
+                if (this.mode === 'conducting') {
+                    this.triggerGeologicalEvent(x, y);
+                }
+            }
+        }
+        
+        this.gesture.active = false;
+    }
+
+    /**
+     * Spawn weather at position (conducting mode)
+     * @private
+     */
+    spawnWeather(screenX, screenY) {
+        // Convert screen to world position
+        const worldX = Math.floor(screenX / this.physics.cellSize);
+        const worldY = Math.floor(screenY / this.physics.cellSize);
+        
+        // Spawn water or snow based on temperature
+        const material = this.physics.ambientTemp < 0 ? 'ice' : 'water';
+        
+        // Rain down from top
+        for (let i = 0; i < 20; i++) {
+            const x = worldX + Math.floor(Math.random() * 10) - 5;
+            const y = Math.max(0, worldY - Math.floor(Math.random() * 20));
+            this.physics.set(x, y, material);
+        }
+    }
+
+    /**
+     * Trigger geological event at position (conducting mode)
+     * @private
+     */
+    triggerGeologicalEvent(screenX, screenY) {
+        // Convert screen to world position
+        const worldX = Math.floor(screenX / this.physics.cellSize);
+        const worldY = Math.floor(screenY / this.physics.cellSize);
+        
+        // Small explosion effect
+        if (this.physics.explode) {
+            this.physics.explode(worldX, worldY, 5);
+        }
+    }
+
+    /**
+     * Get current composition state
+     * @returns {object} State object
+     */
+    getState() {
+        return {
+            mode: this.mode,
+            epoch: this.epoch,
+            score: this.score,
+            harmony: Math.floor(this.harmony),
+            complexity: Math.floor(this.complexity),
+            rhythm: Math.floor(this.rhythm),
+            dynamics: Math.floor(this.dynamics),
+            texture: Math.floor(this.texture),
+            melody: Math.floor(this.melody),
+            activeMaterials: Array.from(this.analysis.activeMaterials),
+            tutorialActive: this.tutorial.active,
+            tutorialStep: this.tutorial.step
+        };
+    }
+
+    /**
+     * Get current tutorial message
+     * @returns {string|null} Tutorial message
+     */
+    getTutorialMessage() {
+        if (!this.tutorial.active || this.tutorial.completed) return null;
+        
+        const step = this.tutorial.steps[this.tutorial.step];
+        return step ? step.message : null;
+    }
+}
+
 // Static properties (must be set AFTER class definition)
-BudEngine.VERSION = '3.9';
+BudEngine.VERSION = '4.0';
 BudEngine.LAYER = {
     DEFAULT: 1,
     PLAYER: 2,

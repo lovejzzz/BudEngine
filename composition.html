@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#000000">
+    <title>The Composition - Your Instrument is the Earth</title>
+    
+    <!-- PWA manifest -->
+    <link rel="manifest" href="data:application/json;base64,eyJuYW1lIjoiVGhlIENvbXBvc2l0aW9uIiwic2hvcnRfbmFtZSI6IkNvbXBvc2l0aW9uIiwic3RhcnRfdXJsIjoiLiIsImRpc3BsYXkiOiJzdGFuZGFsb25lIiwiYmFja2dyb3VuZF9jb2xvciI6IiMwMDAwMDAiLCJ0aGVtZV9jb2xvciI6IiMwMDAwMDAifQ==">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #000;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            color: #fff;
+        }
+
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+        }
+
+        /* UI Overlay */
+        #ui-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        /* Top Bar */
+        #top-bar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: env(safe-area-inset-top, 20px) 20px 15px 20px;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%);
+            pointer-events: all;
+        }
+
+        #epoch-display {
+            font-size: 24px;
+            font-weight: 300;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: #fff;
+            text-shadow: 0 0 20px rgba(255,255,255,0.5);
+            margin-bottom: 8px;
+        }
+
+        #score-display {
+            font-size: 14px;
+            color: rgba(255,255,255,0.7);
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .score-item {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+
+        .score-bar {
+            width: 40px;
+            height: 4px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .score-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4a9eff, #7b61ff);
+            transition: width 0.3s ease;
+        }
+
+        /* Bottom Bar */
+        #bottom-bar {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 15px 0 calc(env(safe-area-inset-bottom, 20px) + 10px) 0;
+            background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0) 100%);
+            pointer-events: all;
+        }
+
+        /* Material Palette */
+        #material-palette {
+            display: flex;
+            gap: 8px;
+            padding: 0 20px 12px 20px;
+            overflow-x: auto;
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+        }
+
+        #material-palette::-webkit-scrollbar {
+            display: none;
+        }
+
+        .material-btn {
+            flex-shrink: 0;
+            width: 50px;
+            height: 50px;
+            border-radius: 8px;
+            border: 2px solid rgba(255,255,255,0.3);
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(10px);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        .material-btn.selected {
+            border-color: #4a9eff;
+            box-shadow: 0 0 20px rgba(74, 158, 255, 0.5);
+            transform: scale(1.1);
+        }
+
+        .material-btn:active {
+            transform: scale(0.95);
+        }
+
+        /* Mode Buttons */
+        #mode-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            padding: 0 20px;
+        }
+
+        .mode-btn {
+            flex: 1;
+            max-width: 120px;
+            height: 44px;
+            border-radius: 22px;
+            border: 2px solid rgba(255,255,255,0.3);
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(10px);
+            color: rgba(255,255,255,0.7);
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+        }
+
+        .mode-btn.active {
+            border-color: #7b61ff;
+            background: rgba(123, 97, 255, 0.3);
+            color: #fff;
+            box-shadow: 0 0 20px rgba(123, 97, 255, 0.4);
+        }
+
+        .mode-btn:active {
+            transform: scale(0.95);
+        }
+
+        /* Score Breakdown Panel */
+        #score-panel {
+            position: absolute;
+            top: 100px;
+            right: 20px;
+            width: 200px;
+            background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(20px);
+            border-radius: 12px;
+            padding: 15px;
+            border: 1px solid rgba(255,255,255,0.2);
+            pointer-events: all;
+            transform: translateX(250px);
+            transition: transform 0.3s ease;
+        }
+
+        #score-panel.visible {
+            transform: translateX(0);
+        }
+
+        #score-panel h3 {
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 12px;
+            color: rgba(255,255,255,0.9);
+        }
+
+        .score-detail {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 12px;
+        }
+
+        .score-detail-label {
+            color: rgba(255,255,255,0.7);
+        }
+
+        .score-detail-value {
+            color: #4a9eff;
+            font-weight: 600;
+        }
+
+        /* Tutorial Overlay */
+        #tutorial-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.9);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 30px 40px;
+            border: 2px solid rgba(255,255,255,0.3);
+            text-align: center;
+            max-width: 80%;
+            pointer-events: all;
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+
+        #tutorial-overlay.visible {
+            opacity: 1;
+        }
+
+        #tutorial-message {
+            font-size: 20px;
+            font-weight: 300;
+            letter-spacing: 1px;
+            line-height: 1.6;
+        }
+
+        /* Sound Toggle */
+        #sound-toggle {
+            position: absolute;
+            top: env(safe-area-inset-top, 20px);
+            right: 20px;
+            width: 44px;
+            height: 44px;
+            border-radius: 22px;
+            border: 2px solid rgba(255,255,255,0.3);
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(10px);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            pointer-events: all;
+            transition: all 0.2s ease;
+        }
+
+        #sound-toggle:active {
+            transform: scale(0.95);
+        }
+
+        #sound-toggle.enabled {
+            border-color: #4a9eff;
+            box-shadow: 0 0 20px rgba(74, 158, 255, 0.5);
+        }
+
+        /* Score Panel Toggle */
+        #score-toggle {
+            position: absolute;
+            top: calc(env(safe-area-inset-top, 20px) + 60px);
+            right: 20px;
+            width: 44px;
+            height: 44px;
+            border-radius: 22px;
+            border: 2px solid rgba(255,255,255,0.3);
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(10px);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            pointer-events: all;
+            transition: all 0.2s ease;
+        }
+
+        #score-toggle:active {
+            transform: scale(0.95);
+        }
+
+        #score-toggle.active {
+            border-color: #7b61ff;
+            box-shadow: 0 0 20px rgba(123, 97, 255, 0.4);
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 600px) {
+            #epoch-display {
+                font-size: 18px;
+            }
+
+            #score-display {
+                font-size: 11px;
+                gap: 8px;
+            }
+
+            .score-bar {
+                width: 30px;
+            }
+
+            .material-btn {
+                width: 44px;
+                height: 44px;
+            }
+
+            #score-panel {
+                width: 160px;
+                padding: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="gameCanvas"></canvas>
+        
+        <!-- UI Overlay -->
+        <div id="ui-overlay">
+            <!-- Top Bar -->
+            <div id="top-bar">
+                <div id="epoch-display">Genesis</div>
+                <div id="score-display">
+                    <div class="score-item">
+                        <span>Score</span>
+                        <span id="score-value">0</span>
+                    </div>
+                    <div class="score-item">
+                        <span>Harmony</span>
+                        <div class="score-bar">
+                            <div class="score-bar-fill" id="harmony-bar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sound Toggle -->
+            <div id="sound-toggle">🔇</div>
+
+            <!-- Score Panel Toggle -->
+            <div id="score-toggle">📊</div>
+
+            <!-- Score Breakdown Panel -->
+            <div id="score-panel">
+                <h3>Musical Analysis</h3>
+                <div class="score-detail">
+                    <span class="score-detail-label">Harmony</span>
+                    <span class="score-detail-value" id="harmony-value">0</span>
+                </div>
+                <div class="score-detail">
+                    <span class="score-detail-label">Complexity</span>
+                    <span class="score-detail-value" id="complexity-value">0</span>
+                </div>
+                <div class="score-detail">
+                    <span class="score-detail-label">Rhythm</span>
+                    <span class="score-detail-value" id="rhythm-value">0</span>
+                </div>
+                <div class="score-detail">
+                    <span class="score-detail-label">Dynamics</span>
+                    <span class="score-detail-value" id="dynamics-value">0</span>
+                </div>
+                <div class="score-detail">
+                    <span class="score-detail-label">Texture</span>
+                    <span class="score-detail-value" id="texture-value">0</span>
+                </div>
+                <div class="score-detail">
+                    <span class="score-detail-label">Melody</span>
+                    <span class="score-detail-value" id="melody-value">0</span>
+                </div>
+            </div>
+
+            <!-- Bottom Bar -->
+            <div id="bottom-bar">
+                <!-- Material Palette -->
+                <div id="material-palette">
+                    <!-- Materials will be added dynamically -->
+                </div>
+
+                <!-- Mode Buttons -->
+                <div id="mode-buttons">
+                    <button class="mode-btn active" data-mode="creation">
+                        <span>🎨</span>
+                        <span>Create</span>
+                    </button>
+                    <button class="mode-btn" data-mode="listening">
+                        <span>👂</span>
+                        <span>Listen</span>
+                    </button>
+                    <button class="mode-btn" data-mode="conducting">
+                        <span>🎵</span>
+                        <span>Conduct</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tutorial Overlay -->
+            <div id="tutorial-overlay">
+                <div id="tutorial-message"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="bud.js"></script>
+    <script>
+        // The Composition v4.0
+        // Your instrument is the Earth
+
+        // Material palette configuration
+        const materials = [
+            { name: 'stone', emoji: '🪨', color: '#808080' },
+            { name: 'water', emoji: '💧', color: '#1a6bff' },
+            { name: 'sand', emoji: '⏳', color: '#c2b280' },
+            { name: 'dirt', emoji: '🟫', color: '#654321' },
+            { name: 'wood', emoji: '🪵', color: '#8b4513' },
+            { name: 'fire', emoji: '🔥', color: '#ff4500' },
+            { name: 'plant', emoji: '🌱', color: '#228b22' },
+            { name: 'ice', emoji: '🧊', color: '#a0d0ff' },
+            { name: 'lava', emoji: '🌋', color: '#ff6600' },
+            { name: 'glass', emoji: '💎', color: '#88ccff' },
+            { name: 'metal', emoji: '⚙️', color: '#c0c0c0' },
+            { name: 'acid', emoji: '🧪', color: '#00ff00' }
+        ];
+
+        let selectedMaterial = 'stone';
+        let soundEnabled = false;
+        let scorePanelVisible = false;
+
+        // Initialize engine
+        const canvas = document.getElementById('gameCanvas');
+        const engine = new BudEngine({
+            canvas: canvas,
+            width: window.innerWidth,
+            height: window.innerHeight,
+            backgroundColor: '#0a0a14'
+        });
+
+        // Initialize physics
+        engine.physics.init(window.innerWidth, window.innerHeight, 3);
+
+        // Initialize composition game
+        engine.composition = new CompositionGame(engine);
+
+        // Build material palette
+        const palette = document.getElementById('material-palette');
+        materials.forEach(mat => {
+            const btn = document.createElement('button');
+            btn.className = 'material-btn';
+            if (mat.name === selectedMaterial) btn.classList.add('selected');
+            btn.innerHTML = mat.emoji;
+            btn.style.background = `linear-gradient(135deg, ${mat.color}40, ${mat.color}20)`;
+            btn.dataset.material = mat.name;
+            btn.onclick = () => {
+                selectedMaterial = mat.name;
+                document.querySelectorAll('.material-btn').forEach(b => b.classList.remove('selected'));
+                btn.classList.add('selected');
+            };
+            palette.appendChild(btn);
+        });
+
+        // Mode buttons
+        document.querySelectorAll('.mode-btn').forEach(btn => {
+            btn.onclick = () => {
+                const mode = btn.dataset.mode;
+                engine.composition.setMode(mode);
+                document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+            };
+        });
+
+        // Sound toggle
+        const soundToggle = document.getElementById('sound-toggle');
+        soundToggle.onclick = () => {
+            if (!soundEnabled) {
+                // Initialize audio on first interaction
+                engine.physics.acoustics.init();
+                soundEnabled = true;
+                soundToggle.textContent = '🔊';
+                soundToggle.classList.add('enabled');
+            } else {
+                soundEnabled = false;
+                soundToggle.textContent = '🔇';
+                soundToggle.classList.remove('enabled');
+                engine.physics.acoustics.enabled = false;
+            }
+        };
+
+        // Score panel toggle
+        const scoreToggle = document.getElementById('score-toggle');
+        const scorePanel = document.getElementById('score-panel');
+        scoreToggle.onclick = () => {
+            scorePanelVisible = !scorePanelVisible;
+            scorePanel.classList.toggle('visible', scorePanelVisible);
+            scoreToggle.classList.toggle('active', scorePanelVisible);
+        };
+
+        // Touch/mouse input
+        let isDrawing = false;
+        let lastDrawX = null;
+        let lastDrawY = null;
+
+        function getInputPos(e) {
+            const rect = canvas.getBoundingClientRect();
+            const touch = e.touches ? e.touches[0] : e;
+            return {
+                x: (touch.clientX - rect.left) * (canvas.width / rect.width),
+                y: (touch.clientY - rect.top) * (canvas.height / rect.height)
+            };
+        }
+
+        function startDrawing(e) {
+            e.preventDefault();
+            const pos = getInputPos(e);
+            isDrawing = true;
+            lastDrawX = pos.x;
+            lastDrawY = pos.y;
+
+            // Gesture tracking for composition game
+            engine.composition.onGestureStart(pos.x, pos.y);
+
+            // Place material
+            if (engine.composition.mode === 'creation') {
+                placeMaterial(pos.x, pos.y);
+            }
+        }
+
+        function continueDrawing(e) {
+            if (!isDrawing) return;
+            e.preventDefault();
+            const pos = getInputPos(e);
+
+            // Gesture tracking
+            engine.composition.onGestureMove(pos.x, pos.y);
+
+            // Continue placing material
+            if (engine.composition.mode === 'creation') {
+                // Interpolate between last pos and current for smooth drawing
+                const dx = pos.x - lastDrawX;
+                const dy = pos.y - lastDrawY;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                const steps = Math.max(1, Math.floor(dist / 5));
+
+                for (let i = 0; i < steps; i++) {
+                    const t = i / steps;
+                    const x = lastDrawX + dx * t;
+                    const y = lastDrawY + dy * t;
+                    placeMaterial(x, y);
+                }
+            }
+
+            lastDrawX = pos.x;
+            lastDrawY = pos.y;
+        }
+
+        function stopDrawing(e) {
+            if (!isDrawing) return;
+            e.preventDefault();
+            const pos = getInputPos(e);
+            isDrawing = false;
+
+            // Gesture tracking
+            engine.composition.onGestureEnd(pos.x, pos.y);
+        }
+
+        function placeMaterial(x, y) {
+            const gridX = Math.floor(x / engine.physics.cellSize);
+            const gridY = Math.floor(y / engine.physics.cellSize);
+
+            // Place a small circle of material
+            const radius = 3;
+            engine.physics.circle(gridX, gridY, radius, selectedMaterial);
+        }
+
+        // Touch events
+        canvas.addEventListener('touchstart', startDrawing, { passive: false });
+        canvas.addEventListener('touchmove', continueDrawing, { passive: false });
+        canvas.addEventListener('touchend', stopDrawing, { passive: false });
+
+        // Mouse events
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mousemove', continueDrawing);
+        canvas.addEventListener('mouseup', stopDrawing);
+        canvas.addEventListener('mouseleave', stopDrawing);
+
+        // Update UI
+        function updateUI() {
+            const state = engine.composition.getState();
+
+            // Epoch
+            document.getElementById('epoch-display').textContent = state.epoch.charAt(0).toUpperCase() + state.epoch.slice(1);
+
+            // Score
+            document.getElementById('score-value').textContent = state.score;
+            document.getElementById('harmony-bar').style.width = state.harmony + '%';
+
+            // Score breakdown
+            document.getElementById('harmony-value').textContent = state.harmony;
+            document.getElementById('complexity-value').textContent = state.complexity;
+            document.getElementById('rhythm-value').textContent = state.rhythm;
+            document.getElementById('dynamics-value').textContent = state.dynamics;
+            document.getElementById('texture-value').textContent = state.texture;
+            document.getElementById('melody-value').textContent = state.melody;
+
+            // Tutorial
+            const tutorialOverlay = document.getElementById('tutorial-overlay');
+            const tutorialMessage = document.getElementById('tutorial-message');
+            const message = engine.composition.getTutorialMessage();
+            
+            if (message) {
+                tutorialMessage.textContent = message;
+                tutorialOverlay.classList.add('visible');
+            } else {
+                tutorialOverlay.classList.remove('visible');
+            }
+        }
+
+        // Game scene
+        engine.scene('main', {
+            init() {
+                console.log('[The Composition] Your instrument is the Earth');
+                
+                // Start with empty dark world (Genesis epoch)
+                // Users will build their world from scratch
+            },
+
+            update(dt) {
+                // Update physics
+                engine.physics.update(dt);
+
+                // Update composition game
+                engine.composition.update(dt);
+
+                // Update UI
+                updateUI();
+            },
+
+            render() {
+                // Render physics
+                engine.physics.render();
+            }
+        });
+
+        // Start game
+        engine.goTo('main');
+        engine.start();
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+            
+            canvas.width = width;
+            canvas.height = height;
+            engine.config.width = width;
+            engine.config.height = height;
+
+            // Reinitialize physics with new dimensions
+            const oldGrid = engine.physics.grid ? new Uint8Array(engine.physics.grid) : null;
+            const oldWidth = engine.physics.gridWidth;
+            const oldHeight = engine.physics.gridHeight;
+            
+            engine.physics.init(width, height, 3);
+
+            // Copy old grid if it exists
+            if (oldGrid) {
+                const minWidth = Math.min(oldWidth, engine.physics.gridWidth);
+                const minHeight = Math.min(oldHeight, engine.physics.gridHeight);
+                for (let y = 0; y < minHeight; y++) {
+                    for (let x = 0; x < minWidth; x++) {
+                        const oldIdx = y * oldWidth + x;
+                        const newIdx = y * engine.physics.gridWidth + x;
+                        engine.physics.grid[newIdx] = oldGrid[oldIdx];
+                    }
+                }
+            }
+        });
+
+        // Prevent context menu on long press
+        window.addEventListener('contextmenu', e => e.preventDefault());
+
+        // Resume audio context on any interaction (iOS requirement)
+        document.addEventListener('touchstart', () => {
+            if (engine.physics.acoustics.ctx && engine.physics.acoustics.ctx.state === 'suspended') {
+                engine.physics.acoustics.ctx.resume();
+            }
+        }, { once: true });
+
+        console.log('[The Composition v4.0] Loaded - Build the world, compose music');
+    </script>
+</body>
+</html>
