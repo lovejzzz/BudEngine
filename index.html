@@ -188,14 +188,35 @@
         </div>
 
         <div class="section">
-            <h2>✨ What's New in v1.5</h2>
+            <h2>✨ What's New in v2.0 — MAJOR UPGRADE!</h2>
+            
+            <h3>🎮 Priority 1 — Core Game Systems</h3>
             <ul class="feature-list">
-                <li><strong>Fixed UI Button Detection</strong> — Canvas buttons now work reliably (timing issue resolved)</li>
-                <li><strong>Enhanced Procedural Art</strong> — Enemies and characters now have gradients, glow effects, and outlines</li>
-                <li><strong>Enemy Wall Collision</strong> — Enemies no longer walk through walls</li>
-                <li><strong>Scene Transitions</strong> — Smooth fade in/out between scenes</li>
-                <li><strong>Better Collision Resolution</strong> — Entities no longer get stuck in walls</li>
-                <li><strong>Visual Polish</strong> — Player trail particles, wave announcements, improved feel</li>
+                <li><strong>Time Scaling</strong> — Bullet-time effects with <code>engine.slowMo(0.3, 2)</code>, plus fixed timestep physics for stable gameplay</li>
+                <li><strong>Touch Input</strong> — Full mobile support! Games now work on phones and tablets</li>
+                <li><strong>Gamepad Support</strong> — Xbox/PlayStation controllers with left stick, buttons, and triggers</li>
+                <li><strong>Sprite Animation System</strong> — Frame-based animations with play/pause/loop, plus state machines for AI</li>
+                <li><strong>Global Event System</strong> — <code>engine.on/emit/off</code> for decoupled communication (entitySpawned, collisionStart, etc.)</li>
+                <li><strong>Trigger Zones</strong> — Non-solid collision detection perfect for doors, pickups, and checkpoints</li>
+            </ul>
+
+            <h3>✨ Priority 2 — Polish Features</h3>
+            <ul class="feature-list">
+                <li><strong>Volume/Mixer Control</strong> — Separate master, SFX, and music volume, plus looping background music</li>
+                <li><strong>Persistent Objects</strong> — <code>engine.persist(entity)</code> to keep objects across scene transitions</li>
+                <li><strong>Save/Load System</strong> — Full game state serialization to localStorage with custom data support</li>
+                <li><strong>Debug Overlay</strong> — Press backtick (`) to show FPS, entity count, collision boxes, and spatial grid</li>
+            </ul>
+
+            <h3>🚀 Priority 3 — Advanced Features</h3>
+            <ul class="feature-list">
+                <li><strong>A* Pathfinding</strong> — Grid-based pathfinding that works with tilemaps: <code>engine.pathfind(from, to)</code></li>
+                <li><strong>Asset Loader</strong> — Load images and spritesheets with progress tracking and batch operations</li>
+            </ul>
+
+            <h3>📜 Previous (v1.5)</h3>
+            <ul class="feature-list">
+                <li>Fixed UI button detection, enhanced procedural art, enemy wall collision, scene transitions</li>
             </ul>
         </div>
 
@@ -203,15 +224,22 @@
             <h2>⚡ Core Features</h2>
             <ul class="feature-list">
                 <li><strong>Single-File Architecture</strong> — No build tools, no bundlers. Just include <code>bud.js</code> and start coding.</li>
-                <li><strong>Entity-Component System</strong> — Spawn entities with sprites, colliders, and custom properties.</li>
+                <li><strong>Entity-Component System</strong> — Spawn entities with sprites, colliders, animations, and custom properties.</li>
                 <li><strong>Procedural Art System</strong> — No external assets needed. Everything generated from code.</li>
-                <li><strong>Physics & Collision</strong> — AABB and circle colliders, spatial grid optimization, raycasting.</li>
+                <li><strong>Physics & Collision</strong> — AABB and circle colliders, spatial grid optimization, raycasting, trigger zones.</li>
+                <li><strong>Time Scaling & Fixed Timestep</strong> — Bullet-time effects and stable physics simulation.</li>
+                <li><strong>Multi-Platform Input</strong> — Keyboard, mouse, touch (mobile), and gamepad support.</li>
+                <li><strong>Animation System</strong> — Frame-based sprite animations with state machines.</li>
+                <li><strong>Event System</strong> — Global pub/sub for decoupled game logic.</li>
                 <li><strong>AI Testing API</strong> — Inspect state, inject input, control time, record & replay.</li>
                 <li><strong>Auto-Playtest Bot</strong> — Built-in AI that plays your game using configurable strategies.</li>
-                <li><strong>Tilemap System</strong> — Create rooms, corridors, and dungeons with ease.</li>
+                <li><strong>Tilemap & Pathfinding</strong> — Create rooms and corridors, AI finds paths using A*.</li>
                 <li><strong>Particle System</strong> — Explosions, trails, and effects.</li>
-                <li><strong>Procedural Sound</strong> — Web Audio API synthesized sounds.</li>
-                <li><strong>Scene Management</strong> — Menu, gameplay, game over — structured state transitions.</li>
+                <li><strong>Procedural Sound</strong> — Web Audio API synthesized sounds with volume mixing.</li>
+                <li><strong>Scene Management</strong> — Menu, gameplay, game over — structured state transitions with persistent objects.</li>
+                <li><strong>Save/Load System</strong> — Serialize game state to localStorage.</li>
+                <li><strong>Debug Overlay</strong> — Press backtick (`) to visualize collision boxes, FPS, and more.</li>
+                <li><strong>Asset Loader</strong> — Load images and spritesheets with progress tracking (optional).</li>
             </ul>
         </div>
 
@@ -318,7 +346,7 @@ console.log('Balance notes:', results.balanceNotes);</code></pre>
 
         <footer>
             <p>Built with ❤️ for AI-human collaboration</p>
-            <p>Bud Engine v1.5 | MIT License</p>
+            <p>Bud Engine v2.0 | MIT License</p>
         </footer>
     </div>
 </body>
