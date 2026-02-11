@@ -6417,8 +6417,15 @@ class PixelPhysics {
         const mat2 = this.getMaterial(id2);
         if (!mat2) return false;
         
-        // Density-based displacement
-        if (mat.density > mat2.density) {
+        // Solids block everything — nothing phases through solid materials
+        if (mat2.state === 'solid') return false;
+        
+        // Density-based displacement (liquids, gases, powders can displace each other)
+        // But only fluids (liquid/gas) can be displaced — powders on powders just stack
+        const fluidStates = ['liquid', 'gas'];
+        const canDisplace = fluidStates.includes(mat2.state) && mat.density > mat2.density;
+        
+        if (canDisplace) {
             // Swap
             const tempId = this.grid[idx1];
             const tempTemp = this.temperatureGrid[idx1];
