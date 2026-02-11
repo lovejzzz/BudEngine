@@ -482,7 +482,7 @@
         </div>
     </div>
 
-    <script src="bud.js?v=46"></script>
+    <script src="bud.js?v=47"></script>
     <script>
         // The Composition v4.0
         // Your instrument is the Earth
@@ -569,12 +569,8 @@
         // Garden button
         document.getElementById('garden-btn').onclick = () => {
             // Clear world and load garden scenario
-            engine.physics.clearWorld();
-            if (engine.composition.loadScenario) {
-                engine.composition.loadScenario('garden');
-            } else if (engine.test && engine.test.loadScenario) {
-                engine.test.loadScenario('garden');
-            }
+            engine.test.clearWorld();
+            engine.test.loadScenario('garden');
         };
 
         // Sound toggle
@@ -733,8 +729,9 @@
                 document.getElementById('fish-count').textContent = eco.creatures.fish || 0;
                 document.getElementById('bug-count').textContent = eco.creatures.bug || 0;
                 
-                // O2 level as percentage (0-100)
-                const o2Pct = Math.round((eco.oxygen / eco.maxOxygen) * 100);
+                // O2 level as percentage (total O2+CO2 = 600, so O2 pct = O2/6)
+                const o2Val = parseFloat(eco.atmosphere.oxygen) || 0;
+                const o2Pct = Math.round((o2Val / 600) * 100);
                 document.getElementById('o2-level').textContent = o2Pct + '%';
             }
         }
