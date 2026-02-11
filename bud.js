@@ -1,11 +1,21 @@
 /**
- * BUD ENGINE v3.5
+ * BUD ENGINE v3.6
  * A 2D web game engine designed for AI-human collaboration
  * 
  * Philosophy: AI can write, TEST, and iterate on games independently.
  * Killer feature: AI Testing API + auto-playtest bot
  * 
  * Architecture: Single-file, no build tools, runs in browser
+ * 
+ * v3.6 BIOLOGY SYSTEM - Life Emerges from Chemistry:
+ * - Living materials: plant, vegetation, fungus, organic decay
+ * - Property-based biology: growth, survival checks, death conditions
+ * - Spontaneous life generation: life emerges naturally when conditions are met
+ * - Ecosystem simulation: oxygen production, nutrient cycles, decomposition
+ * - Tree growth: vegetation columns harden into wood over time
+ * - Light detection: plants need light to photosynthesize, fungus grows in dark
+ * - Complete material count: ~30 materials including biology
+ * - This is how we build Earth.
  * 
  * v3.2 PERFORMANCE + DYNAMIC LIGHTING:
  * - Chunked simulation: 60-80% performance boost for stable worlds
@@ -5990,6 +6000,172 @@ class PixelPhysics {
             ambientSound: null,
             phaseChangeSound: 'sizzle'
         });
+
+        // ========== LIVING MATERIALS (v3.6) ==========
+
+        // PLANT/SEED
+        this.material('plant', {
+            state: 'solid',
+            density: 500,
+            temperature: 20,
+            meltingPoint: null,
+            boilingPoint: null,
+            ignitionPoint: 200,
+            thermalConductivity: 0.2,
+            specificHeat: 2.5,
+            flammability: 0.6,
+            hardness: 0.5,
+            electricConductivity: 0,
+            pH: 6.5,
+            reactivity: 0,
+            solubility: null,
+            color: ['#1a5c1a', '#2d6b2d', '#1f4f1f'],
+            immovable: false,
+            organic: true,
+            living: true,
+            combustionProducts: ['smoke', 'co2'],
+            combustionEnergy: 8,
+            // Acoustic properties
+            speedOfSound: 1000,
+            acousticImpedance: 0.50,
+            absorptionCoeff: 0.25,
+            youngsModulus: 0.5e9,
+            impactSound: 'thud',
+            flowSound: null,
+            ambientSound: null,
+            phaseChangeSound: 'crack',
+            // Biology properties
+            growthRate: 0.005,
+            needsWater: true,
+            needsLight: true,
+            needsDirt: true,
+            minTemp: 10,
+            maxTemp: 40,
+            waterSearchRadius: 3,
+            deathForm: 'decay'
+        });
+
+        // VEGETATION/GRASS
+        this.material('vegetation', {
+            state: 'solid',
+            density: 400,
+            temperature: 20,
+            meltingPoint: null,
+            boilingPoint: null,
+            ignitionPoint: 200,
+            thermalConductivity: 0.18,
+            specificHeat: 2.8,
+            flammability: 0.7,
+            hardness: 0.3,
+            electricConductivity: 0,
+            pH: 6.5,
+            reactivity: 0,
+            solubility: null,
+            color: ['#33aa33', '#44bb44', '#2d992d'],
+            immovable: false,
+            organic: true,
+            living: true,
+            combustionProducts: ['smoke', 'co2'],
+            combustionEnergy: 10,
+            // Acoustic properties
+            speedOfSound: 1000,
+            acousticImpedance: 0.40,
+            absorptionCoeff: 0.25,
+            youngsModulus: 0.3e9,
+            impactSound: 'thud',
+            flowSound: null,
+            ambientSound: null,
+            phaseChangeSound: 'crack',
+            // Biology properties
+            growthRate: 0.005,
+            needsWater: true,
+            needsLight: true,
+            needsDirt: true,
+            minTemp: 5,
+            maxTemp: 45,
+            waterSearchRadius: 5,
+            deathForm: 'decay',
+            producesOxygen: true
+        });
+
+        // FUNGUS/MOSS
+        this.material('fungus', {
+            state: 'solid',
+            density: 450,
+            temperature: 20,
+            meltingPoint: null,
+            boilingPoint: null,
+            ignitionPoint: 180,
+            thermalConductivity: 0.15,
+            specificHeat: 2.6,
+            flammability: 0.5,
+            hardness: 0.2,
+            electricConductivity: 0,
+            pH: 6.0,
+            reactivity: 0,
+            solubility: null,
+            color: ['#8b7355', '#6b5b45', '#9b8365'],
+            immovable: false,
+            organic: true,
+            living: true,
+            combustionProducts: ['smoke'],
+            combustionEnergy: 6,
+            // Acoustic properties
+            speedOfSound: 900,
+            acousticImpedance: 0.41,
+            absorptionCoeff: 0.30,
+            youngsModulus: 0.2e9,
+            impactSound: 'thud',
+            flowSound: null,
+            ambientSound: null,
+            phaseChangeSound: null,
+            // Biology properties
+            growthRate: 0.003,
+            needsWater: true,
+            needsLight: false, // Grows in dark!
+            needsOrganic: true, // Needs organic matter nearby
+            minTemp: 0,
+            maxTemp: 35,
+            waterSearchRadius: 4,
+            deathForm: 'decay',
+            decomposer: true
+        });
+
+        // ORGANIC DECAY
+        this.material('decay', {
+            state: 'solid',
+            density: 700,
+            temperature: 20,
+            meltingPoint: null,
+            boilingPoint: null,
+            ignitionPoint: 180,
+            thermalConductivity: 0.3,
+            specificHeat: 2.0,
+            flammability: 0.4,
+            hardness: 0.1,
+            electricConductivity: 0,
+            pH: 5.5,
+            reactivity: 0.2,
+            solubility: null,
+            color: ['#4a3a2a', '#5a4a3a'],
+            immovable: false,
+            organic: true,
+            living: false,
+            combustionProducts: ['smoke', 'co2'],
+            combustionEnergy: 5,
+            // Acoustic properties
+            speedOfSound: 800,
+            acousticImpedance: 0.56,
+            absorptionCoeff: 0.20,
+            youngsModulus: 0.1e9,
+            impactSound: 'thud',
+            flowSound: null,
+            ambientSound: null,
+            phaseChangeSound: null,
+            // Decay properties
+            lifetime: [3.0, 8.0], // Converts to dirt over time
+            produces: 'dirt'
+        });
     }
 
     /**
@@ -6705,6 +6881,11 @@ class PixelPhysics {
                             }
                         }
                         
+                        // v3.6: Biology simulation for living materials
+                        if (mat.living) {
+                            this.simulateBiology(x, y, mat, idx);
+                        }
+                        
                         // v3.2: Simulate based on state (using flat array)
                         const state = this.stateArr[id];
                         if (state === 4) { // powder
@@ -6725,6 +6906,36 @@ class PixelPhysics {
                             const intensity = Math.min(1, matCount / 200);
                             this.acoustics.playAmbient(mat.ambientSound, intensity);
                         }
+                    }
+                }
+            }
+        }
+        
+        // v3.6: Spontaneous life generation (every ~60 frames)
+        if (this.frameCount % 60 === 0) {
+            // Sample random dirt cells and check if life can emerge
+            const sampleCount = 5; // Check 5 random cells per cycle
+            for (let i = 0; i < sampleCount; i++) {
+                const x = Math.floor(Math.random() * this.gridWidth);
+                const y = Math.floor(Math.random() * this.gridHeight);
+                const idx = this.index(x, y);
+                const id = this.grid[idx];
+                const mat = this.getMaterial(id);
+                
+                // Check if it's dirt (or similar)
+                if (mat && (mat.name === 'dirt' || mat.name === 'mud' || mat.name === 'clay')) {
+                    const temp = this.temperatureGrid[idx];
+                    
+                    // Check conditions for life to emerge
+                    const tempOk = temp >= 10 && temp <= 40;
+                    const hasWater = this.hasWaterNearby(x, y, 3);
+                    const hasLight = this.hasLightAbove(x, y);
+                    
+                    // Very low chance to spawn plant
+                    if (tempOk && hasWater && hasLight && Math.random() < 0.001) {
+                        this.grid[idx] = this.getMaterialId('plant');
+                        this.temperatureGrid[idx] = 20;
+                        this.activateChunk(x, y);
                     }
                 }
             }
@@ -6927,6 +7138,233 @@ class PixelPhysics {
         }
         
         return false;
+    }
+
+    /**
+     * Check if light reaches a cell from above (v3.6: Biology System)
+     * @private
+     */
+    hasLightAbove(x, y) {
+        let blockers = 0;
+        for (let dy = 1; dy < 10 && y - dy >= 0; dy++) {
+            const checkIdx = this.index(x, y - dy);
+            const checkId = this.grid[checkIdx];
+            if (checkId !== 0) {
+                const checkMat = this.getMaterial(checkId);
+                if (checkMat && checkMat.state === 'solid') {
+                    blockers++;
+                    if (blockers >= 3) return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Check if water is nearby (v3.6: Biology System)
+     * @private
+     */
+    hasWaterNearby(x, y, radius) {
+        for (let dy = -radius; dy <= radius; dy++) {
+            for (let dx = -radius; dx <= radius; dx++) {
+                const nx = x + dx;
+                const ny = y + dy;
+                if (!this.inBounds(nx, ny)) continue;
+                
+                const nid = this.grid[this.index(nx, ny)];
+                const nmat = this.getMaterial(nid);
+                if (nmat && (nmat.name === 'water' || nmat.name === 'ice' || nmat.name === 'steam')) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Check if dirt is nearby (v3.6: Biology System)
+     * @private
+     */
+    hasDirtNearby(x, y) {
+        const neighbors = [
+            [x - 1, y], [x + 1, y],
+            [x, y - 1], [x, y + 1]
+        ];
+        
+        for (let [nx, ny] of neighbors) {
+            if (!this.inBounds(nx, ny)) continue;
+            
+            const nid = this.grid[this.index(nx, ny)];
+            const nmat = this.getMaterial(nid);
+            if (nmat && (nmat.name === 'dirt' || nmat.name === 'mud' || nmat.name === 'clay')) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Check if organic matter is nearby (v3.6: Biology System)
+     * @private
+     */
+    hasOrganicNearby(x, y) {
+        for (let dy = -2; dy <= 2; dy++) {
+            for (let dx = -2; dx <= 2; dx++) {
+                const nx = x + dx;
+                const ny = y + dy;
+                if (!this.inBounds(nx, ny)) continue;
+                
+                const nid = this.grid[this.index(nx, ny)];
+                const nmat = this.getMaterial(nid);
+                if (nmat && nmat.organic) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Simulate biology for living materials (v3.6: Biology System)
+     * @private
+     */
+    simulateBiology(x, y, mat, idx) {
+        const temp = this.temperatureGrid[idx];
+        
+        // 1. SURVIVAL CHECK - Are conditions still viable?
+        const tempOk = temp >= mat.minTemp && temp <= mat.maxTemp;
+        const waterOk = !mat.needsWater || this.hasWaterNearby(x, y, mat.waterSearchRadius || 3);
+        const lightOk = !mat.needsLight || this.hasLightAbove(x, y);
+        const dirtOk = !mat.needsDirt || this.hasDirtNearby(x, y);
+        const organicOk = !mat.needsOrganic || this.hasOrganicNearby(x, y);
+        const darkOk = mat.needsLight === false ? !this.hasLightAbove(x, y) : true;
+        
+        // If conditions fail, cell dies → decay
+        if (!tempOk || !waterOk || !lightOk || !dirtOk || !organicOk || !darkOk) {
+            if (mat.deathForm && Math.random() < 0.01) {
+                const deathId = this.getMaterialId(mat.deathForm);
+                if (deathId) {
+                    this.grid[idx] = deathId;
+                    const deathMat = this.getMaterial(deathId);
+                    if (deathMat && deathMat.lifetime) {
+                        const [min, max] = deathMat.lifetime;
+                        this.lifetimeGrid[idx] = min + Math.random() * (max - min);
+                    }
+                    this.activateChunk(x, y);
+                }
+            }
+            return;
+        }
+        
+        // 2. OXYGEN PRODUCTION - Living plants convert CO2 to oxygen
+        if (mat.producesOxygen && Math.random() < 0.005) {
+            const neighbors = [
+                [x - 1, y], [x + 1, y],
+                [x, y - 1], [x, y + 1]
+            ];
+            
+            for (let [nx, ny] of neighbors) {
+                if (!this.inBounds(nx, ny)) continue;
+                
+                const nidx = this.index(nx, ny);
+                const nid = this.grid[nidx];
+                const nmat = this.getMaterial(nid);
+                
+                // Convert CO2 to oxygen
+                if (nmat && nmat.name === 'co2') {
+                    this.grid[nidx] = this.getMaterialId('oxygen');
+                    this.activateChunk(nx, ny);
+                    break;
+                }
+            }
+        }
+        
+        // 3. GROWTH/REPRODUCTION - Spread to adjacent cells
+        if (Math.random() < mat.growthRate) {
+            const neighbors = [
+                [x - 1, y], [x + 1, y],
+                [x, y - 1], [x, y + 1],
+                [x - 1, y - 1], [x + 1, y - 1]
+            ];
+            
+            // Shuffle neighbors for randomness
+            for (let i = neighbors.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [neighbors[i], neighbors[j]] = [neighbors[j], neighbors[i]];
+            }
+            
+            for (let [nx, ny] of neighbors) {
+                if (!this.inBounds(nx, ny)) continue;
+                
+                const nidx = this.index(nx, ny);
+                const nid = this.grid[nidx];
+                
+                // Can grow into empty spaces or dirt
+                if (nid === 0 || (this.getMaterial(nid) && this.getMaterial(nid).name === 'dirt')) {
+                    // Check if target location has good conditions
+                    const targetTemp = this.temperatureGrid[nidx];
+                    const targetTempOk = targetTemp >= mat.minTemp && targetTemp <= mat.maxTemp;
+                    const targetWaterOk = !mat.needsWater || this.hasWaterNearby(nx, ny, mat.waterSearchRadius || 3);
+                    const targetLightOk = !mat.needsLight || this.hasLightAbove(nx, ny);
+                    const targetDirtOk = !mat.needsDirt || this.hasDirtNearby(nx, ny);
+                    const targetDarkOk = mat.needsLight === false ? !this.hasLightAbove(nx, ny) : true;
+                    
+                    if (targetTempOk && targetWaterOk && targetLightOk && targetDirtOk && targetDarkOk) {
+                        this.grid[nidx] = this.getMaterialId(mat.name);
+                        this.temperatureGrid[nidx] = mat.temperature;
+                        this.activateChunk(nx, ny);
+                        break; // Only grow one cell per frame
+                    }
+                }
+            }
+        }
+        
+        // 4. TREE GROWTH - Vegetation columns harden into wood
+        if (mat.name === 'vegetation') {
+            // Check if there's a tall column (5+ cells high)
+            let columnHeight = 1;
+            for (let dy = 1; dy < 10 && y + dy < this.gridHeight; dy++) {
+                const checkIdx = this.index(x, y + dy);
+                const checkId = this.grid[checkIdx];
+                const checkMat = this.getMaterial(checkId);
+                if (checkMat && checkMat.name === 'vegetation') {
+                    columnHeight++;
+                } else {
+                    break;
+                }
+            }
+            
+            // If column is tall enough, harden bottom cells to wood
+            if (columnHeight >= 5 && Math.random() < 0.002) {
+                this.grid[idx] = this.getMaterialId('wood');
+                this.temperatureGrid[idx] = 20;
+                this.activateChunk(x, y);
+            }
+        }
+        
+        // 5. DECOMPOSITION - Fungus breaks down organic matter
+        if (mat.decomposer && Math.random() < 0.01) {
+            const neighbors = [
+                [x - 1, y], [x + 1, y],
+                [x, y - 1], [x, y + 1]
+            ];
+            
+            for (let [nx, ny] of neighbors) {
+                if (!this.inBounds(nx, ny)) continue;
+                
+                const nidx = this.index(nx, ny);
+                const nid = this.grid[nidx];
+                const nmat = this.getMaterial(nid);
+                
+                // Decompose dead organic matter to dirt
+                if (nmat && nmat.name === 'decay') {
+                    this.grid[nidx] = this.getMaterialId('dirt');
+                    this.temperatureGrid[nidx] = this.ambientTemp;
+                    this.activateChunk(nx, ny);
+                    break;
+                }
+            }
+        }
     }
 
     /**

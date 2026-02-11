@@ -3,88 +3,141 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pixel Physics v3.5 - Performance & Integration - Bud Engine</title>
+    <title>Pixel Physics v3.6 - Biology System - Bud Engine</title>
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
         body {
             margin: 0;
-            padding: 20px;
+            padding: 0;
             background: #0a0a14;
             font-family: 'Courier New', monospace;
             color: #fff;
+            overflow: hidden;
+            display: flex;
+            height: 100vh;
+        }
+        
+        /* World Canvas - Left Side */
+        #gameCanvas {
+            width: calc(100vw - 320px);
+            height: 100vh;
+            cursor: crosshair;
+            image-rendering: pixelated;
+        }
+        
+        /* Inventory Sidebar - Right Side */
+        .sidebar {
+            width: 320px;
+            height: 100vh;
+            background: #0f0f1e;
+            border-left: 2px solid #00ffcc;
             display: flex;
             flex-direction: column;
-            align-items: center;
-            gap: 15px;
+            overflow-y: auto;
+            overflow-x: hidden;
         }
         
-        h1 {
-            margin: 0;
-            font-size: 28px;
+        .sidebar::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .sidebar::-webkit-scrollbar-track {
+            background: #0a0a14;
+        }
+        
+        .sidebar::-webkit-scrollbar-thumb {
+            background: #00ffcc;
+            border-radius: 4px;
+        }
+        
+        /* Header */
+        .header {
+            padding: 15px;
             text-align: center;
+            border-bottom: 2px solid #00ffcc;
+            background: linear-gradient(180deg, #0f0f1e 0%, #1a1a2e 100%);
+        }
+        
+        .header h1 {
+            font-size: 18px;
             color: #00ffcc;
             text-shadow: 0 0 10px #00ffcc;
+            margin-bottom: 5px;
         }
         
-        .subtitle {
-            margin: 0;
-            font-size: 16px;
-            color: #ff8800;
-            text-align: center;
-            text-shadow: 0 0 8px #ff8800;
-        }
-        
-        .philosophy {
-            max-width: 700px;
-            text-align: center;
-            font-size: 13px;
-            color: #888;
-            border: 1px solid #333;
-            padding: 10px;
-            background: #1a1a2e;
-            margin-bottom: 10px;
-        }
-        
-        .philosophy strong {
-            color: #00ffcc;
-        }
-        
-        #gameCanvas {
-            border: 2px solid #00ffcc;
-            box-shadow: 0 0 20px rgba(0, 255, 204, 0.3);
-            cursor: crosshair;
-        }
-        
-        .controls {
-            display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
-            justify-content: center;
-            max-width: 900px;
-        }
-        
-        .control-section {
-            background: #16162e;
-            border: 1px solid #333;
-            padding: 8px;
-            border-radius: 3px;
-        }
-        
-        .control-section h3 {
-            margin: 0 0 8px 0;
+        .header .version {
             font-size: 11px;
+            color: #ff8800;
+            text-shadow: 0 0 5px #ff8800;
+        }
+        
+        /* Tabs */
+        .tabs {
+            display: flex;
+            flex-wrap: wrap;
+            background: #0a0a14;
+            border-bottom: 1px solid #333;
+            padding: 5px;
+            gap: 3px;
+        }
+        
+        .tab {
+            flex: 1;
+            min-width: 48px;
+            padding: 6px 4px;
+            background: #1a1a2e;
+            border: 1px solid #444;
             color: #888;
-            text-transform: uppercase;
+            cursor: pointer;
+            font-size: 10px;
+            text-align: center;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        
+        .tab:hover {
+            border-color: #00ffcc;
+            color: #aaa;
+        }
+        
+        .tab.active {
+            background: #00ffcc;
+            color: #0a0a14;
+            border-color: #00ffcc;
+            font-weight: bold;
+        }
+        
+        /* Material Grid */
+        .material-grid {
+            display: none;
+            padding: 10px;
+            gap: 5px;
+            flex-wrap: wrap;
+            background: #0f0f1e;
+        }
+        
+        .material-grid.active {
+            display: flex;
         }
         
         .material-btn {
-            padding: 8px 14px;
+            flex: 1 1 calc(50% - 5px);
+            min-width: 140px;
+            padding: 8px 10px;
             background: #1a1a2e;
             border: 2px solid #444;
-            color: #fff;
+            color: #ccc;
             cursor: pointer;
-            font-family: 'Courier New', monospace;
-            font-size: 12px;
+            font-size: 11px;
             transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
             position: relative;
         }
         
@@ -101,314 +154,638 @@
             font-weight: bold;
         }
         
-        .material-btn::before {
-            content: '';
-            display: inline-block;
-            width: 10px;
-            height: 10px;
-            margin-right: 6px;
+        .material-swatch {
+            width: 14px;
+            height: 14px;
             border: 1px solid rgba(255, 255, 255, 0.3);
+            flex-shrink: 0;
         }
         
-        /* Material colors */
-        .material-btn[data-material="sand"]::before { background: #c2b280; }
-        .material-btn[data-material="water"]::before { background: #1a6bff; }
-        .material-btn[data-material="ice"]::before { background: #a0d0ff; }
-        .material-btn[data-material="steam"]::before { background: #e0e0e0; }
-        .material-btn[data-material="fire"]::before { background: #ff4400; }
-        .material-btn[data-material="wood"]::before { background: #8b4513; }
-        .material-btn[data-material="coal"]::before { background: #1a1a1a; }
-        .material-btn[data-material="oil"]::before { background: #1a1a1a; }
-        .material-btn[data-material="stone"]::before { background: #4a4a4a; }
-        .material-btn[data-material="lava"]::before { background: #ff4400; }
-        .material-btn[data-material="obsidian"]::before { background: #0f0f0f; }
-        .material-btn[data-material="glass"]::before { background: #88ccff; opacity: 0.5; }
-        .material-btn[data-material="dirt"]::before { background: #654321; }
-        .material-btn[data-material="mud"]::before { background: #4a3520; }
-        .material-btn[data-material="clay"]::before { background: #a07855; }
-        .material-btn[data-material="iron"]::before { background: #888888; }
-        .material-btn[data-material="smoke"]::before { background: #3a3a3a; }
-        .material-btn[data-material="oxygen"]::before { background: #ccffff; opacity: 0.4; }
-        .material-btn[data-material="hydrogen"]::before { background: #ffcccc; opacity: 0.4; }
-        .material-btn[data-material="methane"]::before { background: #cceecc; opacity: 0.4; }
-        .material-btn[data-material="co2"]::before { background: #e0e0e0; opacity: 0.4; }
-        .material-btn[data-material="acid"]::before { background: #88ff44; opacity: 0.7; }
-        .material-btn[data-material="salt"]::before { background: #f0f0f0; }
-        .material-btn[data-material="sulfur"]::before { background: #ffff00; }
-        .material-btn[data-material="gunpowder"]::before { background: #2a2a2a; }
+        .material-info {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            text-align: left;
+        }
         
-        .action-btn {
-            padding: 10px 20px;
-            background: #ff4400;
-            border: 2px solid #ff6600;
-            color: #fff;
-            cursor: pointer;
-            font-family: 'Courier New', monospace;
-            font-size: 14px;
+        .material-name {
             font-weight: bold;
-            transition: all 0.2s;
-        }
-        
-        .action-btn:hover {
-            background: #ff6600;
-            box-shadow: 0 0 20px rgba(255, 68, 0, 0.5);
-        }
-        
-        .action-btn.secondary {
-            background: #333;
-            border-color: #555;
-        }
-        
-        .action-btn.secondary:hover {
-            background: #555;
-            box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
-        }
-        
-        .action-btn.heat {
-            background: #ff8800;
-            border-color: #ffaa00;
-        }
-        
-        .action-btn.heat:hover {
-            background: #ffaa00;
-        }
-        
-        .info {
-            text-align: center;
             font-size: 11px;
-            color: #666;
-            max-width: 700px;
-            line-height: 1.5;
         }
         
-        .info strong {
-            color: #00ffcc;
+        .material-prop {
+            font-size: 9px;
+            color: #888;
         }
         
-        .info .temp {
-            color: #ff8800;
+        .material-btn.active .material-prop {
+            color: #0a0a14;
+            opacity: 0.7;
         }
         
-        .brush-size {
+        /* Control Sections */
+        .control-section {
+            padding: 10px;
+            border-bottom: 1px solid #333;
+        }
+        
+        .control-section h3 {
+            margin: 0 0 8px 0;
+            font-size: 10px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .control-row {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .control-item {
             display: flex;
             align-items: center;
             gap: 8px;
-            padding: 8px;
+            background: #1a1a2e;
+            border: 1px solid #444;
+            padding: 6px 10px;
+        }
+        
+        .control-item label {
+            flex: 1;
+            font-size: 11px;
+            color: #aaa;
+        }
+        
+        .control-item input[type="range"] {
+            flex: 2;
+            height: 4px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: #333;
+            outline: none;
+            border-radius: 2px;
+        }
+        
+        .control-item input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 14px;
+            height: 14px;
+            background: #00ffcc;
+            cursor: pointer;
+            border-radius: 2px;
+        }
+        
+        .control-item input[type="range"]::-moz-range-thumb {
+            width: 14px;
+            height: 14px;
+            background: #00ffcc;
+            cursor: pointer;
+            border-radius: 2px;
+            border: none;
+        }
+        
+        .control-item .value {
+            min-width: 40px;
+            text-align: right;
+            font-size: 10px;
+            color: #00ffcc;
+        }
+        
+        /* Action Buttons */
+        .action-btn {
+            width: 100%;
+            padding: 10px;
             background: #1a1a2e;
             border: 2px solid #444;
-        }
-        
-        .brush-size label {
-            font-size: 12px;
-        }
-        
-        .brush-size input {
-            width: 80px;
-        }
-        
-        .stats {
+            color: #aaa;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
             font-size: 11px;
-            color: #888;
-            text-align: center;
+            font-weight: bold;
+            transition: all 0.2s;
+            text-transform: uppercase;
         }
         
-        .temp-display {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: rgba(26, 26, 46, 0.95);
-            border: 2px solid #ff8800;
-            padding: 12px 18px;
-            font-size: 16px;
-            color: #ff8800;
-            text-shadow: 0 0 10px #ff8800;
-            display: none;
-            border-radius: 3px;
+        .action-btn:hover {
+            border-color: #00ffcc;
+            color: #00ffcc;
+            box-shadow: 0 0 15px rgba(0, 255, 204, 0.3);
         }
         
-        .temp-display.active {
-            display: block;
+        .action-btn.primary {
+            background: #ff4400;
+            border-color: #ff6600;
+            color: #fff;
+        }
+        
+        .action-btn.primary:hover {
+            background: #ff6600;
+            border-color: #ff8800;
+            box-shadow: 0 0 15px rgba(255, 68, 0, 0.5);
+        }
+        
+        .action-btn.toggle {
+            background: #2a2a4e;
+            border-color: #5555ff;
+            color: #aaaaff;
+        }
+        
+        .action-btn.toggle:hover {
+            background: #3a3a6e;
+            border-color: #7777ff;
+            color: #ccccff;
+        }
+        
+        .action-btn.toggle.active {
+            background: #00ffcc;
+            border-color: #00ffcc;
+            color: #0a0a14;
+        }
+        
+        /* Scenario Buttons */
+        .scenario-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 5px;
         }
         
         .scenario-btn {
-            padding: 8px 16px;
+            padding: 8px;
             background: #2a2a4e;
             border: 2px solid #5555ff;
             color: #aaaaff;
             cursor: pointer;
             font-family: 'Courier New', monospace;
-            font-size: 12px;
+            font-size: 10px;
             transition: all 0.2s;
+            text-align: center;
         }
         
         .scenario-btn:hover {
             background: #3a3a6e;
             border-color: #7777ff;
             color: #ccccff;
+            box-shadow: 0 0 10px rgba(85, 85, 255, 0.3);
+        }
+        
+        /* Toggle Row */
+        .toggle-row {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .toggle-row .action-btn {
+            flex: 1;
+            padding: 8px;
+            font-size: 10px;
+        }
+        
+        /* Status Bar */
+        .status-bar {
+            padding: 10px;
+            font-size: 10px;
+            color: #666;
+            text-align: center;
+            border-top: 1px solid #333;
+            background: #0a0a14;
+            margin-top: auto;
+        }
+        
+        .status-bar span {
+            color: #00ffcc;
+        }
+        
+        /* Audio Overlay */
+        #audioOverlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 10, 20, 0.95);
+            z-index: 9999;
+            cursor: pointer;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+        }
+        
+        #audioOverlay.active {
+            display: flex;
+        }
+        
+        .audio-prompt {
+            text-align: center;
+            color: #00ffcc;
+            font-size: 24px;
+            text-shadow: 0 0 20px #00ffcc;
+        }
+        
+        .audio-icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+        
+        .audio-subtitle {
+            font-size: 14px;
+            color: #888;
+            margin-top: 10px;
+        }
+        
+        /* Responsive */
+        @media (max-width: 1024px) {
+            #gameCanvas {
+                width: calc(100vw - 280px);
+            }
+            
+            .sidebar {
+                width: 280px;
+            }
+            
+            .material-btn {
+                min-width: 120px;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            #gameCanvas {
+                width: 100vw;
+                height: 70vh;
+            }
+            
+            body {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                width: 100vw;
+                height: 30vh;
+                border-left: none;
+                border-top: 2px solid #00ffcc;
+            }
         }
     </style>
 </head>
 <body>
-    <h1>⚛️ Emergent Pixel Physics v3.5 ⚛️</h1>
-    <p class="subtitle">⚡ Performance Optimized + Entity Integration 🎮</p>
-    
-    <div class="philosophy">
-        <strong>PHILOSOPHY:</strong> No hardcoded interactions. Materials have real physical properties.
-        Interactions EMERGE from those properties meeting conditions. This is how we build Earth.
-    </div>
-    
-    <!-- Audio Enable Overlay -->
-    <div id="audioOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(10,10,20,0.95); z-index:9999; display:flex; align-items:center; justify-content:center; flex-direction:column; cursor:pointer;">
-        <div style="text-align:center; color:#00ffcc; font-size:24px; text-shadow: 0 0 20px #00ffcc;">
-            <div style="font-size:48px; margin-bottom:20px;">🔊</div>
-            <div style="margin-bottom:10px;">Click to Enable Audio</div>
-            <div style="font-size:14px; color:#888;">Web Audio requires user interaction</div>
-        </div>
-    </div>
-    
+    <!-- World Canvas -->
     <canvas id="gameCanvas"></canvas>
     
-    <div class="temp-display" id="tempDisplay">
-        🌡️ <span id="tempValue">20</span>°C
-    </div>
-    
-    <div class="control-section">
-        <h3>🌊 Water Cycle (H₂O)</h3>
-        <div class="controls">
-            <button class="material-btn" data-material="ice">Ice (-10°C)</button>
-            <button class="material-btn" data-material="water">Water (20°C)</button>
-            <button class="material-btn" data-material="steam">Steam (100°C)</button>
+    <!-- Inventory Sidebar -->
+    <div class="sidebar">
+        <!-- Header -->
+        <div class="header">
+            <h1>⚛️ Pixel Physics ⚛️</h1>
+            <div class="version">v3.6 • BIOLOGY SYSTEM</div>
         </div>
-    </div>
-    
-    <div class="control-section">
-        <h3>🪨 Earth & Minerals</h3>
-        <div class="controls">
-            <button class="material-btn active" data-material="sand">Sand (SiO₂)</button>
-            <button class="material-btn" data-material="glass">Glass (1700°C)</button>
-            <button class="material-btn" data-material="stone">Stone</button>
-            <button class="material-btn" data-material="lava">Lava (1200°C)</button>
-            <button class="material-btn" data-material="obsidian">Obsidian</button>
-            <button class="material-btn" data-material="dirt">Dirt</button>
-            <button class="material-btn" data-material="mud">Mud</button>
-            <button class="material-btn" data-material="clay">Clay</button>
-            <button class="material-btn" data-material="iron">Iron</button>
+        
+        <!-- Material Tabs -->
+        <div class="tabs">
+            <div class="tab" data-tab="elements">🌊 Elements</div>
+            <div class="tab active" data-tab="earth">🪨 Earth</div>
+            <div class="tab" data-tab="energy">🔥 Energy</div>
+            <div class="tab" data-tab="gases">💨 Gases</div>
+            <div class="tab" data-tab="reactive">⚗️ Reactive</div>
+            <div class="tab" data-tab="life">🌿 Life</div>
         </div>
-    </div>
-    
-    <div class="control-section">
-        <h3>🔥 Flammable Materials</h3>
-        <div class="controls">
-            <button class="material-btn" data-material="wood">Wood (300°C)</button>
-            <button class="material-btn" data-material="coal">Coal (350°C)</button>
-            <button class="material-btn" data-material="oil">Oil (210°C)</button>
-            <button class="material-btn" data-material="gunpowder">Gunpowder (280°C)</button>
-            <button class="material-btn" data-material="fire">Fire (800°C)</button>
+        
+        <!-- Material Grids -->
+        <div class="material-grid" data-grid="elements">
+            <button class="material-btn" data-material="ice">
+                <div class="material-swatch" style="background: #a0d0ff;"></div>
+                <div class="material-info">
+                    <div class="material-name">Ice</div>
+                    <div class="material-prop">0°C melting</div>
+                </div>
+            </button>
+            <button class="material-btn" data-material="water">
+                <div class="material-swatch" style="background: #1a6bff;"></div>
+                <div class="material-info">
+                    <div class="material-name">Water</div>
+                    <div class="material-prop">100°C boiling</div>
+                </div>
+            </button>
+            <button class="material-btn" data-material="steam">
+                <div class="material-swatch" style="background: #e0e0e0;"></div>
+                <div class="material-info">
+                    <div class="material-name">Steam</div>
+                    <div class="material-prop">Condenses</div>
+                </div>
+            </button>
         </div>
-    </div>
-    
-    <div class="control-section">
-        <h3>💨 Gases</h3>
-        <div class="controls">
-            <button class="material-btn" data-material="smoke">Smoke</button>
-            <button class="material-btn" data-material="oxygen">Oxygen (O₂)</button>
-            <button class="material-btn" data-material="hydrogen">Hydrogen (H₂)</button>
-            <button class="material-btn" data-material="methane">Methane (CH₄)</button>
-            <button class="material-btn" data-material="co2">CO₂</button>
+        
+        <div class="material-grid active" data-grid="earth">
+            <button class="material-btn active" data-material="sand">
+                <div class="material-swatch" style="background: #c2b280;"></div>
+                <div class="material-info">
+                    <div class="material-name">Sand</div>
+                    <div class="material-prop">1700°C → Glass</div>
+                </div>
+            </button>
+            <button class="material-btn" data-material="glass">
+                <div class="material-swatch" style="background: #88ccff; opacity: 0.6;"></div>
+                <div class="material-info">
+                    <div class="material-name">Glass</div>
+                    <div class="material-prop">Transparent</div>
+                </div>
+            </button>
+            <button class="material-btn" data-material="stone">
+                <div class="material-swatch" style="background: #4a4a4a;"></div>
+                <div class="material-info">
+                    <div class="material-name">Stone</div>
+                    <div class="material-prop">1200°C → Lava</div>
+                </div>
+            </button>
+            <button class="material-btn" data-material="lava">
+                <div class="material-swatch" style="background: #ff4400;"></div>
+                <div class="material-info">
+                    <div class="material-name">Lava</div>
+                    <div class="material-prop">1200°C liquid</div>
+                </div>
+            </button>
+            <button class="material-btn" data-material="obsidian">
+                <div class="material-swatch" style="background: #0f0f0f;"></div>
+                <div class="material-info">
+                    <div class="material-name">Obsidian</div>
+                    <div class="material-prop">Cooled lava</div>
+                </div>
+            </button>
+            <button class="material-btn" data-material="dirt">
+                <div class="material-swatch" style="background: #654321;"></div>
+                <div class="material-info">
+                    <div class="material-name">Dirt</div>
+                    <div class="material-prop">Nutrients</div>
+                </div>
+            </button>
+            <button class="material-btn" data-material="mud">
+                <div class="material-swatch" style="background: #4a3520;"></div>
+                <div class="material-info">
+                    <div class="material-name">Mud</div>
+                    <div class="material-prop">Dirt + Water</div>
+                </div>
+            </button>
+            <button class="material-btn" data-material="clay">
+                <div class="material-swatch" style="background: #a07855;"></div>
+                <div class="material-info">
+                    <div class="material-name">Clay</div>
+                    <div class="material-prop">Cohesive</div>
+                </div>
+            </button>
+            <button class="material-btn" data-material="iron">
+                <div class="material-swatch" style="background: #888888;"></div>
+                <div class="material-info">
+                    <div class="material-name">Iron</div>
+                    <div class="material-prop">1538°C melting</div>
+                </div>
+            </button>
         </div>
-    </div>
-    
-    <div class="control-section">
-        <h3>⚗️ Reactive Materials</h3>
-        <div class="controls">
-            <button class="material-btn" data-material="acid">Acid (pH 1)</button>
-            <button class="material-btn" data-material="salt">Salt (NaCl)</button>
-            <button class="material-btn" data-material="sulfur">Sulfur (S)</button>
+        
+        <div class="material-grid" data-grid="energy">
+            <button class="material-btn" data-material="wood">
+                <div class="material-swatch" style="background: #8b4513;"></div>
+                <div class="material-info">
+                    <div class="material-name">Wood</div>
+                    <div class="material-prop">300°C ignition</div>
+                </div>
+            </button>
+            <button class="material-btn" data-material="coal">
+                <div class="material-swatch" style="background: #1a1a1a;"></div>
+                <div class="material-info">
+                    <div class="material-name">Coal</div>
+                    <div class="material-prop">350°C ignition</div>
+                </div>
+            </button>
+            <button class="material-btn" data-material="oil">
+                <div class="material-swatch" style="background: #1a1a1a;"></div>
+                <div class="material-info">
+                    <div class="material-name">Oil</div>
+                    <div class="material-prop">210°C ignition</div>
+                </div>
+            </button>
+            <button class="material-btn" data-material="gunpowder">
+                <div class="material-swatch" style="background: #2a2a2a;"></div>
+                <div class="material-info">
+                    <div class="material-name">Gunpowder</div>
+                    <div class="material-prop">280°C explosive</div>
+                </div>
+            </button>
+            <button class="material-btn" data-material="fire">
+                <div class="material-swatch" style="background: #ff4400;"></div>
+                <div class="material-info">
+                    <div class="material-name">Fire</div>
+                    <div class="material-prop">800°C plasma</div>
+                </div>
+            </button>
         </div>
-    </div>
-    
-    <div class="controls">
-        <div class="brush-size">
-            <label>Brush:</label>
-            <input type="range" id="brushSize" min="3" max="50" value="12">
-            <span id="brushSizeValue">12</span>px
+        
+        <div class="material-grid" data-grid="gases">
+            <button class="material-btn" data-material="smoke">
+                <div class="material-swatch" style="background: #3a3a3a;"></div>
+                <div class="material-info">
+                    <div class="material-name">Smoke</div>
+                    <div class="material-prop">Rises</div>
+                </div>
+            </button>
+            <button class="material-btn" data-material="oxygen">
+                <div class="material-swatch" style="background: #ccffff; opacity: 0.5;"></div>
+                <div class="material-info">
+                    <div class="material-name">Oxygen</div>
+                    <div class="material-prop">O₂</div>
+                </div>
+            </button>
+            <button class="material-btn" data-material="hydrogen">
+                <div class="material-swatch" style="background: #ffcccc; opacity: 0.5;"></div>
+                <div class="material-info">
+                    <div class="material-name">Hydrogen</div>
+                    <div class="material-prop">H₂ explosive</div>
+                </div>
+            </button>
+            <button class="material-btn" data-material="methane">
+                <div class="material-swatch" style="background: #cceecc; opacity: 0.5;"></div>
+                <div class="material-info">
+                    <div class="material-name">Methane</div>
+                    <div class="material-prop">CH₄</div>
+                </div>
+            </button>
+            <button class="material-btn" data-material="co2">
+                <div class="material-swatch" style="background: #e0e0e0; opacity: 0.5;"></div>
+                <div class="material-info">
+                    <div class="material-name">CO₂</div>
+                    <div class="material-prop">Sinks</div>
+                </div>
+            </button>
         </div>
-    </div>
-    
-    <div class="controls">
-        <button class="action-btn heat" id="soundBtn" onclick="toggleSound()">🔊 Enable Sound</button>
-        <div class="brush-size" id="volumeControl" style="display:none;">
-            <label>Volume:</label>
-            <input type="range" id="volumeSlider" min="0" max="100" value="70">
-            <span id="volumeValue">70</span>%
+        
+        <div class="material-grid" data-grid="reactive">
+            <button class="material-btn" data-material="acid">
+                <div class="material-swatch" style="background: #88ff44; opacity: 0.7;"></div>
+                <div class="material-info">
+                    <div class="material-name">Acid</div>
+                    <div class="material-prop">pH 1 corrosive</div>
+                </div>
+            </button>
+            <button class="material-btn" data-material="salt">
+                <div class="material-swatch" style="background: #f0f0f0;"></div>
+                <div class="material-info">
+                    <div class="material-name">Salt</div>
+                    <div class="material-prop">NaCl</div>
+                </div>
+            </button>
+            <button class="material-btn" data-material="sulfur">
+                <div class="material-swatch" style="background: #ffff00;"></div>
+                <div class="material-info">
+                    <div class="material-name">Sulfur</div>
+                    <div class="material-prop">S flammable</div>
+                </div>
+            </button>
         </div>
-    </div>
-    
-    <div class="controls">
-        <button class="action-btn heat" onclick="toggleHeat()">🌡️ Heat View (T)</button>
-        <button class="action-btn heat" onclick="toggleLighting()">🌙 Lighting (L)</button>
-        <button class="action-btn" onclick="createExplosion()">💥 EXPLODE!</button>
-        <button class="action-btn secondary" onclick="clearWorld()">🗑️ Clear All</button>
-    </div>
-    
-    <div class="control-section">
-        <h3>💨 Wind System (v3.5)</h3>
-        <div class="controls">
-            <div class="brush-size">
-                <label>Wind X:</label>
-                <input type="range" id="windX" min="-2" max="2" step="0.1" value="0">
-                <span id="windXValue">0</span>
+        
+        <div class="material-grid" data-grid="life">
+            <button class="material-btn" data-material="plant">
+                <div class="material-swatch" style="background: #1a5c1a;"></div>
+                <div class="material-info">
+                    <div class="material-name">Plant</div>
+                    <div class="material-prop">Seed 10-40°C</div>
+                </div>
+            </button>
+            <button class="material-btn" data-material="vegetation">
+                <div class="material-swatch" style="background: #33aa33;"></div>
+                <div class="material-info">
+                    <div class="material-name">Vegetation</div>
+                    <div class="material-prop">Grows/O₂</div>
+                </div>
+            </button>
+            <button class="material-btn" data-material="fungus">
+                <div class="material-swatch" style="background: #8b7355;"></div>
+                <div class="material-info">
+                    <div class="material-name">Fungus</div>
+                    <div class="material-prop">Dark/damp</div>
+                </div>
+            </button>
+            <button class="material-btn" data-material="decay">
+                <div class="material-swatch" style="background: #4a3a2a;"></div>
+                <div class="material-info">
+                    <div class="material-name">Decay</div>
+                    <div class="material-prop">→ Dirt</div>
+                </div>
+            </button>
+        </div>
+        
+        <!-- Brush Control -->
+        <div class="control-section">
+            <h3>🖌️ Brush</h3>
+            <div class="control-row">
+                <div class="control-item">
+                    <label>Size</label>
+                    <input type="range" id="brushSize" min="3" max="50" value="12">
+                    <span class="value"><span id="brushSizeValue">12</span>px</span>
+                </div>
             </div>
-            <div class="brush-size">
-                <label>Wind Y:</label>
-                <input type="range" id="windY" min="-2" max="2" step="0.1" value="0">
-                <span id="windYValue">0</span>
+        </div>
+        
+        <!-- Wind Control -->
+        <div class="control-section">
+            <h3>💨 Wind</h3>
+            <div class="control-row">
+                <div class="control-item">
+                    <label>X</label>
+                    <input type="range" id="windX" min="-2" max="2" step="0.1" value="0">
+                    <span class="value" id="windXValue">0</span>
+                </div>
+                <div class="control-item">
+                    <label>Y</label>
+                    <input type="range" id="windY" min="-2" max="2" step="0.1" value="0">
+                    <span class="value" id="windYValue">0</span>
+                </div>
             </div>
-            <button class="action-btn secondary" onclick="resetWind()">Reset Wind</button>
+        </div>
+        
+        <!-- Volume Control (hidden until sound enabled) -->
+        <div class="control-section" id="volumeSection" style="display: none;">
+            <h3>🔊 Volume</h3>
+            <div class="control-row">
+                <div class="control-item">
+                    <label>Level</label>
+                    <input type="range" id="volumeSlider" min="0" max="100" value="70">
+                    <span class="value"><span id="volumeValue">70</span>%</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Actions -->
+        <div class="control-section">
+            <h3>⚙️ Actions</h3>
+            <div class="control-row">
+                <button class="action-btn primary" onclick="createExplosion()">💥 Explode</button>
+                <button class="action-btn" onclick="clearWorld()">🗑️ Clear All</button>
+                <button class="action-btn" onclick="saveWorld()">💾 Save World</button>
+                <button class="action-btn" onclick="loadWorld()">📂 Load World</button>
+            </div>
+        </div>
+        
+        <!-- Scenarios -->
+        <div class="control-section">
+            <h3>📋 Scenarios</h3>
+            <div class="scenario-grid">
+                <button class="scenario-btn" onclick="loadScenario('volcano')">🌋 Volcano</button>
+                <button class="scenario-btn" onclick="loadScenario('lab')">🧪 Lab</button>
+                <button class="scenario-btn" onclick="loadScenario('forest')">🔥 Forest</button>
+                <button class="scenario-btn" onclick="loadScenario('garden')">🌿 Garden</button>
+                <button class="scenario-btn" onclick="loadScenario('underwater')">🌊 Ocean</button>
+                <button class="scenario-btn" onclick="loadScenario('arctic')">❄️ Arctic</button>
+            </div>
+        </div>
+        
+        <!-- Toggles -->
+        <div class="control-section">
+            <h3>👁️ View</h3>
+            <div class="toggle-row">
+                <button class="action-btn toggle" id="heatBtn" onclick="toggleHeat()">🌡️ Heat</button>
+                <button class="action-btn toggle active" id="lightBtn" onclick="toggleLighting()">🌙 Light</button>
+                <button class="action-btn toggle" id="soundBtn" onclick="toggleSound()">🔊 Sound</button>
+            </div>
+        </div>
+        
+        <!-- Status Bar -->
+        <div class="status-bar">
+            FPS: <span id="fps">60</span> • 
+            v3.6 • 
+            Materials: <span>30</span> • 
+            🌿 <span>Biology System</span>
         </div>
     </div>
     
-    <div class="control-section">
-        <h3>💾 Save/Load (v3.5)</h3>
-        <div class="controls">
-            <button class="action-btn secondary" onclick="saveWorld()">💾 Save World</button>
-            <button class="action-btn secondary" onclick="loadWorld()">📂 Load World</button>
+    <!-- Audio Overlay -->
+    <div id="audioOverlay">
+        <div class="audio-prompt">
+            <div class="audio-icon">🔊</div>
+            <div>Click to Enable Audio</div>
+            <div class="audio-subtitle">Web Audio requires user interaction</div>
         </div>
-    </div>
-    
-    <div class="control-section">
-        <h3>📋 Scenarios</h3>
-        <div class="controls">
-            <button class="scenario-btn" onclick="loadScenario('volcano')">🌋 Volcano</button>
-            <button class="scenario-btn" onclick="loadScenario('lab')">🧪 Lab</button>
-            <button class="scenario-btn" onclick="loadScenario('forest')">🔥 Forest Fire</button>
-            <button class="scenario-btn" onclick="loadScenario('underwater')">🌊 Underwater</button>
-            <button class="scenario-btn" onclick="loadScenario('arctic')">❄️ Arctic</button>
-        </div>
-    </div>
-    
-    <div class="info">
-        <strong>v3.5: Performance Optimized + Entity Integration ⚡</strong><br>
-        • <span class="temp">Cell-based lighting</span> — NO canvas gradients! 40+ FPS on volcano scenario (was 15 FPS)<br>
-        • <span class="temp">Entity-physics integration</span> — getMaterialAt(), isSolidAt(), isDangerousAt(), disturbArea()<br>
-        • <span class="temp">Wind system</span> — affects fire, smoke, gases • Try setting wind and lighting fires!<br>
-        • <span class="temp">Save/Load</span> — save your creations and reload them anytime<br>
-        • <span class="temp">Hot materials glow</span> — materials above 400°C blend toward white/yellow<br>
-        • <span class="temp">Procedural sound</span> from material properties (click 🔊 to enable)<br>
-        • Hover for temp • <strong>T</strong> = heat view • <strong>L</strong> = lighting • <strong>`</strong> = debug
-    </div>
-    
-    <div class="stats">
-        FPS: <span id="fps">60</span> • Materials: 25 • v3.5: Optimized Lighting • Wind: <span id="windStatus">(0, 0)</span> • Sound: <span id="soundStatus">Disabled</span>
     </div>
 
     <script src="bud.js"></script>
     <script>
         // Create engine
         const engine = new BudEngine({
-            width: 800,
-            height: 600,
+            canvas: document.getElementById('gameCanvas'),
+            width: window.innerWidth - 320,
+            height: window.innerHeight,
             backgroundColor: '#0f0f1e'
+        });
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            const newWidth = window.innerWidth > 768 ? window.innerWidth - 320 : window.innerWidth;
+            const newHeight = window.innerHeight;
+            engine.canvas.width = newWidth;
+            engine.canvas.height = newHeight;
+            engine.physics.init(newWidth, newHeight, engine.physics.cellSize);
+            buildInitialWorld();
         });
 
         // Initialize pixel physics
@@ -420,6 +797,21 @@
         let isMouseDown = false;
         let lastMouseX = 0;
         let lastMouseY = 0;
+
+        // Tab switching
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabName = tab.dataset.tab;
+                
+                // Update active tab
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                
+                // Update active grid
+                document.querySelectorAll('.material-grid').forEach(g => g.classList.remove('active'));
+                document.querySelector(`[data-grid="${tabName}"]`).classList.add('active');
+            });
+        });
 
         // Material button selection
         document.querySelectorAll('.material-btn').forEach(btn => {
@@ -438,31 +830,9 @@
             brushSizeValue.textContent = brushSize;
         });
 
-        // Temperature display on hover
-        const tempDisplay = document.getElementById('tempDisplay');
-        const tempValue = document.getElementById('tempValue');
-        
-        engine.canvas.addEventListener('mousemove', (e) => {
-            const rect = engine.canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-            
-            const temp = engine.physics.getTemp(x, y);
-            tempValue.textContent = Math.round(temp);
-            
-            if (!isMouseDown) {
-                tempDisplay.classList.add('active');
-            }
-        });
-        
-        engine.canvas.addEventListener('mouseleave', () => {
-            tempDisplay.classList.remove('active');
-        });
-
         // Mouse interaction for placing materials
         engine.canvas.addEventListener('mousedown', (e) => {
             isMouseDown = true;
-            tempDisplay.classList.remove('active');
             const rect = engine.canvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
@@ -503,7 +873,7 @@
             isMouseDown = false;
         });
 
-        // Touch support for mobile
+        // Touch support
         engine.canvas.addEventListener('touchstart', (e) => {
             e.preventDefault();
             const touch = e.touches[0];
@@ -555,40 +925,30 @@
             }
         });
 
-        // v3.3: Sound toggle
+        // Sound toggle
         function toggleSound() {
             const soundBtn = document.getElementById('soundBtn');
-            const volumeControl = document.getElementById('volumeControl');
-            const soundStatus = document.getElementById('soundStatus');
+            const volumeSection = document.getElementById('volumeSection');
             const audioOverlay = document.getElementById('audioOverlay');
             
             if (!engine.physics.acoustics.enabled) {
                 // Show overlay to get user interaction
-                audioOverlay.style.display = 'flex';
+                audioOverlay.classList.add('active');
                 audioOverlay.onclick = () => {
-                    audioOverlay.style.display = 'none';
+                    audioOverlay.classList.remove('active');
                     const success = engine.physics.acoustics.init();
                     if (success) {
-                        soundBtn.textContent = '🔊 Sound ON';
+                        soundBtn.textContent = '🔊 Sound';
                         soundBtn.classList.add('active');
-                        volumeControl.style.display = 'flex';
-                        soundStatus.textContent = 'Enabled';
-                        soundStatus.style.color = '#00ffcc';
+                        volumeSection.style.display = 'block';
                         console.log('🔊 Acoustic Physics System enabled!');
-                    } else {
-                        soundBtn.textContent = '🔇 Sound Failed';
-                        soundStatus.textContent = 'Failed';
-                        soundStatus.style.color = '#ff0000';
                     }
                 };
             } else {
                 // Toggle off
                 engine.physics.acoustics.enabled = false;
-                soundBtn.textContent = '🔇 Sound OFF';
                 soundBtn.classList.remove('active');
-                volumeControl.style.display = 'none';
-                soundStatus.textContent = 'Disabled';
-                soundStatus.style.color = '#888';
+                volumeSection.style.display = 'none';
             }
         }
         
@@ -601,51 +961,30 @@
             engine.physics.acoustics.setVolume(volume);
         });
         
-        // v3.5: Wind controls
+        // Wind controls
         const windXSlider = document.getElementById('windX');
         const windXValue = document.getElementById('windXValue');
         const windYSlider = document.getElementById('windY');
         const windYValue = document.getElementById('windYValue');
-        const windStatus = document.getElementById('windStatus');
         
         windXSlider.addEventListener('input', (e) => {
             const value = parseFloat(e.target.value);
             windXValue.textContent = value.toFixed(1);
             engine.physics.wind.x = value;
-            updateWindStatus();
         });
         
         windYSlider.addEventListener('input', (e) => {
             const value = parseFloat(e.target.value);
             windYValue.textContent = value.toFixed(1);
             engine.physics.wind.y = value;
-            updateWindStatus();
         });
         
-        function updateWindStatus() {
-            const wx = engine.physics.wind.x.toFixed(1);
-            const wy = engine.physics.wind.y.toFixed(1);
-            windStatus.textContent = `(${wx}, ${wy})`;
-        }
-        
-        function resetWind() {
-            engine.physics.wind.x = 0;
-            engine.physics.wind.y = 0;
-            windXSlider.value = 0;
-            windYSlider.value = 0;
-            windXValue.textContent = '0';
-            windYValue.textContent = '0';
-            updateWindStatus();
-            console.log('💨 Wind reset');
-        }
-        
-        // v3.5: Save/Load functions
+        // Save/Load functions
         function saveWorld() {
             const saveData = engine.physics.save();
             if (saveData) {
                 localStorage.setItem('pixelPhysics_world', JSON.stringify(saveData));
-                console.log('💾 World saved to localStorage');
-                alert('World saved successfully!');
+                console.log('💾 World saved');
             }
         }
         
@@ -654,32 +993,29 @@
             if (saveData) {
                 try {
                     engine.physics.load(JSON.parse(saveData));
-                    console.log('📂 World loaded from localStorage');
-                    alert('World loaded successfully!');
+                    console.log('📂 World loaded');
                     
                     // Update wind controls
                     windXSlider.value = engine.physics.wind.x;
                     windYSlider.value = engine.physics.wind.y;
                     windXValue.textContent = engine.physics.wind.x.toFixed(1);
                     windYValue.textContent = engine.physics.wind.y.toFixed(1);
-                    updateWindStatus();
                 } catch (e) {
                     console.error('Failed to load world:', e);
-                    alert('Failed to load world!');
                 }
-            } else {
-                alert('No saved world found!');
             }
         }
         
         // Heat visualization toggle
         function toggleHeat() {
             engine.physics.toggleHeatView();
+            document.getElementById('heatBtn').classList.toggle('active');
         }
         
-        // v3.5: Dynamic lighting toggle
+        // Lighting toggle
         function toggleLighting() {
             engine.physics.toggleLighting();
+            document.getElementById('lightBtn').classList.toggle('active');
         }
 
         // Explosion function
@@ -706,12 +1042,10 @@
                 // Stone walls
                 engine.physics.fill(200, 300, 280, 550, 'stone');
                 engine.physics.fill(520, 300, 600, 550, 'stone');
-                // Water pool on one side
+                // Water pool
                 engine.physics.fill(50, 450, 150, 550, 'water');
-                // Wooden platforms
-                engine.physics.fill(150, 350, 200, 370, 'wood');
                 
-                console.log('🌋 Volcano: Watch lava heat the environment. Pour water on it!');
+                console.log('🌋 Volcano scenario loaded');
             } else if (name === 'lab') {
                 // Test tubes
                 engine.physics.fill(150, 450, 170, 550, 'glass');
@@ -729,11 +1063,7 @@
                 // Metal samples
                 engine.physics.fill(600, 480, 640, 500, 'iron');
                 
-                // Flammable materials
-                engine.physics.fill(100, 300, 130, 330, 'oil');
-                engine.physics.fill(200, 300, 230, 330, 'gunpowder');
-                
-                console.log('🧪 Lab: Drop acid on metal. Mix hydrogen + oxygen, then ignite!');
+                console.log('🧪 Lab scenario loaded');
             } else if (name === 'forest') {
                 // Trees (wood)
                 for (let i = 0; i < 8; i++) {
@@ -742,12 +1072,39 @@
                 }
                 // Ground
                 engine.physics.fill(0, 550, 800, 600, 'dirt');
-                // Some coal deposits
-                engine.physics.fill(300, 520, 340, 550, 'coal');
+                // Some vegetation
+                for (let i = 0; i < 10; i++) {
+                    const x = Math.random() * 800;
+                    engine.physics.circle(x, 530, 10, 'vegetation');
+                }
                 // Starting fire
                 engine.physics.circle(100, 400, 15, 'fire');
                 
-                console.log('🔥 Forest Fire: Watch fire spread, heat neighbors, and consume oxygen');
+                console.log('🔥 Forest fire scenario loaded');
+            } else if (name === 'garden') {
+                // Soil base
+                engine.physics.fill(0, 500, 800, 600, 'dirt');
+                // Water channels
+                engine.physics.fill(200, 480, 220, 600, 'water');
+                engine.physics.fill(580, 480, 600, 600, 'water');
+                // Plant some seeds
+                for (let i = 0; i < 15; i++) {
+                    const x = Math.random() * 800;
+                    engine.physics.circle(x, 490, 3, 'plant');
+                }
+                // Some vegetation
+                for (let i = 0; i < 10; i++) {
+                    const x = Math.random() * 800;
+                    engine.physics.circle(x, 490, 8, 'vegetation');
+                }
+                // Add fungus in shaded areas
+                engine.physics.fill(50, 450, 100, 500, 'stone');
+                for (let i = 0; i < 5; i++) {
+                    const x = 50 + Math.random() * 50;
+                    engine.physics.circle(x, 440, 5, 'fungus');
+                }
+                
+                console.log('🌿 Garden scenario loaded - Watch life grow!');
             } else if (name === 'underwater') {
                 // Water
                 engine.physics.fill(0, 100, 800, 600, 'water');
@@ -757,7 +1114,7 @@
                 engine.physics.fill(350, 500, 450, 550, 'stone');
                 engine.physics.circle(400, 520, 30, 'lava');
                 
-                console.log('🌊 Underwater: Lava + Water = Steam! Watch it rise');
+                console.log('🌊 Underwater scenario loaded');
             } else if (name === 'arctic') {
                 // Ice shelf
                 engine.physics.fill(0, 300, 800, 400, 'ice');
@@ -766,27 +1123,29 @@
                 // Some lava to melt it
                 engine.physics.circle(400, 350, 40, 'lava');
                 
-                console.log('❄️ Arctic: Watch ice melt into water, then boil into steam');
+                console.log('❄️ Arctic scenario loaded');
             }
         }
 
-        // Build some initial structures
+        // Build initial world
         function buildInitialWorld() {
             // Bottom stone floor
-            engine.physics.fill(0, 560, 800, 600, 'stone');
+            engine.physics.fill(0, engine.canvas.height - 40, engine.canvas.width, engine.canvas.height, 'stone');
             
             // Stone walls on sides
-            engine.physics.fill(0, 0, 25, 600, 'stone');
-            engine.physics.fill(775, 0, 800, 600, 'stone');
+            engine.physics.fill(0, 0, 25, engine.canvas.height, 'stone');
+            engine.physics.fill(engine.canvas.width - 25, 0, engine.canvas.width, engine.canvas.height, 'stone');
             
-            // Some wooden platforms
-            engine.physics.fill(100, 480, 280, 495, 'wood');
-            engine.physics.fill(520, 400, 700, 415, 'wood');
-            engine.physics.fill(200, 300, 380, 315, 'wood');
+            // Wooden platforms
+            const h = engine.canvas.height;
+            engine.physics.fill(100, h - 120, 280, h - 105, 'wood');
+            engine.physics.fill(520, h - 200, 700, h - 185, 'wood');
             
-            // Stone pillars
-            engine.physics.fill(150, 420, 175, 480, 'stone');
-            engine.physics.fill(625, 330, 650, 400, 'stone');
+            // Some dirt patches
+            engine.physics.fill(300, h - 80, 500, h - 60, 'dirt');
+            
+            // Plant a seed
+            engine.physics.circle(400, h - 90, 5, 'plant');
         }
 
         // Initialize world
@@ -795,13 +1154,29 @@
         // Main scene
         engine.scene('main', {
             enter() {
-                console.log('[PixelPhysics v3.5] Performance Optimized + Entity Integration');
-                console.log('• Cell-based lighting: 40+ FPS (was 15 FPS)');
-                console.log('• Entity-physics integration: getMaterialAt(), isSolidAt(), isDangerousAt(), disturbArea()');
-                console.log('• Wind system: affects fire, smoke, gases');
-                console.log('• Save/Load worlds');
-                console.log('• Hot materials glow (>400°C)');
-                console.log('• Press T for heat view, L for lighting toggle');
+                console.log('═════════════════════════════════════════════════════════════');
+                console.log('⚛️ PIXEL PHYSICS v3.6 - BIOLOGY SYSTEM');
+                console.log('═════════════════════════════════════════════════════════════');
+                console.log('NEW IN v3.6:');
+                console.log('  🌿 Living materials: plant, vegetation, fungus, decay');
+                console.log('  🌱 Life emerges naturally from chemistry');
+                console.log('  🌳 Trees grow: vegetation → wood over time');
+                console.log('  💨 Oxygen production: plants convert CO₂ → O₂');
+                console.log('  🍄 Decomposition: fungus breaks down organic matter');
+                console.log('  ☀️ Light detection: plants need light, fungus grows in dark');
+                console.log('  🌡️ Temperature-based survival: materials die if too hot/cold');
+                console.log('  💧 Water requirement: biology needs moisture to thrive');
+                console.log('');
+                console.log('🌱 TRY THIS:');
+                console.log('  • Load "Garden" scenario → watch life grow');
+                console.log('  • Place dirt + water → add plant → watch it spread');
+                console.log('  • Build a cave → add fungus → watch it decompose organic matter');
+                console.log('  • Burn vegetation → it becomes decay → eventually dirt');
+                console.log('  • Stack vegetation tall → bottom hardens into wood (trees!)');
+                console.log('');
+                console.log('🔬 Materials: ~30 total (including 5 living materials)');
+                console.log('T = heat view • L = lighting • Use sidebar to select materials');
+                console.log('═════════════════════════════════════════════════════════════');
             },
             
             update(dt) {
@@ -813,33 +1188,6 @@
         // Start engine
         engine.goTo('main');
         engine.start();
-
-        console.log('═════════════════════════════════════════════════════════════');
-        console.log('⚡ PIXEL PHYSICS v3.5 - Performance Optimized + Entity Integration');
-        console.log('═════════════════════════════════════════════════════════════');
-        console.log('NEW IN v3.5:');
-        console.log('  ⚡ Cell-based lighting: 40+ FPS on volcano (was 15 FPS!)');
-        console.log('  🎮 Entity-physics integration API:');
-        console.log('     • engine.physics.getMaterialAt(x, y)');
-        console.log('     • engine.physics.isSolidAt(x, y)');
-        console.log('     • engine.physics.isLiquidAt(x, y)');
-        console.log('     • engine.physics.isDangerousAt(x, y)');
-        console.log('     • engine.physics.disturbArea(x, y, radius, force)');
-        console.log('  💨 Wind system: affects fire, smoke, gases');
-        console.log('     • Set wind.x and wind.y with sliders');
-        console.log('     • Fire flickers in wind direction');
-        console.log('  💾 Save/Load: save your creations!');
-        console.log('  ✨ Hot materials glow: >400°C blend toward white/yellow');
-        console.log('');
-        console.log('🔬 TRY THESE EXPERIMENTS:');
-        console.log('  • Load "Volcano" — watch FPS stay at 40+ (was 15!)');
-        console.log('  • Set wind → light a fire → watch it blow sideways');
-        console.log('  • Create something cool → click Save → Clear → Load it back');
-        console.log('  • Pour lava → watch it glow brighter as it heats up');
-        console.log('  • Click 🔊 Enable Sound to hear the physics!');
-        console.log('');
-        console.log('T = heat view • L = lighting • Wind sliders • Save/Load buttons');
-        console.log('═════════════════════════════════════════════════════════════');
     </script>
 </body>
 </html>
