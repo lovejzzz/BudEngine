@@ -2377,6 +2377,32 @@ class SoundSystem {
                 osc.stop(now + 0.05);
                 break;
             
+            case 'hit_heavy':
+                // Deeper, more impactful hit for bosses
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.exponentialRampToValueAtTime(30, now + 0.08);
+                gain.gain.setValueAtTime(0.35 * effectiveVolume, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+                filter.frequency.setValueAtTime(800, now);
+                filter.frequency.exponentialRampToValueAtTime(200, now + 0.08);
+                osc.start(now);
+                osc.stop(now + 0.08);
+                break;
+            
+            case 'slash':
+                // Quick swoosh for melee attacks
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(800, now);
+                osc.frequency.exponentialRampToValueAtTime(200, now + 0.08);
+                gain.gain.setValueAtTime(0.18 * effectiveVolume, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+                filter.frequency.setValueAtTime(3000, now);
+                filter.frequency.exponentialRampToValueAtTime(600, now + 0.08);
+                osc.start(now);
+                osc.stop(now + 0.08);
+                break;
+            
             case 'explode':
                 osc.type = 'triangle';
                 osc.frequency.setValueAtTime(100, now);

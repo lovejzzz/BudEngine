@@ -253,7 +253,7 @@ function createPlayer(x, y) {
 }
 
 function performMeleeAttack(player) {
-    engine.sound.play('hit');
+    engine.sound.play('slash'); // Use slash sound for melee
     
     // Create visual slash arc
     const slashAngle = player.rotation;
@@ -842,21 +842,34 @@ function createDamageNumber(x, y, damage) {
 
 // ===== DECORATIONS =====
 
-function createPillar(x, y, color = '#1a1a2e') {
-    const pillarSprite = engine.art.tile({
-        size: 32,
-        color: color,
-        pattern: 'grid'
-    });
-    
+function createPillar(x, y, color = '#1a1a2e', glowColor = '#00ffcc') {
     engine.spawn('pillar', {
         x, y,
         sprite: (ctx, entity) => {
-            // Ambient glow
-            const pulse = Math.sin(engine.time * 2 + entity.x) * 0.3 + 0.7;
-            ctx.shadowBlur = 20 * pulse;
-            ctx.shadowColor = '#00ffcc';
-            ctx.drawImage(pillarSprite, -pillarSprite.width / 2, -pillarSprite.height / 2);
+            const pulse = Math.sin(engine.time * 2 + entity.x * 0.1) * 0.3 + 0.7;
+            const size = 32;
+            
+            // Outer glow
+            ctx.shadowBlur = 30 * pulse;
+            ctx.shadowColor = glowColor;
+            
+            // Dark base
+            ctx.fillStyle = color;
+            ctx.fillRect(-size/2, -size/2, size, size);
+            
+            // Neon border lines
+            ctx.strokeStyle = glowColor;
+            ctx.lineWidth = 3;
+            ctx.globalAlpha = pulse;
+            ctx.strokeRect(-size/2 + 2, -size/2 + 2, size - 4, size - 4);
+            
+            // Inner highlight
+            ctx.strokeStyle = engine.art.lightenColor(glowColor, 40);
+            ctx.lineWidth = 1;
+            ctx.strokeRect(-size/2 + 5, -size/2 + 5, size - 10, size - 10);
+            
+            ctx.globalAlpha = 1;
+            ctx.shadowBlur = 0;
         },
         collider: { type: 'aabb', width: 32, height: 32 },
         tags: ['wall', 'solid', 'decoration'],
@@ -903,6 +916,45 @@ function createDebris(x, y) {
     });
 }
 
+// ===== AMBIENT PARTICLES =====
+
+function createAmbientParticleEmitter(x, y, theme = 'cyan') {
+    const colors = {
+        'cyan': ['#00ffcc', '#00ffff', '#88ffff'],
+        'red': ['#ff3333', '#ff6666', '#ff9999'],
+        'purple': ['#ff00ff', '#ff66ff', '#cc66ff'],
+        'orange': ['#ff8800', '#ffaa00', '#ffcc66']
+    };
+    
+    const emitterColors = colors[theme] || colors['cyan'];
+    
+    engine.spawn('ambient-emitter', {
+        x, y,
+        emitTimer: 0,
+        emitInterval: engine.random(0.8, 1.5),
+        theme: theme,
+        tags: ['decoration'],
+        layer: 10,
+        
+        update(dt) {
+            this.emitTimer -= dt;
+            if (this.emitTimer <= 0) {
+                this.emitTimer = this.emitInterval;
+                
+                // Emit a few particles drifting upward
+                engine.particles.emit(this.x, this.y, {
+                    count: engine.random(1, 3),
+                    color: emitterColors,
+                    speed: [5, 20],
+                    life: [2, 4],
+                    size: [1, 3],
+                    gravity: -10 // Float upward
+                });
+            }
+        }
+    });
+}
+
 // ===== ROOM SYSTEM =====
 
 function createRoom(roomName) {
@@ -917,11 +969,16 @@ function createRoom(roomName) {
         createDoorTrigger(29 * 32, 10 * 32, 'room2', 'left');
         
         // Decorations - pillars and lights
-        createPillar(300, 300);
-        createPillar(700, 300);
+        createPillar(300, 300, '#1a1a2e', '#00ffcc');
+        createPillar(700, 300, '#1a1a2e', '#00ffcc');
         createNeonLight(150, 150, '#00ffcc');
         createNeonLight(850, 150, '#00ffcc');
         createNeonLight(500, 550, '#00ff88');
+        
+        // Ambient particles
+        createAmbientParticleEmitter(200, 200, 'cyan');
+        createAmbientParticleEmitter(750, 450, 'cyan');
+        createAmbientParticleEmitter(400, 300, 'cyan');
         
         // Scatter debris
         for (let i = 0; i < 15; i++) {
@@ -949,15 +1006,21 @@ function createRoom(roomName) {
         createDoorTrigger(34 * 32, 12 * 32, 'room3', 'left');
         
         // More decorations - red theme for combat
-        createPillar(350, 250);
-        createPillar(350, 550);
-        createPillar(950, 250);
-        createPillar(950, 550);
+        createPillar(350, 250, '#1a1a2e', '#ff3333');
+        createPillar(350, 550, '#1a1a2e', '#ff3333');
+        createPillar(950, 250, '#1a1a2e', '#ff3333');
+        createPillar(950, 550, '#1a1a2e', '#ff3333');
         createNeonLight(200, 200, '#ff3333');
         createNeonLight(1000, 200, '#ff3333');
         createNeonLight(600, 400, '#ff8800');
         createNeonLight(200, 700, '#ff3333');
         createNeonLight(1000, 700, '#ff3333');
+        
+        // Ambient particles - red theme
+        createAmbientParticleEmitter(300, 300, 'red');
+        createAmbientParticleEmitter(800, 400, 'orange');
+        createAmbientParticleEmitter(550, 650, 'red');
+        createAmbientParticleEmitter(200, 500, 'red');
         
         // Debris
         for (let i = 0; i < 20; i++) {
@@ -986,15 +1049,21 @@ function createRoom(roomName) {
         createDoorTrigger(29 * 32, 15 * 32, 'boss-room', 'left');
         
         // Purple/magenta theme for ominous feeling
-        createPillar(300, 300);
-        createPillar(600, 300);
-        createPillar(300, 700);
-        createPillar(600, 700);
+        createPillar(300, 300, '#1a1a2e', '#ff00ff');
+        createPillar(600, 300, '#1a1a2e', '#ff00ff');
+        createPillar(300, 700, '#1a1a2e', '#ff00ff');
+        createPillar(600, 700, '#1a1a2e', '#ff00ff');
         createNeonLight(450, 450, '#ff00ff');
         createNeonLight(200, 200, '#8800ff');
         createNeonLight(700, 200, '#8800ff');
         createNeonLight(200, 850, '#8800ff');
         createNeonLight(700, 850, '#8800ff');
+        
+        // Ambient particles - purple theme (ominous)
+        createAmbientParticleEmitter(450, 450, 'purple');
+        createAmbientParticleEmitter(250, 350, 'purple');
+        createAmbientParticleEmitter(650, 750, 'purple');
+        createAmbientParticleEmitter(400, 800, 'purple');
         
         // More debris
         for (let i = 0; i < 25; i++) {
@@ -1163,7 +1232,7 @@ function createBoss(x, y) {
         
         takeDamage(amount) {
             this.health -= amount;
-            engine.sound.play('hit');
+            engine.sound.play('hit_heavy'); // Heavy sound for boss
             
             // Damage number - larger for boss
             const dmgNum = engine.spawn('damage-number', {
@@ -1449,8 +1518,6 @@ function setupCollisions() {
 // ===== ROOM TRANSITIONS =====
 
 function transitionToRoom(roomName, spawnSide) {
-    game.currentRoom = roomName;
-    
     // Save player state
     const player = engine.findOne('player');
     if (player) {
@@ -1458,32 +1525,44 @@ function transitionToRoom(roomName, spawnSide) {
         game.playerData.energy = player.energy;
     }
     
-    // Clear current room
-    engine.clear();
-    engine.ui.clear();
+    // Fade out
+    engine.screenFade('#000000', 1, 0.3);
+    engine.slowMo(0.5, 0.3); // Slow-mo during transition
     
-    // Create new room
-    createRoom(roomName);
-    
-    // Spawn player at appropriate position
-    let spawnX = 100;
-    let spawnY = 360;
-    
-    if (spawnSide === 'left') {
-        spawnX = 80;
-    } else if (spawnSide === 'right') {
-        spawnX = 1100;
-    }
-    
-    const newPlayer = createPlayer(spawnX, spawnY);
-    
-    // FIXED: Snap camera to player immediately to prevent offset
-    engine.camera.x = newPlayer.x;
-    engine.camera.y = newPlayer.y;
-    engine.cameraFollow(newPlayer, 0.1);
-    
-    // Setup UI
-    setupGameUI();
+    // Wait for fade, then switch room
+    engine.after(0.3, () => {
+        game.currentRoom = roomName;
+        
+        // Clear current room
+        engine.clear();
+        engine.ui.clear();
+        
+        // Create new room
+        createRoom(roomName);
+        
+        // Spawn player at appropriate position
+        let spawnX = 100;
+        let spawnY = 360;
+        
+        if (spawnSide === 'left') {
+            spawnX = 80;
+        } else if (spawnSide === 'right') {
+            spawnX = 1100;
+        }
+        
+        const newPlayer = createPlayer(spawnX, spawnY);
+        
+        // Snap camera to player immediately to prevent offset
+        engine.camera.x = newPlayer.x;
+        engine.camera.y = newPlayer.y;
+        engine.cameraFollow(newPlayer, 0.1);
+        
+        // Setup UI
+        setupGameUI();
+        
+        // Fade in
+        engine.screenFade('#000000', 0, 0.3);
+    });
 }
 
 // ===== UI =====
