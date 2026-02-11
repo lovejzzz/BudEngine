@@ -5081,7 +5081,7 @@ class PixelPhysics {
         this.lightSources = new Set(); // Track light-emitting cells
         this.lightCanvas = null; // Offscreen canvas for light map
         this.lightCtx = null;
-        this.lightUpdateInterval = 2; // Update light every N frames
+        this.lightUpdateInterval = 4; // Update light every N frames (lower = prettier, higher = faster)
         
         // Performance optimizations
         this.dirtyRects = [];
@@ -6964,7 +6964,7 @@ class PixelPhysics {
         // Use heatSources set (already tracked) instead of scanning entire grid
         // Sample every Nth heat source to limit draw calls
         let lightCount = 0;
-        const MAX_LIGHTS = 80; // cap for performance
+        const MAX_LIGHTS = 40; // cap for performance
         const step = this.heatSources.size > MAX_LIGHTS ? Math.ceil(this.heatSources.size / MAX_LIGHTS) : 1;
         let i = 0;
         
