@@ -561,9 +561,22 @@
             };
         }
 
+        // Debug display for touch coordinates
+        let debugDiv = document.createElement('div');
+        debugDiv.id = 'touch-debug';
+        debugDiv.style.cssText = 'position:fixed;top:60px;left:10px;background:rgba(255,0,0,0.8);color:#fff;padding:8px;font-size:12px;z-index:9999;border-radius:4px;font-family:monospace;pointer-events:none;';
+        document.body.appendChild(debugDiv);
+
         function startDrawing(e) {
             e.preventDefault();
+            const rect = canvas.getBoundingClientRect();
+            const touch = e.touches && e.touches[0] ? e.touches[0] : e;
+            const rawX = touch.clientX;
+            const rawY = touch.clientY;
             const pos = getInputPos(e);
+            
+            debugDiv.textContent = `raw: ${Math.round(rawX)},${Math.round(rawY)} | rect: ${Math.round(rect.left)},${Math.round(rect.top)} ${Math.round(rect.width)}x${Math.round(rect.height)} | canvas: ${canvas.width}x${canvas.height} | mapped: ${Math.round(pos.x)},${Math.round(pos.y)} | ratio: ${(canvas.width/rect.width).toFixed(2)}`;
+
             isDrawing = true;
             lastDrawX = pos.x;
             lastDrawY = pos.y;
