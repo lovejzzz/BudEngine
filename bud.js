@@ -1,11 +1,17 @@
 /**
- * BUD ENGINE v2.5
+ * BUD ENGINE v2.6
  * A 2D web game engine designed for AI-human collaboration
  * 
  * Philosophy: AI can write, TEST, and iterate on games independently.
  * Killer feature: AI Testing API + auto-playtest bot
  * 
  * Architecture: Single-file, no build tools, runs in browser
+ * 
+ * v2.6 Improvements (Neon Ronin - Systems):
+ * - Enhanced scene transitions (fade/wipe/flash with callbacks)
+ * - Room/Level management system (engine.room API)
+ * - Lightweight state machine system for AI (engine.stateMachine)
+ * - Game polish and improvements
  * 
  * v2.5 Improvements (Neon Ronin - Camera & Feel):
  * - Native camera lookahead system (cameraLookahead)
@@ -207,6 +213,9 @@ class BudEngine {
         // Gravity (optional, for platformers)
         this.gravity = config.gravity || 0;
 
+        // Room system (v2.6)
+        this.initRoomSystem();
+
         // Scene transitions
         this.transition = {
             active: false,
@@ -320,7 +329,7 @@ class BudEngine {
         // Update screen effects (v2.3)
         this.updateScreenEffects(dt);
 
-        // Update scene transitions
+        // Update scene transitions (v2.6 - Enhanced)
         if (this.transition.active) {
             this.transition.progress += dt / this.transition.duration;
             
@@ -329,6 +338,14 @@ class BudEngine {
                 
                 if (this.transition.fadeOut) {
                     // Fade out complete, switch scene
+                    // Call onMiddle callback if provided (v2.6)
+                    if (this.transition.onMiddle) {
+                        try {
+                            this.transition.onMiddle();
+                        } catch (e) {
+                            console.error('[BudEngine] Transition onMiddle callback error:', e);
+                        }
+                    }
                     this.goTo(this.transition.nextScene, false);
                 } else {
                     // Fade in complete, end transition
@@ -479,11 +496,39 @@ class BudEngine {
             if (scene.draw) scene.draw(ctx);
         }
 
-        // Render scene transitions
+        // Render scene transitions (v2.6 - Enhanced)
         if (this.transition.active) {
-            const alpha = this.transition.fadeOut ? this.transition.progress : 1 - this.transition.progress;
-            ctx.fillStyle = `rgba(10, 10, 20, ${alpha})`;
-            ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            const progress = this.transition.fadeOut ? this.transition.progress : 1 - this.transition.progress;
+            const type = this.transition.type || 'fade';
+            const color = this.transition.color || '#000000';
+            
+            // Parse color to rgba
+            let r, g, b;
+            if (color.startsWith('#')) {
+                const hex = color.slice(1);
+                r = parseInt(hex.slice(0, 2), 16);
+                g = parseInt(hex.slice(2, 4), 16);
+                b = parseInt(hex.slice(4, 6), 16);
+            } else {
+                r = 10; g = 10; b = 20; // Default dark color
+            }
+            
+            if (type === 'fade') {
+                // Classic fade to color
+                ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${progress})`;
+                ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            } else if (type === 'wipe') {
+                // Horizontal wipe effect
+                const wipeWidth = this.canvas.width * progress;
+                ctx.fillStyle = color;
+                ctx.fillRect(0, 0, wipeWidth, this.canvas.height);
+            } else if (type === 'flash') {
+                // Quick flash to white/color then fade
+                const flashProgress = this.transition.fadeOut ? progress * 2 : (1 - progress) * 2;
+                const alpha = Math.min(1, flashProgress);
+                ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+                ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            }
         }
 
         // Render screen effects (v2.3)
@@ -1572,13 +1617,19 @@ class BudEngine {
     }
 
     /**
-     * Switch to a different scene
+     * Switch to a different scene with enhanced transitions (v2.6)
      * @param {string} name - Scene name
-     * @param {boolean} [useTransition=false] - Use fade transition
+     * @param {boolean|object} [transition=false] - Transition config or true for default fade
+     * @param {string} [transition.type='fade'] - Transition type: 'fade', 'wipe', 'flash'
+     * @param {number} [transition.duration=0.5] - Transition duration in seconds
+     * @param {string} [transition.color='#000000'] - Transition color
+     * @param {function} [transition.onMiddle] - Callback when transition reaches middle (scene switches)
      * @example
-     * engine.goTo('gameover', true); // Go to gameover with fade
+     * engine.goTo('gameover', true); // Default fade
+     * engine.goTo('level2', { type: 'fade', duration: 0.3, color: '#000' });
+     * engine.goTo('battle', { type: 'flash', color: '#ff0000', duration: 0.2 });
      */
-    goTo(name, useTransition = false) {
+    goTo(name, transition = false) {
         // Error handling: validate scene exists
         if (!name || typeof name !== 'string') {
             console.error('[BudEngine] goTo() requires a scene name string');
@@ -1589,12 +1640,31 @@ class BudEngine {
             return;
         }
 
-        if (useTransition && !this.transition.active) {
-            // Start fade out transition
+        // Parse transition config (v2.6)
+        if (transition && !this.transition.active) {
+            let config = {
+                type: 'fade',
+                duration: 0.5,
+                color: '#000000',
+                onMiddle: null
+            };
+            
+            if (typeof transition === 'object') {
+                Object.assign(config, transition);
+            } else if (transition === true) {
+                // Default fade
+                config.type = 'fade';
+            }
+            
+            // Start transition
             this.transition.active = true;
+            this.transition.type = config.type;
             this.transition.fadeOut = true;
             this.transition.progress = 0;
+            this.transition.duration = config.duration;
+            this.transition.color = config.color;
             this.transition.nextScene = name;
+            this.transition.onMiddle = config.onMiddle;
             return;
         }
 
@@ -1637,7 +1707,7 @@ class BudEngine {
         this.emit('sceneChanged', { scene: name });
 
         // Start fade in if transitioning
-        if (useTransition) {
+        if (transition) {
             this.transition.fadeOut = false;
             this.transition.progress = 0;
         }
@@ -1657,6 +1727,252 @@ class BudEngine {
         const tilemap = new Tilemap(this, tileSize);
         this.currentTilemap = tilemap;
         return tilemap;
+    }
+
+    // ===== ROOM/LEVEL MANAGEMENT SYSTEM (v2.6) =====
+
+    /**
+     * Initialize the room system (v2.6)
+     * Creates a room management API on engine.room
+     * @private
+     */
+    initRoomSystem() {
+        this.rooms = new Map();
+        this.currentRoom = null;
+        
+        // Create the room API
+        this.room = (name, config) => {
+            if (!config) {
+                // Getter: return room data
+                return this.rooms.get(name);
+            }
+            
+            // Setter: define a room
+            this.rooms.set(name, {
+                name,
+                width: config.width || 30,
+                height: config.height || 20,
+                tileSize: config.tileSize || 32,
+                setup: config.setup || null,
+                doors: []
+            });
+            
+            return this.room;
+        };
+        
+        // Add door connection method
+        this.room.door = (fromRoom, toRoom, position) => {
+            const room = this.rooms.get(fromRoom);
+            if (!room) {
+                console.error(`[BudEngine] Room '${fromRoom}' not found`);
+                return;
+            }
+            
+            room.doors.push({
+                target: toRoom,
+                position: position // {x, y} in tile coordinates or string like 'left', 'right'
+            });
+            
+            return this.room;
+        };
+        
+        // Go to a room with automatic transition
+        this.room.go = (name, spawnPoint = null, transition = null) => {
+            const room = this.rooms.get(name);
+            if (!room) {
+                console.error(`[BudEngine] Room '${name}' not found`);
+                return;
+            }
+            
+            // Default transition
+            const defaultTransition = {
+                type: 'fade',
+                duration: 0.3,
+                color: '#000000',
+                onMiddle: () => {
+                    // This runs at the transition midpoint (when screen is fully black)
+                    this.loadRoom(name, spawnPoint);
+                }
+            };
+            
+            const finalTransition = transition || defaultTransition;
+            
+            // If no scene transition system integration needed, just load directly
+            if (!finalTransition || this.transition.active) {
+                this.loadRoom(name, spawnPoint);
+            } else {
+                // Use enhanced transition system
+                this.transition.active = true;
+                this.transition.type = finalTransition.type;
+                this.transition.fadeOut = true;
+                this.transition.progress = 0;
+                this.transition.duration = finalTransition.duration;
+                this.transition.color = finalTransition.color;
+                this.transition.nextScene = this.currentScene; // Stay in same scene
+                this.transition.onMiddle = finalTransition.onMiddle;
+            }
+        };
+    }
+
+    /**
+     * Load a room (internal method)
+     * @private
+     * @param {string} name - Room name
+     * @param {object|string} [spawnPoint=null] - Spawn point {x, y} or direction string
+     */
+    loadRoom(name, spawnPoint = null) {
+        const room = this.rooms.get(name);
+        if (!room) {
+            console.error(`[BudEngine] Room '${name}' not found`);
+            return;
+        }
+        
+        // Save player state before clearing
+        const player = this.findOne('player');
+        const playerState = player ? {
+            health: player.health,
+            maxHealth: player.maxHealth,
+            energy: player.energy,
+            maxEnergy: player.maxEnergy,
+            // Save any other important player properties
+            ...Object.fromEntries(
+                Object.entries(player).filter(([key, val]) => 
+                    (typeof val === 'number' || typeof val === 'string' || typeof val === 'boolean') &&
+                    !['x', 'y', 'velocity', 'rotation'].includes(key)
+                )
+            )
+        } : null;
+        
+        // Clear current room entities
+        this.entities = this.entities.filter(e => e.tags && e.tags.includes('persistent'));
+        this.entityTags.clear();
+        this.particles.clear();
+        
+        // Re-index persistent entities
+        for (let entity of this.entities) {
+            for (let tag of entity.tags) {
+                if (!this.entityTags.has(tag)) {
+                    this.entityTags.set(tag, new Set());
+                }
+                this.entityTags.get(tag).add(entity);
+            }
+        }
+        
+        // Create tilemap for room
+        const map = this.tilemap(room.tileSize);
+        map.room(0, 0, room.width, room.height, 'floor', 'wall');
+        
+        // Set current room
+        this.currentRoom = name;
+        
+        // Setup room (user-defined)
+        if (room.setup) {
+            room.setup(room, map);
+        }
+        
+        // Auto-create door triggers for defined doors
+        for (let door of room.doors) {
+            // Determine spawn position on other side
+            let spawnSide = 'center';
+            let doorX, doorY;
+            
+            if (typeof door.position === 'string') {
+                // String position like 'left', 'right', 'top', 'bottom'
+                const midY = Math.floor(room.height / 2);
+                const midX = Math.floor(room.width / 2);
+                
+                if (door.position === 'left') {
+                    doorX = 0;
+                    doorY = midY;
+                    spawnSide = 'right';
+                    map.door(0, midY, 'left');
+                } else if (door.position === 'right') {
+                    doorX = room.width - 1;
+                    doorY = midY;
+                    spawnSide = 'left';
+                    map.door(room.width - 1, midY, 'right');
+                } else if (door.position === 'top') {
+                    doorX = midX;
+                    doorY = 0;
+                    spawnSide = 'bottom';
+                    map.door(midX, 0, 'up');
+                } else if (door.position === 'bottom') {
+                    doorX = midX;
+                    doorY = room.height - 1;
+                    spawnSide = 'top';
+                    map.door(midX, room.height - 1, 'down');
+                }
+            } else {
+                // Position is {x, y} in tile coordinates
+                doorX = door.position.x;
+                doorY = door.position.y;
+            }
+            
+            // Create trigger zone for door
+            this.spawn('door-trigger', {
+                x: doorX * room.tileSize + room.tileSize / 2,
+                y: doorY * room.tileSize + room.tileSize / 2,
+                collider: { type: 'circle', radius: 40, trigger: true },
+                targetRoom: door.target,
+                spawnSide: spawnSide,
+                tags: ['door', 'persistent']
+            });
+        }
+        
+        // Calculate spawn position
+        let spawnX, spawnY;
+        const roomMidY = (room.height * room.tileSize) / 2;
+        const roomMidX = (room.width * room.tileSize) / 2;
+        
+        if (spawnPoint) {
+            if (typeof spawnPoint === 'object' && spawnPoint.x !== undefined) {
+                spawnX = spawnPoint.x;
+                spawnY = spawnPoint.y;
+            } else if (typeof spawnPoint === 'string') {
+                // String spawn like 'left', 'right', etc.
+                if (spawnPoint === 'left') {
+                    spawnX = 80;
+                    spawnY = roomMidY;
+                } else if (spawnPoint === 'right') {
+                    spawnX = room.width * room.tileSize - 80;
+                    spawnY = roomMidY;
+                } else if (spawnPoint === 'top') {
+                    spawnX = roomMidX;
+                    spawnY = 80;
+                } else if (spawnPoint === 'bottom') {
+                    spawnX = roomMidX;
+                    spawnY = room.height * room.tileSize - 80;
+                } else {
+                    spawnX = roomMidX;
+                    spawnY = roomMidY;
+                }
+            } else {
+                spawnX = roomMidX;
+                spawnY = roomMidY;
+            }
+        } else {
+            spawnX = roomMidX;
+            spawnY = roomMidY;
+        }
+        
+        // Restore or create player
+        if (playerState) {
+            // Emit event for game to handle player recreation
+            this.emit('roomPlayerRespawn', { x: spawnX, y: spawnY, state: playerState });
+        }
+        
+        // Set camera bounds
+        const halfW = this.canvas.width / 2;
+        const halfH = this.canvas.height / 2;
+        this.camera.bounds = {
+            minX: halfW / this.camera.zoom,
+            minY: halfH / this.camera.zoom,
+            maxX: room.width * room.tileSize - halfW / this.camera.zoom,
+            maxY: room.height * room.tileSize - halfH / this.camera.zoom
+        };
+        
+        // Emit room loaded event
+        this.emit('roomLoaded', { room: name });
     }
 
     // ===== CAMERA =====
@@ -1724,6 +2040,32 @@ class BudEngine {
      */
     animation(frames, fps = 12) {
         return new Animation(frames, fps);
+    }
+
+    // ===== STATE MACHINE (v2.6) =====
+
+    /**
+     * Create a lightweight state machine (v2.6)
+     * @param {object} states - State definitions with enter, update, exit callbacks
+     * @param {string} [initialState] - Initial state name (defaults to first state)
+     * @returns {StateMachine} State machine instance
+     * @example
+     * const sm = engine.stateMachine({
+     *   idle: {
+     *     enter(entity) { entity.velocity.x = 0; },
+     *     update(entity, dt) { if (seesPlayer) this.go('chase'); }
+     *   },
+     *   chase: {
+     *     enter(entity) { entity.speed = 200; },
+     *     update(entity, dt) { // chase logic }
+     *   }
+     * }, 'idle');
+     * 
+     * // In entity update:
+     * entity.stateMachine.update(entity, dt);
+     */
+    stateMachine(states, initialState = null) {
+        return new StateMachine(this, states, initialState);
     }
 
     // ===== HELPERS =====
@@ -3620,6 +3962,172 @@ class Animation {
         this.currentFrameIndex = 0;
         this.time = 0;
         this.playing = true;
+    }
+}
+
+// ===== STATE MACHINE (v2.6) =====
+
+/**
+ * Lightweight state machine for entity AI and behavior
+ * @example
+ * const sm = engine.stateMachine({
+ *   idle: {
+ *     enter(entity) { entity.idleTimer = 0; },
+ *     update(entity, dt) {
+ *       entity.idleTimer += dt;
+ *       if (entity.idleTimer > 2) this.go('patrol');
+ *     }
+ *   },
+ *   patrol: { ... }
+ * }, 'idle');
+ */
+class StateMachine {
+    /**
+     * @param {BudEngine} engine - Engine reference
+     * @param {object} states - State definitions
+     * @param {string} [initialState] - Initial state name
+     */
+    constructor(engine, states, initialState = null) {
+        this.engine = engine;
+        this.states = states || {};
+        this.currentState = initialState || Object.keys(states)[0] || null;
+        this.previousState = null;
+        this.stateTime = 0;
+        this.timedTransitions = []; // For after() method
+        
+        // Validate states
+        for (let stateName in this.states) {
+            const state = this.states[stateName];
+            if (!state) {
+                console.warn(`[BudEngine] State '${stateName}' is undefined`);
+                continue;
+            }
+            // Bind state methods to state machine for 'this.go()' access
+            if (state.enter) state.enter = state.enter.bind(this);
+            if (state.update) state.update = state.update.bind(this);
+            if (state.exit) state.exit = state.exit.bind(this);
+        }
+        
+        // Enter initial state
+        if (this.currentState && this.states[this.currentState]) {
+            const state = this.states[this.currentState];
+            if (state.enter) {
+                try {
+                    state.enter(null); // No entity context on initialization
+                } catch (e) {
+                    console.error(`[BudEngine] Error in state '${this.currentState}' enter:`, e);
+                }
+            }
+        }
+    }
+
+    /**
+     * Update the current state
+     * @param {object} entity - Entity context to pass to state callbacks
+     * @param {number} dt - Delta time
+     */
+    update(entity, dt) {
+        this.stateTime += dt;
+        
+        // Update timed transitions
+        for (let i = this.timedTransitions.length - 1; i >= 0; i--) {
+            const transition = this.timedTransitions[i];
+            transition.timer -= dt;
+            
+            if (transition.timer <= 0) {
+                this.go(transition.state, entity);
+                this.timedTransitions.splice(i, 1);
+            }
+        }
+        
+        // Update current state
+        if (this.currentState && this.states[this.currentState]) {
+            const state = this.states[this.currentState];
+            if (state.update) {
+                try {
+                    state.update(entity, dt);
+                } catch (e) {
+                    console.error(`[BudEngine] Error in state '${this.currentState}' update:`, e);
+                }
+            }
+        }
+    }
+
+    /**
+     * Transition to a new state
+     * @param {string} newState - State name to transition to
+     * @param {object} [entity] - Entity context for exit/enter callbacks
+     */
+    go(newState, entity = null) {
+        if (!this.states[newState]) {
+            console.warn(`[BudEngine] State '${newState}' does not exist`);
+            return;
+        }
+        
+        if (this.currentState === newState) return; // Already in this state
+        
+        // Exit current state
+        if (this.currentState && this.states[this.currentState]) {
+            const state = this.states[this.currentState];
+            if (state.exit) {
+                try {
+                    state.exit(entity);
+                } catch (e) {
+                    console.error(`[BudEngine] Error in state '${this.currentState}' exit:`, e);
+                }
+            }
+        }
+        
+        // Clear timed transitions when manually changing state
+        this.timedTransitions = [];
+        
+        // Transition
+        this.previousState = this.currentState;
+        this.currentState = newState;
+        this.stateTime = 0;
+        
+        // Enter new state
+        if (this.states[newState]) {
+            const state = this.states[newState];
+            if (state.enter) {
+                try {
+                    state.enter(entity);
+                } catch (e) {
+                    console.error(`[BudEngine] Error in state '${newState}' enter:`, e);
+                }
+            }
+        }
+    }
+
+    /**
+     * Schedule a state transition after a delay
+     * @param {number} seconds - Delay in seconds
+     * @param {string} state - State to transition to
+     * @example
+     * sm.after(2, 'idle'); // Return to idle after 2 seconds
+     */
+    after(seconds, state) {
+        this.timedTransitions.push({
+            timer: seconds,
+            state: state
+        });
+    }
+
+    /**
+     * Get the current state name
+     * @returns {string} Current state name
+     */
+    get state() {
+        return this.currentState;
+    }
+
+    /**
+     * Check if in a specific state
+     * @param {string} stateName - State name to check
+     * @returns {boolean} True if in that state
+     */
+    is(stateName) {
+        return this.currentState === stateName;
     }
 }
 

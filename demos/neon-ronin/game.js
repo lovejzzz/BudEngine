@@ -441,6 +441,133 @@ function createMeleeRusher(x, y, variant = 0) {
         glow: true
     });
     
+    // Create state machine for enemy AI (v2.6)
+    const stateMachine = engine.stateMachine({
+        chase: {
+            enter(entity) {
+                entity.pathfindCooldown = 0;
+            },
+            
+            update(entity, dt) {
+                const player = engine.findOne('player');
+                if (!player) return;
+                
+                const dx = player.x - entity.x;
+                const dy = player.y - entity.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                
+                // If in attack range, switch to telegraph
+                if (dist < 40) {
+                    this.go('telegraph', entity);
+                    return;
+                }
+                
+                // Pathfinding AI
+                entity.pathfindCooldown -= dt;
+                if (entity.pathfindCooldown <= 0 && engine.currentTilemap) {
+                    entity.pathfindCooldown = 0.5; // Recalculate path every 0.5s
+                    entity.currentPath = engine.pathfind(
+                        { x: entity.x, y: entity.y },
+                        { x: player.x, y: player.y }
+                    );
+                    entity.currentWaypoint = 0;
+                }
+                
+                // Follow path if we have one
+                if (entity.currentPath && entity.currentPath.length > 0) {
+                    const waypoint = entity.currentPath[entity.currentWaypoint];
+                    if (waypoint) {
+                        const wpDx = waypoint.x - entity.x;
+                        const wpDy = waypoint.y - entity.y;
+                        const wpDist = Math.sqrt(wpDx * wpDx + wpDy * wpDy);
+                        
+                        if (wpDist < 20) {
+                            // Reached waypoint, move to next
+                            entity.currentWaypoint++;
+                        } else {
+                            // Move towards current waypoint
+                            entity.velocity.x = (wpDx / wpDist) * entity.speed;
+                            entity.velocity.y = (wpDy / wpDist) * entity.speed;
+                        }
+                        
+                        entity.rotation = Math.atan2(entity.velocity.y, entity.velocity.x);
+                    }
+                } else {
+                    // No path, go direct (fallback)
+                    entity.velocity.x = (dx / dist) * entity.speed;
+                    entity.velocity.y = (dy / dist) * entity.speed;
+                    entity.rotation = Math.atan2(dy, dx);
+                }
+            }
+        },
+        
+        telegraph: {
+            enter(entity) {
+                entity.velocity.x = 0;
+                entity.velocity.y = 0;
+                entity.telegraphTime = 0.4; // Wind-up time
+                engine.sound.play('powerup'); // Warning sound
+            },
+            
+            update(entity, dt) {
+                entity.telegraphTime -= dt;
+                
+                // Flash red during telegraph (visual warning)
+                const flashIntensity = Math.sin(entity.telegraphTime * 20) * 0.5 + 0.5;
+                entity.flash = flashIntensity * 0.8;
+                
+                // Face player
+                const player = engine.findOne('player');
+                if (player) {
+                    const dx = player.x - entity.x;
+                    const dy = player.y - entity.y;
+                    entity.rotation = Math.atan2(dy, dx);
+                }
+                
+                if (entity.telegraphTime <= 0) {
+                    this.go('attack', entity);
+                }
+            },
+            
+            exit(entity) {
+                entity.flash = 0;
+            }
+        },
+        
+        attack: {
+            enter(entity) {
+                const player = engine.findOne('player');
+                if (!player) {
+                    this.go('chase', entity);
+                    return;
+                }
+                
+                const dx = player.x - entity.x;
+                const dy = player.y - entity.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                
+                // Quick lunge attack
+                if (dist < 60 && player.takeDamage) {
+                    player.takeDamage(entity.damage);
+                    
+                    // Lunge toward player
+                    const lungeSpeed = 300;
+                    entity.velocity.x = (dx / dist) * lungeSpeed;
+                    entity.velocity.y = (dy / dist) * lungeSpeed;
+                }
+                
+                // Return to chase after brief delay
+                this.after(0.3, 'chase');
+            },
+            
+            update(entity, dt) {
+                // Slow down lunge
+                entity.velocity.x *= 0.9;
+                entity.velocity.y *= 0.9;
+            }
+        }
+    }, 'chase');
+    
     const enemy = engine.spawn('enemy', {
         x, y,
         deathColor: v.color, // Store for death effect
@@ -456,82 +583,17 @@ function createMeleeRusher(x, y, variant = 0) {
         maxHealth: 50,
         speed: 120,
         damage: 15,
-        attackCooldown: 0,
         pathfindCooldown: 0,
         currentPath: [],
         currentWaypoint: 0,
+        telegraphTime: 0,
         type: 'rusher',
         tags: ['enemy'],
+        stateMachine: stateMachine, // Attach state machine
         
         update(dt) {
-            this.attackCooldown -= dt;
-            this.pathfindCooldown -= dt;
-            
-            // Attack telegraphing - flash red before attacking
-            if (this.attackCooldown > 0 && this.attackCooldown < 0.3) {
-                this.flash = 0.6 * (0.3 - this.attackCooldown) / 0.3;
-            }
-            
-            const player = engine.findOne('player');
-            if (!player) return;
-            
-            const dx = player.x - this.x;
-            const dy = player.y - this.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            
-            if (dist > 30) {
-                // Pathfinding AI
-                if (this.pathfindCooldown <= 0 && engine.currentTilemap) {
-                    this.pathfindCooldown = 0.5; // Recalculate path every 0.5s
-                    this.currentPath = engine.pathfind(
-                        { x: this.x, y: this.y },
-                        { x: player.x, y: player.y }
-                    );
-                    this.currentWaypoint = 0;
-                }
-                
-                // Follow path if we have one
-                if (this.currentPath && this.currentPath.length > 0) {
-                    const waypoint = this.currentPath[this.currentWaypoint];
-                    if (waypoint) {
-                        const wpDx = waypoint.x - this.x;
-                        const wpDy = waypoint.y - this.y;
-                        const wpDist = Math.sqrt(wpDx * wpDx + wpDy * wpDy);
-                        
-                        if (wpDist < 20) {
-                            // Reached waypoint, move to next
-                            this.currentWaypoint++;
-                            if (this.currentWaypoint >= this.currentPath.length) {
-                                // Reached end of path, go direct
-                                this.velocity.x = (dx / dist) * this.speed;
-                                this.velocity.y = (dy / dist) * this.speed;
-                            }
-                        } else {
-                            // Move towards current waypoint
-                            this.velocity.x = (wpDx / wpDist) * this.speed;
-                            this.velocity.y = (wpDy / wpDist) * this.speed;
-                        }
-                        
-                        this.rotation = Math.atan2(this.velocity.y, this.velocity.x);
-                    }
-                } else {
-                    // No path, go direct (fallback)
-                    this.velocity.x = (dx / dist) * this.speed;
-                    this.velocity.y = (dy / dist) * this.speed;
-                    this.rotation = Math.atan2(dy, dx);
-                }
-            } else {
-                // Attack range
-                this.velocity.x = 0;
-                this.velocity.y = 0;
-                
-                if (this.attackCooldown <= 0) {
-                    this.attackCooldown = 1.5;
-                    if (player.takeDamage) {
-                        player.takeDamage(this.damage);
-                    }
-                }
-            }
+            // Update state machine (v2.6 - replaces old ad-hoc logic)
+            this.stateMachine.update(this, dt);
         },
         
         takeDamage(amount) {
@@ -1049,20 +1111,17 @@ function createAmbientParticleEmitter(x, y, theme = 'cyan') {
     });
 }
 
-// ===== ROOM SYSTEM =====
+// ===== ROOM SYSTEM (v2.6 - Using new engine.room API) =====
 
-function createRoom(roomName) {
-    const map = engine.tilemap(32);
-    
-    if (roomName === 'room1') {
-        // Starting room
-        map.room(0, 0, 30, 20, 'floor', 'wall');
-        
-        // Door to room2
-        map.door(29, 10, 'right');
-        createDoorTrigger(29 * 32, 10 * 32, 'room2', 'left');
-        
-        // Decorations - pillars and lights
+// Define all rooms using new room system
+function defineRooms() {
+    // Room 1 - Starting room
+    engine.room('room1', {
+        width: 30,
+        height: 20,
+        tileSize: 32,
+        setup: (room, map) => {
+            // Decorations - pillars and lights
         createPillar(300, 300, '#1a1a2e', '#00ffcc');
         createPillar(700, 300, '#1a1a2e', '#00ffcc');
         createNeonLight(150, 150, '#00ffcc');
