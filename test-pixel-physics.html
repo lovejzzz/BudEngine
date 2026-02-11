@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pixel Physics v3.2 - Performance + Dynamic Lighting - Bud Engine</title>
+    <title>Pixel Physics v3.3 - Acoustic Physics System - Bud Engine</title>
     <style>
         body {
             margin: 0;
@@ -249,12 +249,21 @@
     </style>
 </head>
 <body>
-    <h1>⚛️ Emergent Pixel Physics v3.2 ⚛️</h1>
-    <p class="subtitle">Performance + Dynamic Lighting — Building Earth with Style</p>
+    <h1>⚛️ Emergent Pixel Physics v3.3 ⚛️</h1>
+    <p class="subtitle">Acoustic Physics System — "The Composition" 🔊</p>
     
     <div class="philosophy">
         <strong>PHILOSOPHY:</strong> No hardcoded interactions. Materials have real physical properties.
         Interactions EMERGE from those properties meeting conditions. This is how we build Earth.
+    </div>
+    
+    <!-- Audio Enable Overlay -->
+    <div id="audioOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(10,10,20,0.95); z-index:9999; display:flex; align-items:center; justify-content:center; flex-direction:column; cursor:pointer;">
+        <div style="text-align:center; color:#00ffcc; font-size:24px; text-shadow: 0 0 20px #00ffcc;">
+            <div style="font-size:48px; margin-bottom:20px;">🔊</div>
+            <div style="margin-bottom:10px;">Click to Enable Audio</div>
+            <div style="font-size:14px; color:#888;">Web Audio requires user interaction</div>
+        </div>
     </div>
     
     <canvas id="gameCanvas"></canvas>
@@ -327,6 +336,15 @@
     </div>
     
     <div class="controls">
+        <button class="action-btn heat" id="soundBtn" onclick="toggleSound()">🔊 Enable Sound</button>
+        <div class="brush-size" id="volumeControl" style="display:none;">
+            <label>Volume:</label>
+            <input type="range" id="volumeSlider" min="0" max="100" value="70">
+            <span id="volumeValue">70</span>%
+        </div>
+    </div>
+    
+    <div class="controls">
         <button class="action-btn heat" onclick="toggleHeat()">🌡️ Heat View (T)</button>
         <button class="action-btn heat" onclick="toggleLighting()">🌙 Lighting (L)</button>
         <button class="action-btn" onclick="createExplosion()">💥 EXPLODE!</button>
@@ -345,18 +363,18 @@
     </div>
     
     <div class="info">
-        <strong>v3.2: Performance + Dynamic Lighting!</strong><br>
-        • <span class="temp">60-80% faster</span> with chunked simulation (only simulates active areas)<br>
-        • <span class="temp">Fire, lava, and hot materials cast light</span> — dramatic visuals!<br>
-        • Materials <span class="temp">melt, boil, freeze, condense</span> at their real temperatures<br>
-        • Fire requires <strong>oxygen</strong> and ignites materials at their <span class="temp">ignition point</span><br>
-        • Acid + Metal → Hydrogen gas | Hydrogen + Oxygen + Heat → EXPLOSION → Steam<br>
-        • Sand melts at 1700°C → Glass | Lava cools → Obsidian<br>
-        • Hover for temp • <strong>T</strong> = heat view • <strong>L</strong> = lighting toggle • <strong>`</strong> = debug
+        <strong>v3.3: Acoustic Physics System — "The Composition" 🔊</strong><br>
+        • <span class="temp">Procedural sound generation</span> from real material properties — NO audio files!<br>
+        • <span class="temp">Impact sounds</span> derived from Young's modulus: f = k × √(E/ρ)<br>
+        • <span class="temp">Flow sounds</span> for liquids/powders • <span class="temp">Ambient</span> fire crackle & lava bubble<br>
+        • <span class="temp">Phase changes</span> make sound: ice crack, water sizzle, steam hiss<br>
+        • <strong>Metal clangs, glass rings, water splashes, wood thuds</strong> — all scientifically accurate!<br>
+        • Click <strong>🔊 Enable Sound</strong> to hear the physics come alive<br>
+        • Hover for temp • <strong>T</strong> = heat view • <strong>L</strong> = lighting • <strong>`</strong> = debug
     </div>
     
     <div class="stats">
-        FPS: <span id="fps">60</span> • Materials: 25 • v3.2: Chunked + Lighting • 60 FPS @ Full-Screen
+        FPS: <span id="fps">60</span> • Materials: 25 • v3.3: Acoustic Physics • Sound: <span id="soundStatus">Disabled</span>
     </div>
 
     <script src="bud.js"></script>
@@ -512,6 +530,52 @@
             }
         });
 
+        // v3.3: Sound toggle
+        function toggleSound() {
+            const soundBtn = document.getElementById('soundBtn');
+            const volumeControl = document.getElementById('volumeControl');
+            const soundStatus = document.getElementById('soundStatus');
+            const audioOverlay = document.getElementById('audioOverlay');
+            
+            if (!engine.physics.acoustics.enabled) {
+                // Show overlay to get user interaction
+                audioOverlay.style.display = 'flex';
+                audioOverlay.onclick = () => {
+                    audioOverlay.style.display = 'none';
+                    const success = engine.physics.acoustics.init();
+                    if (success) {
+                        soundBtn.textContent = '🔊 Sound ON';
+                        soundBtn.classList.add('active');
+                        volumeControl.style.display = 'flex';
+                        soundStatus.textContent = 'Enabled';
+                        soundStatus.style.color = '#00ffcc';
+                        console.log('🔊 Acoustic Physics System enabled!');
+                    } else {
+                        soundBtn.textContent = '🔇 Sound Failed';
+                        soundStatus.textContent = 'Failed';
+                        soundStatus.style.color = '#ff0000';
+                    }
+                };
+            } else {
+                // Toggle off
+                engine.physics.acoustics.enabled = false;
+                soundBtn.textContent = '🔇 Sound OFF';
+                soundBtn.classList.remove('active');
+                volumeControl.style.display = 'none';
+                soundStatus.textContent = 'Disabled';
+                soundStatus.style.color = '#888';
+            }
+        }
+        
+        // Volume slider
+        const volumeSlider = document.getElementById('volumeSlider');
+        const volumeValue = document.getElementById('volumeValue');
+        volumeSlider.addEventListener('input', (e) => {
+            const volume = parseInt(e.target.value) / 100;
+            volumeValue.textContent = e.target.value;
+            engine.physics.acoustics.setVolume(volume);
+        });
+        
         // Heat visualization toggle
         function toggleHeat() {
             engine.physics.toggleHeatView();
@@ -635,11 +699,11 @@
         // Main scene
         engine.scene('main', {
             enter() {
-                console.log('[PixelPhysics v3.2] Performance + Dynamic Lighting initialized!');
-                console.log('• Chunked simulation: 60-80% performance boost');
-                console.log('• Flat array properties: O(1) lookups');
-                console.log('• O(1) reaction table: no nested loops');
-                console.log('• Dynamic lighting: fire/lava cast light');
+                console.log('[PixelPhysics v3.3] Acoustic Physics System — "The Composition"');
+                console.log('• Procedural sound from material properties');
+                console.log('• Impact frequency: f = k × √(E/ρ)');
+                console.log('• Flow, ambient, and phase change sounds');
+                console.log('• Click 🔊 Enable Sound to hear the physics!');
                 console.log('• Press T for heat view, L for lighting toggle');
             },
             
@@ -654,24 +718,27 @@
         engine.start();
 
         console.log('═════════════════════════════════════════════════════════════');
-        console.log('🌍 PIXEL PHYSICS v3.2 - Performance + Dynamic Lighting');
+        console.log('🔊 PIXEL PHYSICS v3.3 - Acoustic Physics System');
         console.log('═════════════════════════════════════════════════════════════');
-        console.log('NEW IN v3.2:');
-        console.log('  ⚡ Chunked simulation: 60-80% faster (skips stable areas)');
-        console.log('  💡 Dynamic lighting: fire/lava cast gorgeous light');
-        console.log('  🚀 Flat arrays: O(1) property access');
-        console.log('  🔗 Reaction table: O(1) chemistry checks');
-        console.log('  🎮 Maintains 60 FPS with full-screen physics');
+        console.log('NEW IN v3.3: "THE COMPOSITION"');
+        console.log('  🎵 Scientifically accurate procedural sound');
+        console.log('  🔬 Impact frequency from Young\'s modulus: f = k × √(E/ρ)');
+        console.log('  🌊 Flow sounds for water, sand, lava, gas');
+        console.log('  🔥 Ambient sounds: fire crackle, lava bubble, acid sizzle');
+        console.log('  ❄️  Phase change sounds: ice crack, water boil, steam hiss');
+        console.log('  💥 Explosion sounds with realistic boom + debris');
+        console.log('  🎸 NO AUDIO FILES — 100% generated from material properties!');
         console.log('');
-        console.log('🔬 TRY THESE EXPERIMENTS:');
-        console.log('  • Load "Forest Fire" scenario — watch lighting in action!');
-        console.log('  • Load "Volcano" — lava glows dramatically');
-        console.log('  • Press L to toggle lighting (see the difference!)');
-        console.log('  • Heat sand to 1700°C → becomes glass');
-        console.log('  • Pour water on lava → obsidian + steam');
-        console.log('  • Mix hydrogen + oxygen + fire → EXPLOSION → water');
+        console.log('🔬 TRY THESE EXPERIMENTS (WITH SOUND!):');
+        console.log('  • Click 🔊 Enable Sound first!');
+        console.log('  • Drop metal on stone — hear the clang');
+        console.log('  • Pour water — listen to the splash');
+        console.log('  • Load "Forest Fire" — crackling fire sounds');
+        console.log('  • Load "Volcano" — hear lava bubble');
+        console.log('  • Explode gunpowder — procedural explosion boom');
+        console.log('  • Boil water into steam — sizzling phase change');
         console.log('');
-        console.log('Press T for heat view • Press L for lighting toggle');
+        console.log('Click 🔊 to enable sound • T = heat • L = lighting');
         console.log('═════════════════════════════════════════════════════════════');
     </script>
 </body>

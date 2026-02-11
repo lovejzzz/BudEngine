@@ -5101,6 +5101,9 @@ class PixelPhysics {
         this.registerDefaultMaterials();
         this.registerReactionRules();
         this.buildReactionLookupTable();
+        
+        // v3.3: Acoustic Engine - The Composition
+        this.acoustics = new AcousticEngine(this);
     }
 
     /**
@@ -5155,10 +5158,11 @@ class PixelPhysics {
         console.log(`[PixelPhysics v3.2] Lighting system initialized: ${this.lightCanvas.width}x${this.lightCanvas.height} light map`);
         
         this.initialized = true;
-        console.log(`[PixelPhysics v3.2] Initialized ${this.gridWidth}x${this.gridHeight} grid (cell size: ${cellSize}px)`);
-        console.log('[PixelPhysics v3.2] Property-based emergent physics enabled');
-        console.log('[PixelPhysics v3.2] Temperature simulation active');
-        console.log('[PixelPhysics v3.2] Performance optimizations: chunking, flat arrays, O(1) reactions');
+        console.log(`[PixelPhysics v3.3] Initialized ${this.gridWidth}x${this.gridHeight} grid (cell size: ${cellSize}px)`);
+        console.log('[PixelPhysics v3.3] Property-based emergent physics enabled');
+        console.log('[PixelPhysics v3.3] Temperature simulation active');
+        console.log('[PixelPhysics v3.3] Performance optimizations: chunking, flat arrays, O(1) reactions');
+        console.log('[PixelPhysics v3.3] Acoustic Physics System initialized - The Composition');
     }
 
     /**
@@ -5183,7 +5187,16 @@ class PixelPhysics {
             reactivity: 0,
             solubility: null,
             color: ['#00000000'],
-            supportsCombustion: true // Oxygen in air
+            supportsCombustion: true, // Oxygen in air
+            // Acoustic properties (real scientific values)
+            speedOfSound: 343,           // m/s — measured value
+            acousticImpedance: 0.0004,   // MRayl (density × speed / 1e6)
+            absorptionCoeff: 0.0,        // 0-1, sound energy absorbed
+            youngsModulus: null,         // Pa — N/A for gas
+            impactSound: null,
+            flowSound: null,
+            ambientSound: null,
+            phaseChangeSound: null
         });
 
         // ========== WATER CYCLE ==========
@@ -5207,7 +5220,16 @@ class PixelPhysics {
             color: ['#1a6bff', '#2080ff', '#1050dd', '#1860ee'],
             solidForm: 'ice',
             gasForm: 'steam',
-            viscosity: 0.5
+            viscosity: 0.5,
+            // Acoustic properties (real scientific values)
+            speedOfSound: 1480,          // m/s
+            acousticImpedance: 1.48,     // MRayl
+            absorptionCoeff: 0.01,       // 0-1
+            youngsModulus: 2.2e9,        // Pa
+            impactSound: 'splash',
+            flowSound: 'pour',
+            ambientSound: null,
+            phaseChangeSound: 'sizzle'
         });
 
         // ICE (solid H₂O)
@@ -5228,7 +5250,16 @@ class PixelPhysics {
             solubility: null,
             color: ['#a0d0ff', '#b5e0ff', '#c0f0ff'],
             liquidForm: 'water',
-            immovable: false // ice can slide eventually
+            immovable: false, // ice can slide eventually
+            // Acoustic properties
+            speedOfSound: 3280,
+            acousticImpedance: 3.01,
+            absorptionCoeff: 0.02,
+            youngsModulus: 9.3e9,
+            impactSound: 'crack',
+            flowSound: null,
+            ambientSound: null,
+            phaseChangeSound: 'crack'
         });
 
         // STEAM (gaseous H₂O)
@@ -5250,7 +5281,16 @@ class PixelPhysics {
             color: ['#e0e0e080', '#f0f0f060', '#d0d0d070'],
             liquidForm: 'water',
             lifetime: [2.0, 4.0], // condenses over time
-            alpha: 0.5
+            alpha: 0.5,
+            // Acoustic properties
+            speedOfSound: 405,
+            acousticImpedance: 0.0003,
+            absorptionCoeff: 0.0,
+            youngsModulus: null,
+            impactSound: null,
+            flowSound: 'hiss',
+            ambientSound: 'hiss',
+            phaseChangeSound: 'hiss'
         });
 
         // ========== EARTH & MINERALS ==========
@@ -5273,7 +5313,16 @@ class PixelPhysics {
             solubility: null,
             color: ['#c2b280', '#d4c494', '#b0a070', '#a89060'],
             friction: 0.5,
-            liquidForm: 'glass' // melted sand becomes glass!
+            liquidForm: 'glass', // melted sand becomes glass!
+            // Acoustic properties
+            speedOfSound: 500,
+            acousticImpedance: 0.80,
+            absorptionCoeff: 0.30,
+            youngsModulus: 0.1e9,
+            impactSound: 'crunch',
+            flowSound: 'rush',
+            ambientSound: null,
+            phaseChangeSound: 'sizzle'
         });
 
         // GLASS (molten/cooled sand)
@@ -5294,7 +5343,16 @@ class PixelPhysics {
             solubility: null,
             color: ['#88ccff40', '#99ddff50', '#aaeeff48'],
             immovable: true,
-            alpha: 0.3
+            alpha: 0.3,
+            // Acoustic properties
+            speedOfSound: 5640,
+            acousticImpedance: 14.1,
+            absorptionCoeff: 0.03,
+            youngsModulus: 70e9,
+            impactSound: 'ring',
+            flowSound: null,
+            ambientSound: null,
+            phaseChangeSound: 'crack'
         });
 
         // STONE (generic rock)
@@ -5315,7 +5373,16 @@ class PixelPhysics {
             solubility: null,
             color: ['#4a4a4a', '#555555', '#3f3f3f', '#5a5a5a'],
             immovable: true,
-            liquidForm: 'lava'
+            liquidForm: 'lava',
+            // Acoustic properties
+            speedOfSound: 5950,
+            acousticImpedance: 16.1,
+            absorptionCoeff: 0.02,
+            youngsModulus: 60e9,
+            impactSound: 'crack',
+            flowSound: null,
+            ambientSound: null,
+            phaseChangeSound: 'crack'
         });
 
         // LAVA (molten rock)
@@ -5341,7 +5408,16 @@ class PixelPhysics {
             // v3.2: Dynamic lighting
             lightRadius: 40,
             lightColor: '#ff4400',
-            lightIntensity: 0.6
+            lightIntensity: 0.6,
+            // Acoustic properties
+            speedOfSound: 2500,
+            acousticImpedance: 7.5,
+            absorptionCoeff: 0.05,
+            youngsModulus: 10e9,
+            impactSound: 'splash',
+            flowSound: 'pour',
+            ambientSound: 'bubble',
+            phaseChangeSound: 'sizzle'
         });
 
         // OBSIDIAN (cooled lava)
@@ -5362,7 +5438,16 @@ class PixelPhysics {
             solubility: null,
             color: ['#1a1a1a', '#0f0f0f', '#252525'],
             immovable: true,
-            liquidForm: 'lava'
+            liquidForm: 'lava',
+            // Acoustic properties
+            speedOfSound: 5900,
+            acousticImpedance: 15.3,
+            absorptionCoeff: 0.02,
+            youngsModulus: 70e9,
+            impactSound: 'crack',
+            flowSound: null,
+            ambientSound: null,
+            phaseChangeSound: 'crack'
         });
 
         // DIRT
@@ -5383,7 +5468,16 @@ class PixelPhysics {
             solubility: null,
             color: ['#654321', '#7a5230', '#553311', '#6b4423'],
             friction: 0.8,
-            cohesion: 0.3
+            cohesion: 0.3,
+            // Acoustic properties
+            speedOfSound: 400,
+            acousticImpedance: 0.52,
+            absorptionCoeff: 0.15,
+            youngsModulus: 0.05e9,
+            impactSound: 'thud',
+            flowSound: 'rush',
+            ambientSound: null,
+            phaseChangeSound: null
         });
 
         // MUD (dirt + water)
@@ -5404,7 +5498,16 @@ class PixelPhysics {
             solubility: null,
             color: ['#4a3520', '#5a4530', '#3a2510'],
             solidForm: 'dirt', // dries out
-            viscosity: 0.9
+            viscosity: 0.9,
+            // Acoustic properties
+            speedOfSound: 800,
+            acousticImpedance: 1.12,
+            absorptionCoeff: 0.20,
+            youngsModulus: 0.02e9,
+            impactSound: 'splash',
+            flowSound: 'pour',
+            ambientSound: null,
+            phaseChangeSound: null
         });
 
         // CLAY
@@ -5425,7 +5528,16 @@ class PixelPhysics {
             solubility: null,
             color: ['#a07855', '#b08865', '#906845'],
             friction: 0.9,
-            cohesion: 0.7
+            cohesion: 0.7,
+            // Acoustic properties
+            speedOfSound: 2000,
+            acousticImpedance: 4.0,
+            absorptionCoeff: 0.10,
+            youngsModulus: 1.5e9,
+            impactSound: 'thud',
+            flowSound: 'rush',
+            ambientSound: null,
+            phaseChangeSound: null
         });
 
         // ========== METALS ==========
@@ -5448,7 +5560,16 @@ class PixelPhysics {
             solubility: null,
             color: ['#888888', '#999999', '#777777'],
             immovable: true,
-            metal: true
+            metal: true,
+            // Acoustic properties
+            speedOfSound: 5960,
+            acousticImpedance: 46.9,
+            absorptionCoeff: 0.01,
+            youngsModulus: 200e9,
+            impactSound: 'clang',
+            flowSound: null,
+            ambientSound: null,
+            phaseChangeSound: 'sizzle'
         });
 
         // ========== FLAMMABLE MATERIALS ==========
@@ -5472,7 +5593,16 @@ class PixelPhysics {
             color: ['#8b4513', '#a0522d', '#7a3f0f', '#9a5523'],
             immovable: true,
             combustionProducts: ['smoke', 'fire'],
-            combustionEnergy: 16 // MJ/kg
+            combustionEnergy: 16, // MJ/kg
+            // Acoustic properties
+            speedOfSound: 3850,
+            acousticImpedance: 2.31,
+            absorptionCoeff: 0.10,
+            youngsModulus: 11e9,
+            impactSound: 'thud',
+            flowSound: null,
+            ambientSound: null,
+            phaseChangeSound: 'crack'
         });
 
         // COAL (Carbon)
@@ -5494,7 +5624,16 @@ class PixelPhysics {
             color: ['#1a1a1a', '#2a2a2a', '#0f0f0f'],
             immovable: true,
             combustionProducts: ['smoke', 'fire'],
-            combustionEnergy: 24
+            combustionEnergy: 24,
+            // Acoustic properties
+            speedOfSound: 2700,
+            acousticImpedance: 3.78,
+            absorptionCoeff: 0.12,
+            youngsModulus: 3e9,
+            impactSound: 'crack',
+            flowSound: null,
+            ambientSound: null,
+            phaseChangeSound: 'crack'
         });
 
         // OIL (Hydrocarbon)
@@ -5516,7 +5655,16 @@ class PixelPhysics {
             color: ['#1a1a1a', '#2a2a2a', '#0f0f0f', '#353535'],
             viscosity: 0.7,
             combustionProducts: ['smoke', 'fire'],
-            combustionEnergy: 42
+            combustionEnergy: 42,
+            // Acoustic properties
+            speedOfSound: 1740,
+            acousticImpedance: 1.57,
+            absorptionCoeff: 0.03,
+            youngsModulus: 1.5e9,
+            impactSound: 'splash',
+            flowSound: 'pour',
+            ambientSound: null,
+            phaseChangeSound: 'sizzle'
         });
 
         // GUNPOWDER (Carbon + Sulfur + Saltpeter)
@@ -5541,7 +5689,16 @@ class PixelPhysics {
             explosionRadius: 50,
             explosionPower: 200,
             combustionProducts: ['smoke'],
-            combustionEnergy: 3
+            combustionEnergy: 3,
+            // Acoustic properties
+            speedOfSound: 400,
+            acousticImpedance: 0.68,
+            absorptionCoeff: 0.25,
+            youngsModulus: 0.1e9,
+            impactSound: 'crunch',
+            flowSound: 'rush',
+            ambientSound: null,
+            phaseChangeSound: 'pop'
         });
 
         // ========== GASES ==========
@@ -5569,7 +5726,16 @@ class PixelPhysics {
             // v3.2: Dynamic lighting
             lightRadius: 60,
             lightColor: '#ff6600',
-            lightIntensity: 0.8
+            lightIntensity: 0.8,
+            // Acoustic properties
+            speedOfSound: 700,
+            acousticImpedance: 0.0005,
+            absorptionCoeff: 0.0,
+            youngsModulus: null,
+            impactSound: null,
+            flowSound: 'whoosh',
+            ambientSound: 'crackle',
+            phaseChangeSound: 'whoosh'
         });
 
         // SMOKE
@@ -5590,7 +5756,16 @@ class PixelPhysics {
             solubility: null,
             color: ['#3a3a3a', '#4a4a4a', '#5a5a5a', '#2a2a2a'],
             lifetime: [1.5, 3.0],
-            alpha: 0.6
+            alpha: 0.6,
+            // Acoustic properties
+            speedOfSound: 350,
+            acousticImpedance: 0.0004,
+            absorptionCoeff: 0.0,
+            youngsModulus: null,
+            impactSound: null,
+            flowSound: null,
+            ambientSound: null,
+            phaseChangeSound: null
         });
 
         // OXYGEN (O₂)
@@ -5611,7 +5786,16 @@ class PixelPhysics {
             solubility: 'water',
             color: ['#ccffff40', '#ddeeff50'],
             supportsCombustion: true,
-            alpha: 0.3
+            alpha: 0.3,
+            // Acoustic properties
+            speedOfSound: 330,
+            acousticImpedance: 0.0004,
+            absorptionCoeff: 0.0,
+            youngsModulus: null,
+            impactSound: null,
+            flowSound: null,
+            ambientSound: null,
+            phaseChangeSound: null
         });
 
         // HYDROGEN (H₂)
@@ -5633,7 +5817,16 @@ class PixelPhysics {
             color: ['#ffcccc30', '#ffddd40'],
             combustionProducts: ['steam'], // H₂ + O₂ → H₂O!
             combustionEnergy: 142,
-            alpha: 0.25
+            alpha: 0.25,
+            // Acoustic properties
+            speedOfSound: 1270,
+            acousticImpedance: 0.0001,
+            absorptionCoeff: 0.0,
+            youngsModulus: null,
+            impactSound: null,
+            flowSound: null,
+            ambientSound: null,
+            phaseChangeSound: 'pop'
         });
 
         // METHANE (CH₄)
@@ -5655,7 +5848,16 @@ class PixelPhysics {
             color: ['#cceecc30', '#ddffdd40'],
             combustionProducts: ['smoke', 'steam'],
             combustionEnergy: 55,
-            alpha: 0.3
+            alpha: 0.3,
+            // Acoustic properties
+            speedOfSound: 450,
+            acousticImpedance: 0.0003,
+            absorptionCoeff: 0.0,
+            youngsModulus: null,
+            impactSound: null,
+            flowSound: null,
+            ambientSound: null,
+            phaseChangeSound: 'pop'
         });
 
         // CARBON DIOXIDE (CO₂)
@@ -5676,7 +5878,16 @@ class PixelPhysics {
             solubility: 'water',
             color: ['#e0e0e040', '#f0f0f050'],
             extinguishesFire: true, // fire suppression
-            alpha: 0.3
+            alpha: 0.3,
+            // Acoustic properties
+            speedOfSound: 267,
+            acousticImpedance: 0.0005,
+            absorptionCoeff: 0.0,
+            youngsModulus: null,
+            impactSound: null,
+            flowSound: null,
+            ambientSound: null,
+            phaseChangeSound: 'hiss'
         });
 
         // ========== REACTIVE MATERIALS ==========
@@ -5700,7 +5911,16 @@ class PixelPhysics {
             color: ['#88ff4480', '#99ff5590', '#aaff6688'],
             viscosity: 0.3,
             corrosive: true,
-            alpha: 0.7
+            alpha: 0.7,
+            // Acoustic properties
+            speedOfSound: 1500,
+            acousticImpedance: 1.80,
+            absorptionCoeff: 0.02,
+            youngsModulus: 2.5e9,
+            impactSound: 'splash',
+            flowSound: 'pour',
+            ambientSound: 'sizzle',
+            phaseChangeSound: 'sizzle'
         });
 
         // SALT (NaCl)
@@ -5720,7 +5940,16 @@ class PixelPhysics {
             reactivity: 0,
             solubility: 'water', // dissolves in water
             color: ['#f0f0f0', '#ffffff', '#e8e8e8'],
-            friction: 0.4
+            friction: 0.4,
+            // Acoustic properties
+            speedOfSound: 4500,
+            acousticImpedance: 9.72,
+            absorptionCoeff: 0.05,
+            youngsModulus: 40e9,
+            impactSound: 'crunch',
+            flowSound: 'rush',
+            ambientSound: null,
+            phaseChangeSound: 'crack'
         });
 
         // SULFUR (S)
@@ -5742,7 +5971,16 @@ class PixelPhysics {
             color: ['#ffff00', '#f0f000', '#eeee00'],
             friction: 0.5,
             combustionProducts: ['smoke'],
-            combustionEnergy: 9
+            combustionEnergy: 9,
+            // Acoustic properties
+            speedOfSound: 2200,
+            acousticImpedance: 4.55,
+            absorptionCoeff: 0.08,
+            youngsModulus: 8e9,
+            impactSound: 'crack',
+            flowSound: 'rush',
+            ambientSound: null,
+            phaseChangeSound: 'sizzle'
         });
     }
 
@@ -6257,6 +6495,9 @@ class PixelPhysics {
      * @param {number} power - Explosion power (affects scatter distance)
      */
     explode(x, y, radius, power) {
+        // v3.3: Explosion sound
+        this.acoustics.playExplosion(radius, power);
+        
         const gx = Math.floor(x / this.cellSize);
         const gy = Math.floor(y / this.cellSize);
         const gr = Math.ceil(radius / this.cellSize);
@@ -6469,10 +6710,20 @@ class PixelPhysics {
                             // But check for reactions
                             this.checkReactions(x, y, mat, idx, id);
                         }
+                        
+                        // v3.3: Ambient sounds (throttled)
+                        if (mat.ambientSound && this.frameCount % 30 === 0 && Math.random() < 0.005) {
+                            const matCount = 100; // Approximate material presence
+                            const intensity = Math.min(1, matCount / 200);
+                            this.acoustics.playAmbient(mat.ambientSound, intensity);
+                        }
                     }
                 }
             }
         }
+        
+        // v3.3: Update acoustic engine
+        this.acoustics.update(dt);
     }
 
     /**
@@ -6585,6 +6836,10 @@ class PixelPhysics {
                 if (liquidMat) {
                     this.temperatureGrid[idx] = mat.meltingPoint;
                 }
+                // v3.3: Melting sound
+                if (mat.phaseChangeSound && Math.random() < 0.05) {
+                    this.acoustics.playPhaseChange(mat.phaseChangeSound, 0.5);
+                }
             }
         }
         
@@ -6596,6 +6851,10 @@ class PixelPhysics {
                 const gasMat = this.getMaterial(gasId);
                 if (gasMat) {
                     this.temperatureGrid[idx] = mat.boilingPoint;
+                }
+                // v3.3: Boiling sound
+                if (mat.phaseChangeSound && Math.random() < 0.05) {
+                    this.acoustics.playPhaseChange(mat.phaseChangeSound, 0.6);
                 }
             }
         }
@@ -6609,6 +6868,10 @@ class PixelPhysics {
                 if (solidMat) {
                     this.temperatureGrid[idx] = mat.meltingPoint;
                 }
+                // v3.3: Freezing sound
+                if (mat.phaseChangeSound && Math.random() < 0.05) {
+                    this.acoustics.playPhaseChange('crack', 0.4);
+                }
             }
         }
         
@@ -6620,6 +6883,10 @@ class PixelPhysics {
                 const liquidMat = this.getMaterial(liquidId);
                 if (liquidMat) {
                     this.temperatureGrid[idx] = mat.boilingPoint;
+                }
+                // v3.3: Condensing sound
+                if (mat.phaseChangeSound && Math.random() < 0.03) {
+                    this.acoustics.playPhaseChange('hiss', 0.3);
                 }
             }
         }
@@ -6849,7 +7116,31 @@ class PixelPhysics {
             this.activateChunk(x1, y1);
             this.activateChunk(x2, y2);
             
+            // v3.3: Impact sound when materials collide
+            if (Math.random() < 0.02) { // 2% chance per collision to avoid spam
+                const mat1 = this.getMaterial(id1);
+                const mat2 = this.getMaterial(id2);
+                if (mat1 && mat1.impactSound) {
+                    const densityDiff = Math.abs(this.densityArr[id1] - this.densityArr[id2]);
+                    const intensity = Math.min(1, densityDiff / 2000);
+                    const worldX = x2 * this.cellSize;
+                    const worldY = y2 * this.cellSize;
+                    this.acoustics.playImpact(mat1.impactSound, mat1, intensity, worldX, worldY);
+                }
+            }
+            
             return true;
+        }
+        
+        // v3.3: Impact sound when hitting solid
+        if (state2 === 1 && Math.random() < 0.01) {
+            const mat1 = this.getMaterial(id1);
+            if (mat1 && mat1.impactSound) {
+                const intensity = Math.min(1, this.densityArr[id1] / 3000);
+                const worldX = x2 * this.cellSize;
+                const worldY = y2 * this.cellSize;
+                this.acoustics.playImpact(mat1.impactSound, mat1, intensity, worldX, worldY);
+            }
         }
         
         return false;
@@ -7087,8 +7378,693 @@ class PixelPhysics {
     }
 }
 
+// ===== ACOUSTIC ENGINE (v3.3) =====
+
+/**
+ * Acoustic Engine v3.3 - Scientifically Accurate Procedural Sound
+ * 
+ * PHILOSOPHY: Every sound is generated procedurally from real material properties.
+ * No audio files. Sound frequencies derived from Young's modulus and density.
+ * This is "The Composition" — the soul of the physics engine.
+ * 
+ * @class AcousticEngine
+ */
+class AcousticEngine {
+    /**
+     * Create an acoustic engine
+     * @param {PixelPhysics} pixelPhysics - Physics system instance
+     */
+    constructor(pixelPhysics) {
+        this.physics = pixelPhysics;
+        this.enabled = false;
+        this.masterVolume = 0.7;
+        this.reverbLevel = 0.3;
+        
+        // Web Audio API context
+        this.ctx = null;
+        this.masterGain = null;
+        this.convolver = null;
+        
+        // Sound source management
+        this.activeSounds = new Map(); // Track active sound sources
+        this.maxSources = 16; // Maximum simultaneous sounds
+        this.soundThrottle = 4; // Check for sounds every N frames
+        this.frameCounter = 0;
+        
+        // Performance: aggregate sounds by region
+        this.regionSize = 32; // Group sounds by 32x32 regions
+        this.regionSounds = new Map(); // region key -> sound data
+        
+        console.log('[AcousticEngine v3.3] Initialized - The Composition');
+    }
+
+    /**
+     * Initialize Web Audio API context (requires user interaction)
+     * @returns {boolean} True if initialized successfully
+     */
+    init() {
+        if (this.ctx) return true;
+        
+        try {
+            this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+            this.masterGain = this.ctx.createGain();
+            this.masterGain.gain.value = this.masterVolume;
+            
+            // Create reverb convolver
+            this.convolver = this.ctx.createConvolver();
+            this.convolver.buffer = this.createReverbImpulse(2, 0.5);
+            
+            // Connect: sources -> masterGain -> convolver -> destination
+            const reverbGain = this.ctx.createGain();
+            reverbGain.gain.value = this.reverbLevel;
+            
+            this.masterGain.connect(this.ctx.destination);
+            this.masterGain.connect(this.convolver);
+            this.convolver.connect(reverbGain);
+            reverbGain.connect(this.ctx.destination);
+            
+            this.enabled = true;
+            console.log('[AcousticEngine v3.3] Web Audio initialized');
+            return true;
+        } catch (e) {
+            console.error('[AcousticEngine] Failed to initialize:', e);
+            return false;
+        }
+    }
+
+    /**
+     * Create a procedural reverb impulse response
+     * @private
+     * @param {number} duration - Duration in seconds
+     * @param {number} decay - Decay factor (0-1)
+     * @returns {AudioBuffer} Impulse response buffer
+     */
+    createReverbImpulse(duration, decay) {
+        const rate = this.ctx.sampleRate;
+        const length = rate * duration;
+        const impulse = this.ctx.createBuffer(2, length, rate);
+        const left = impulse.getChannelData(0);
+        const right = impulse.getChannelData(1);
+        
+        for (let i = 0; i < length; i++) {
+            const n = length - i;
+            left[i] = (Math.random() * 2 - 1) * Math.pow(n / length, decay * 3);
+            right[i] = (Math.random() * 2 - 1) * Math.pow(n / length, decay * 3);
+        }
+        
+        return impulse;
+    }
+
+    /**
+     * Calculate impact frequency from Young's modulus and density
+     * f = k * sqrt(E/ρ) where k scales to audible range
+     * @private
+     * @param {number} youngsModulus - Young's modulus in Pa
+     * @param {number} density - Density in kg/m³
+     * @returns {number} Frequency in Hz
+     */
+    calculateImpactFrequency(youngsModulus, density) {
+        if (!youngsModulus || youngsModulus === 0 || !density || density === 0) {
+            return 200; // Default low frequency
+        }
+        
+        const k = 0.0015; // Scaling constant to audible range
+        const freq = k * Math.sqrt(youngsModulus / density);
+        return Math.max(80, Math.min(4000, freq)); // Clamp to audible range
+    }
+
+    /**
+     * Generate an impact sound when materials collide
+     * @param {string} soundType - Type of sound ('ring'|'thud'|'splash'|'crack'|'shatter'|'crunch'|'clang')
+     * @param {object} material - Material properties
+     * @param {number} intensity - Impact intensity (0-1)
+     * @param {number} x - World X position (for spatial audio)
+     * @param {number} y - World Y position
+     */
+    playImpact(soundType, material, intensity, x, y) {
+        if (!this.enabled || !this.ctx) return;
+        
+        const now = this.ctx.currentTime;
+        const volume = intensity * this.masterVolume * 0.3;
+        
+        // Calculate frequency from material properties
+        const baseFreq = this.calculateImpactFrequency(
+            material.youngsModulus || 1e9,
+            material.density || 1000
+        );
+        
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        const filter = this.ctx.createBiquadFilter();
+        
+        filter.type = 'lowpass';
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.masterGain);
+        
+        switch (soundType) {
+            case 'ring': // Metal, glass - bright ring with long sustain
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(baseFreq, now);
+                osc.frequency.exponentialRampToValueAtTime(baseFreq * 0.9, now + 0.3);
+                gain.gain.setValueAtTime(volume, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+                filter.frequency.setValueAtTime(baseFreq * 3, now);
+                osc.start(now);
+                osc.stop(now + 0.4);
+                break;
+                
+            case 'thud': // Wood, dirt - warm thud with medium sustain
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(baseFreq * 0.5, now);
+                osc.frequency.exponentialRampToValueAtTime(baseFreq * 0.3, now + 0.15);
+                gain.gain.setValueAtTime(volume, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+                filter.frequency.setValueAtTime(800, now);
+                osc.start(now);
+                osc.stop(now + 0.15);
+                break;
+                
+            case 'splash': // Water, liquid - noise burst + low freq
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(100, now);
+                osc.frequency.exponentialRampToValueAtTime(50, now + 0.12);
+                gain.gain.setValueAtTime(volume * 0.8, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+                filter.frequency.setValueAtTime(1200, now);
+                filter.frequency.exponentialRampToValueAtTime(400, now + 0.12);
+                osc.start(now);
+                osc.stop(now + 0.12);
+                break;
+                
+            case 'crack': // Stone, ice - sharp crack
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(baseFreq * 1.5, now);
+                osc.frequency.exponentialRampToValueAtTime(baseFreq * 0.5, now + 0.08);
+                gain.gain.setValueAtTime(volume, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+                filter.frequency.setValueAtTime(3000, now);
+                filter.frequency.exponentialRampToValueAtTime(800, now + 0.08);
+                osc.start(now);
+                osc.stop(now + 0.08);
+                break;
+                
+            case 'shatter': // Glass breaking - crystalline ping with harmonics
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(baseFreq, now);
+                osc.frequency.exponentialRampToValueAtTime(baseFreq * 2, now + 0.05);
+                osc.frequency.exponentialRampToValueAtTime(baseFreq * 0.5, now + 0.2);
+                gain.gain.setValueAtTime(volume, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+                filter.frequency.setValueAtTime(4000, now);
+                osc.start(now);
+                osc.stop(now + 0.2);
+                break;
+                
+            case 'crunch': // Sand, powder - dull thud, no sustain
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(150, now);
+                osc.frequency.exponentialRampToValueAtTime(80, now + 0.06);
+                gain.gain.setValueAtTime(volume * 0.6, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.06);
+                filter.frequency.setValueAtTime(600, now);
+                osc.start(now);
+                osc.stop(now + 0.06);
+                break;
+                
+            case 'clang': // Metal impact - bright clang
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(baseFreq * 1.2, now);
+                osc.frequency.exponentialRampToValueAtTime(baseFreq * 0.8, now + 0.25);
+                gain.gain.setValueAtTime(volume, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+                filter.frequency.setValueAtTime(baseFreq * 4, now);
+                osc.start(now);
+                osc.stop(now + 0.3);
+                break;
+                
+            default:
+                osc.stop();
+                return;
+        }
+    }
+
+    /**
+     * Generate flow sounds for moving liquids/powders
+     * @param {string} soundType - Type of flow ('trickle'|'pour'|'rush'|'hiss'|'whoosh')
+     * @param {object} material - Material properties
+     * @param {number} velocity - Flow velocity (0-1)
+     * @param {number} cellCount - Number of moving cells
+     */
+    playFlow(soundType, material, velocity, cellCount) {
+        if (!this.enabled || !this.ctx) return;
+        
+        const regionKey = soundType + '_flow';
+        if (this.activeSounds.has(regionKey)) return; // Already playing
+        
+        const now = this.ctx.currentTime;
+        const volume = Math.min(1, cellCount / 100) * this.masterVolume * 0.2;
+        
+        // Noise-based flow sounds
+        const bufferSize = this.ctx.sampleRate * 0.5;
+        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        
+        // Generate noise
+        for (let i = 0; i < bufferSize; i++) {
+            data[i] = Math.random() * 2 - 1;
+        }
+        
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = buffer;
+        noise.loop = true;
+        
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        
+        const gain = this.ctx.createGain();
+        gain.gain.value = volume;
+        
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.masterGain);
+        
+        // Frequency tied to velocity
+        const baseFreq = 200 + velocity * 800;
+        
+        switch (soundType) {
+            case 'pour': // Water - blue noise, higher pitch = faster
+                filter.frequency.value = baseFreq * 1.5;
+                filter.Q.value = 2;
+                break;
+            case 'rush': // Sand, powder - pink noise, granular
+                filter.frequency.value = baseFreq * 0.8;
+                filter.Q.value = 1.5;
+                break;
+            case 'hiss': // Gas, steam - high frequency noise
+                filter.frequency.value = baseFreq * 2;
+                filter.Q.value = 3;
+                break;
+            case 'whoosh': // Fire, fast gas - low rumble + high noise
+                filter.frequency.value = baseFreq * 1.2;
+                filter.Q.value = 1;
+                break;
+            default:
+                filter.frequency.value = baseFreq;
+                filter.Q.value = 1;
+        }
+        
+        noise.start(now);
+        
+        // Store reference and auto-stop after duration
+        this.activeSounds.set(regionKey, { source: noise, gain, startTime: now });
+        
+        setTimeout(() => {
+            gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.1);
+            setTimeout(() => {
+                noise.stop();
+                this.activeSounds.delete(regionKey);
+            }, 150);
+        }, 300);
+    }
+
+    /**
+     * Generate ambient sounds for ongoing material presence
+     * @param {string} soundType - Type of ambient ('crackle'|'sizzle'|'bubble'|'hum')
+     * @param {number} intensity - Sound intensity (0-1)
+     */
+    playAmbient(soundType, intensity) {
+        if (!this.enabled || !this.ctx) return;
+        
+        const regionKey = soundType + '_ambient';
+        if (this.activeSounds.has(regionKey)) return;
+        
+        const now = this.ctx.currentTime;
+        const volume = intensity * this.masterVolume * 0.15;
+        
+        switch (soundType) {
+            case 'crackle': // Fire - filtered noise + random pops
+                this.playFireCrackle(volume);
+                break;
+            case 'sizzle': // Acid, hot reactions - high-freq noise
+                this.playSizzle(volume);
+                break;
+            case 'bubble': // Lava, boiling - random sine pops
+                this.playBubble(volume);
+                break;
+            case 'hum': // Deep drone
+                this.playHum(volume);
+                break;
+        }
+    }
+
+    /**
+     * Play fire crackling sound
+     * @private
+     */
+    playFireCrackle(volume) {
+        const now = this.ctx.currentTime;
+        const regionKey = 'crackle_ambient';
+        
+        // Random pops
+        for (let i = 0; i < 3; i++) {
+            const delay = Math.random() * 0.2;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(300 + Math.random() * 400, now + delay);
+            gain.gain.setValueAtTime(volume * 0.4, now + delay);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.05);
+            
+            osc.connect(gain);
+            gain.connect(this.masterGain);
+            osc.start(now + delay);
+            osc.stop(now + delay + 0.05);
+        }
+        
+        this.activeSounds.set(regionKey, { startTime: now });
+        setTimeout(() => this.activeSounds.delete(regionKey), 200);
+    }
+
+    /**
+     * Play sizzle sound (acid, hot reactions)
+     * @private
+     */
+    playSizzle(volume) {
+        const now = this.ctx.currentTime;
+        const regionKey = 'sizzle_ambient';
+        
+        const bufferSize = this.ctx.sampleRate * 0.3;
+        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        
+        for (let i = 0; i < bufferSize; i++) {
+            data[i] = Math.random() * 2 - 1;
+        }
+        
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = buffer;
+        
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'highpass';
+        filter.frequency.value = 2000;
+        
+        const gain = this.ctx.createGain();
+        gain.gain.value = volume * 0.5;
+        
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.masterGain);
+        noise.start(now);
+        
+        this.activeSounds.set(regionKey, { source: noise, startTime: now });
+        setTimeout(() => {
+            noise.stop();
+            this.activeSounds.delete(regionKey);
+        }, 300);
+    }
+
+    /**
+     * Play bubble sound (lava, boiling water)
+     * @private
+     */
+    playBubble(volume) {
+        const now = this.ctx.currentTime;
+        const regionKey = 'bubble_ambient';
+        
+        // Random bubble pops
+        for (let i = 0; i < 2; i++) {
+            const delay = Math.random() * 0.3;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            
+            osc.type = 'sine';
+            const freq = 200 + Math.random() * 600;
+            osc.frequency.setValueAtTime(freq, now + delay);
+            osc.frequency.exponentialRampToValueAtTime(freq * 0.5, now + delay + 0.1);
+            
+            gain.gain.setValueAtTime(volume * 0.6, now + delay);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.1);
+            
+            osc.connect(gain);
+            gain.connect(this.masterGain);
+            osc.start(now + delay);
+            osc.stop(now + delay + 0.1);
+        }
+        
+        this.activeSounds.set(regionKey, { startTime: now });
+        setTimeout(() => this.activeSounds.delete(regionKey), 300);
+    }
+
+    /**
+     * Play deep hum/drone
+     * @private
+     */
+    playHum(volume) {
+        const now = this.ctx.currentTime;
+        const regionKey = 'hum_ambient';
+        
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        
+        osc.type = 'triangle';
+        osc.frequency.value = 60;
+        gain.gain.setValueAtTime(volume * 0.3, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+        
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+        osc.start(now);
+        osc.stop(now + 0.5);
+        
+        this.activeSounds.set(regionKey, { source: osc, startTime: now });
+        setTimeout(() => this.activeSounds.delete(regionKey), 500);
+    }
+
+    /**
+     * Play phase change sound (freezing, boiling, melting, combustion)
+     * @param {string} soundType - Type of phase change ('sizzle'|'crack'|'pop'|'hiss')
+     * @param {number} intensity - Intensity (0-1)
+     */
+    playPhaseChange(soundType, intensity) {
+        if (!this.enabled || !this.ctx) return;
+        
+        const now = this.ctx.currentTime;
+        const volume = intensity * this.masterVolume * 0.25;
+        
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        const filter = this.ctx.createBiquadFilter();
+        
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.masterGain);
+        
+        switch (soundType) {
+            case 'sizzle': // Melting, evaporation
+                filter.type = 'highpass';
+                filter.frequency.value = 1500;
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.exponentialRampToValueAtTime(200, now + 0.15);
+                gain.gain.setValueAtTime(volume, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+                osc.start(now);
+                osc.stop(now + 0.15);
+                break;
+                
+            case 'crack': // Freezing, ice expanding
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(800, now);
+                osc.frequency.exponentialRampToValueAtTime(200, now + 0.1);
+                gain.gain.setValueAtTime(volume, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+                filter.frequency.setValueAtTime(2000, now);
+                osc.start(now);
+                osc.stop(now + 0.1);
+                break;
+                
+            case 'pop': // Bubble bursting, combustion
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(600, now);
+                osc.frequency.exponentialRampToValueAtTime(100, now + 0.08);
+                gain.gain.setValueAtTime(volume, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+                osc.start(now);
+                osc.stop(now + 0.08);
+                break;
+                
+            case 'hiss': // Gas release
+                filter.type = 'bandpass';
+                filter.frequency.value = 3000;
+                filter.Q.value = 2;
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(2000, now);
+                gain.gain.setValueAtTime(volume * 0.7, now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+                osc.start(now);
+                osc.stop(now + 0.2);
+                break;
+        }
+    }
+
+    /**
+     * Play explosion sound (big low boom + debris)
+     * @param {number} radius - Explosion radius
+     * @param {number} power - Explosion power
+     */
+    playExplosion(radius, power) {
+        if (!this.enabled || !this.ctx) return;
+        
+        const now = this.ctx.currentTime;
+        const volume = Math.min(1, power / 300) * this.masterVolume * 0.5;
+        
+        // Deep boom
+        const boom = this.ctx.createOscillator();
+        const boomGain = this.ctx.createGain();
+        const boomFilter = this.ctx.createBiquadFilter();
+        
+        boom.type = 'sine';
+        boom.frequency.setValueAtTime(60, now);
+        boom.frequency.exponentialRampToValueAtTime(30, now + 0.4);
+        
+        boomFilter.type = 'lowpass';
+        boomFilter.frequency.setValueAtTime(200, now);
+        
+        boomGain.gain.setValueAtTime(volume, now);
+        boomGain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+        
+        boom.connect(boomFilter);
+        boomFilter.connect(boomGain);
+        boomGain.connect(this.masterGain);
+        
+        boom.start(now);
+        boom.stop(now + 0.5);
+        
+        // High-frequency debris crackle
+        const crackle = this.ctx.createOscillator();
+        const crackleGain = this.ctx.createGain();
+        
+        crackle.type = 'sawtooth';
+        crackle.frequency.setValueAtTime(1000, now);
+        crackle.frequency.exponentialRampToValueAtTime(200, now + 0.3);
+        
+        crackleGain.gain.setValueAtTime(volume * 0.6, now + 0.05);
+        crackleGain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+        
+        crackle.connect(crackleGain);
+        crackleGain.connect(this.masterGain);
+        
+        crackle.start(now + 0.05);
+        crackle.stop(now + 0.3);
+    }
+
+    /**
+     * Update acoustic engine (called each frame)
+     * @param {number} dt - Delta time in seconds
+     */
+    update(dt) {
+        if (!this.enabled) return;
+        
+        this.frameCounter++;
+        if (this.frameCounter % this.soundThrottle !== 0) return;
+        
+        // Cleanup expired sounds
+        const now = this.ctx.currentTime;
+        for (const [key, sound] of this.activeSounds) {
+            if (now - sound.startTime > 2) {
+                if (sound.source) {
+                    try {
+                        sound.source.stop();
+                    } catch (e) {
+                        // Already stopped
+                    }
+                }
+                this.activeSounds.delete(key);
+            }
+        }
+        
+        // Limit active sources
+        if (this.activeSounds.size > this.maxSources) {
+            const oldest = Array.from(this.activeSounds.entries())
+                .sort((a, b) => a[1].startTime - b[1].startTime)[0];
+            if (oldest && oldest[1].source) {
+                try {
+                    oldest[1].source.stop();
+                } catch (e) {}
+            }
+            this.activeSounds.delete(oldest[0]);
+        }
+    }
+
+    /**
+     * Set master volume
+     * @param {number} volume - Volume (0-1)
+     */
+    setVolume(volume) {
+        this.masterVolume = Math.max(0, Math.min(1, volume));
+        if (this.masterGain) {
+            this.masterGain.gain.value = this.masterVolume;
+        }
+    }
+
+    /**
+     * Set reverb level
+     * @param {number} level - Reverb level (0-1)
+     */
+    setReverbLevel(level) {
+        this.reverbLevel = Math.max(0, Math.min(1, level));
+        // Recreate reverb with new level
+        if (this.ctx && this.convolver) {
+            this.convolver.buffer = this.createReverbImpulse(2, this.reverbLevel);
+        }
+    }
+
+    /**
+     * Analyze surrounding geometry to estimate room size for reverb
+     * @param {number} x - Center X position
+     * @param {number} y - Center Y position
+     * @returns {number} Estimated room size (0-1, small to large)
+     */
+    analyzeRoomSize(x, y) {
+        // Raycast in multiple directions to find walls
+        let totalDist = 0;
+        const rays = 8;
+        
+        for (let i = 0; i < rays; i++) {
+            const angle = (i / rays) * Math.PI * 2;
+            const dx = Math.cos(angle);
+            const dy = Math.sin(angle);
+            
+            let dist = 0;
+            const maxDist = 200;
+            
+            while (dist < maxDist) {
+                const checkX = Math.floor((x + dx * dist) / this.physics.cellSize);
+                const checkY = Math.floor((y + dy * dist) / this.physics.cellSize);
+                
+                if (!this.physics.inBounds(checkX, checkY)) break;
+                
+                const idx = this.physics.index(checkX, checkY);
+                const matId = this.physics.grid[idx];
+                const mat = this.physics.getMaterial(matId);
+                
+                if (mat && mat.state === 'solid') break;
+                
+                dist += 5;
+            }
+            
+            totalDist += dist;
+        }
+        
+        const avgDist = totalDist / rays;
+        return Math.min(1, avgDist / 200); // Normalize to 0-1
+    }
+}
+
 // Static properties (must be set AFTER class definition)
-BudEngine.VERSION = '3.2';
+BudEngine.VERSION = '3.3';
 BudEngine.LAYER = {
     DEFAULT: 1,
     PLAYER: 2,
