@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bud Engine - 2D Game Engine for AI-Human Collaboration</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: linear-gradient(135deg, #0a0a14 0%, #1a1a2e 100%);
+            color: #00ffcc;
+            min-height: 100vh;
+            padding: 40px 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-size: 4em;
+            text-align: center;
+            margin-bottom: 20px;
+            text-shadow: 0 0 20px #00ffcc;
+            animation: glow 2s ease-in-out infinite alternate;
+        }
+
+        @keyframes glow {
+            from { text-shadow: 0 0 20px #00ffcc; }
+            to { text-shadow: 0 0 40px #00ffcc, 0 0 60px #00ffcc; }
+        }
+
+        .tagline {
+            text-align: center;
+            font-size: 1.5em;
+            color: #ff3333;
+            margin-bottom: 60px;
+        }
+
+        .section {
+            background: rgba(26, 26, 46, 0.6);
+            border: 2px solid #00ffcc;
+            padding: 30px;
+            margin-bottom: 40px;
+            border-radius: 10px;
+            box-shadow: 0 0 30px rgba(0, 255, 204, 0.3);
+        }
+
+        h2 {
+            color: #ff3333;
+            font-size: 2em;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #ff3333;
+            padding-bottom: 10px;
+        }
+
+        h3 {
+            color: #00ffcc;
+            font-size: 1.4em;
+            margin-top: 25px;
+            margin-bottom: 15px;
+        }
+
+        p {
+            line-height: 1.8;
+            margin-bottom: 15px;
+            color: #e0e0e0;
+        }
+
+        code {
+            background: #0a0a14;
+            padding: 2px 6px;
+            border-radius: 3px;
+            color: #ff8800;
+        }
+
+        pre {
+            background: #0a0a14;
+            padding: 20px;
+            border-radius: 5px;
+            overflow-x: auto;
+            margin: 15px 0;
+            border-left: 4px solid #00ffcc;
+        }
+
+        pre code {
+            background: none;
+            padding: 0;
+            color: #00ffcc;
+        }
+
+        .demos {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-top: 30px;
+        }
+
+        .demo-card {
+            background: linear-gradient(135deg, #1a1a2e 0%, #0d0d16 100%);
+            border: 2px solid #00ffcc;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .demo-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 10px 40px rgba(0, 255, 204, 0.5);
+            border-color: #ff3333;
+        }
+
+        .demo-card h3 {
+            margin-top: 0;
+        }
+
+        .demo-card a {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 15px 40px;
+            background: #00ffcc;
+            color: #0a0a14;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        .demo-card a:hover {
+            background: #ff3333;
+            color: white;
+            transform: scale(1.05);
+        }
+
+        .feature-list {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .feature-list li {
+            padding: 10px 0;
+            padding-left: 30px;
+            position: relative;
+            color: #e0e0e0;
+        }
+
+        .feature-list li:before {
+            content: "▶";
+            position: absolute;
+            left: 0;
+            color: #00ffcc;
+        }
+
+        .highlight {
+            background: linear-gradient(90deg, #ff3333, #ff8800);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: bold;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 60px;
+            padding-top: 30px;
+            border-top: 2px solid #00ffcc;
+            color: #888;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>BUD ENGINE</h1>
+        <p class="tagline">A 2D Web Game Engine Designed for AI-Human Collaboration</p>
+
+        <div class="section">
+            <h2>🤖 Philosophy</h2>
+            <p>Bud Engine is built so an AI developer can write, <span class="highlight">TEST</span>, and iterate on games independently before handing polished results to a human.</p>
+            <p>The killer feature: <strong>AI Testing API + Auto-Playtest Bot</strong></p>
+        </div>
+
+        <div class="section">
+            <h2>⚡ Core Features</h2>
+            <ul class="feature-list">
+                <li><strong>Single-File Architecture</strong> — No build tools, no bundlers. Just include <code>bud.js</code> and start coding.</li>
+                <li><strong>Entity-Component System</strong> — Spawn entities with sprites, colliders, and custom properties.</li>
+                <li><strong>Procedural Art System</strong> — No external assets needed. Everything generated from code.</li>
+                <li><strong>Physics & Collision</strong> — AABB and circle colliders, spatial grid optimization, raycasting.</li>
+                <li><strong>AI Testing API</strong> — Inspect state, inject input, control time, record & replay.</li>
+                <li><strong>Auto-Playtest Bot</strong> — Built-in AI that plays your game using configurable strategies.</li>
+                <li><strong>Tilemap System</strong> — Create rooms, corridors, and dungeons with ease.</li>
+                <li><strong>Particle System</strong> — Explosions, trails, and effects.</li>
+                <li><strong>Procedural Sound</strong> — Web Audio API synthesized sounds.</li>
+                <li><strong>Scene Management</strong> — Menu, gameplay, game over — structured state transitions.</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h2>🎮 Demos</h2>
+            <div class="demos">
+                <div class="demo-card">
+                    <h3>Top-Down Shooter</h3>
+                    <p>WASD movement, mouse aim, 5-room dungeon, 3 enemy types, wave system.</p>
+                    <p><strong>Tested:</strong> 30+ second avg survival with autoplay bot</p>
+                    <a href="demos/shooter/">PLAY NOW</a>
+                </div>
+
+                <div class="demo-card">
+                    <h3>Platformer</h3>
+                    <p>Arrow keys to move, jump physics, coins, spikes, 3 levels.</p>
+                    <p><strong>Tested:</strong> All levels completable by AI bot</p>
+                    <a href="demos/platformer/">PLAY NOW</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🧪 Testing API Example</h2>
+            <pre><code>// Get game state
+const state = engine.test.getState();
+console.log(state.player.health);
+
+// Inject input
+engine.test.input('w', true);  // hold W
+engine.test.click(100, 200);   // click at world position
+
+// Time control
+engine.test.step(60);          // advance 60 frames (1 second)
+engine.test.fastForward(5);    // skip 5 seconds instantly
+
+// Run auto-playtest
+const results = engine.test.autoplay({
+    strategy: 'survive',  // or 'aggressive', 'explore', 'random'
+    duration: 60,         // seconds
+    runs: 50,             // number of playtests
+    report: true
+});
+
+console.log('Avg survival:', results.avgSurvival);
+console.log('Deaths:', results.deaths);
+console.log('Balance notes:', results.balanceNotes);</code></pre>
+        </div>
+
+        <div class="section">
+            <h2>🚀 Quick Start</h2>
+            <pre><code>&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+    &lt;title&gt;My Game&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;script src="bud.js"&gt;&lt;/script&gt;
+    &lt;script&gt;
+        const engine = new BudEngine({ width: 1280, height: 720 });
+
+        engine.scene('game', {
+            enter() {
+                // Spawn player
+                const player = engine.spawn('player', {
+                    x: 640, y: 360,
+                    sprite: engine.art.character({ 
+                        body: 'circle', 
+                        color: '#00ffcc', 
+                        size: 20 
+                    }),
+                    collider: { type: 'circle', radius: 16 },
+                    health: 100,
+                    speed: 200
+                });
+
+                // Camera follows player
+                engine.cameraFollow(player);
+            },
+
+            update(dt) {
+                const player = engine.findOne('player');
+                
+                // Movement
+                if (engine.input.key('w')) player.y -= player.speed * dt;
+                if (engine.input.key('s')) player.y += player.speed * dt;
+                if (engine.input.key('a')) player.x -= player.speed * dt;
+                if (engine.input.key('d')) player.x += player.speed * dt;
+            }
+        });
+
+        engine.goTo('game');
+        engine.start();
+    &lt;/script&gt;
+&lt;/body&gt;
+&lt;/html&gt;</code></pre>
+        </div>
+
+        <div class="section">
+            <h2>📦 Download</h2>
+            <p>Grab <code>bud.js</code> from the <a href="https://github.com/lovejzzz/BudEngine" style="color: #ff3333;">GitHub repository</a>.</p>
+            <p>Check out the demos source code to see how to build complete games.</p>
+        </div>
+
+        <footer>
+            <p>Built with ❤️ for AI-human collaboration</p>
+            <p>Bud Engine v0.1 | MIT License</p>
+        </footer>
+    </div>
+</body>
+</html>

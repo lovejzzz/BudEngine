@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Top-Down Shooter - Bud Engine Demo</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #0a0a14;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            font-family: 'Courier New', monospace;
+            color: #00ffcc;
+        }
+
+        canvas {
+            border: 2px solid #00ffcc;
+            box-shadow: 0 0 30px rgba(0, 255, 204, 0.5);
+        }
+
+        #info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(10, 10, 20, 0.9);
+            padding: 15px;
+            border: 2px solid #00ffcc;
+            border-radius: 5px;
+            font-size: 14px;
+            max-width: 300px;
+        }
+
+        #info h3 {
+            margin: 0 0 10px 0;
+            color: #ff3333;
+        }
+
+        #info p {
+            margin: 5px 0;
+            line-height: 1.4;
+        }
+
+        #autoplay-btn {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            padding: 15px 30px;
+            background: #00ffcc;
+            color: #0a0a14;
+            border: none;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        #autoplay-btn:hover {
+            background: #ff3333;
+            color: white;
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+    <div id="info">
+        <h3>🎮 TOP-DOWN SHOOTER</h3>
+        <p><strong>Controls:</strong></p>
+        <p>WASD - Move</p>
+        <p>Mouse - Aim</p>
+        <p>Click - Shoot</p>
+        <p style="margin-top: 10px; color: #ff8800;">Survive as long as you can!</p>
+    </div>
+
+    <button id="autoplay-btn" onclick="runAutoplay()">🤖 RUN AUTOPLAY TEST</button>
+
+    <script src="../../bud.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>
