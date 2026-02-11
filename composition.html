@@ -472,22 +472,27 @@
 
         // Initialize engine
         const canvas = document.getElementById('gameCanvas');
-        // Use actual canvas display size for proper touch mapping
-        const initRect = canvas.getBoundingClientRect();
-        const initW = Math.round(initRect.width);
-        const initH = Math.round(initRect.height);
+        // Force canvas pixel size to match CSS display size (critical for mobile touch)
+        function syncCanvasSize() {
+            const w = canvas.clientWidth || window.innerWidth;
+            const h = canvas.clientHeight || window.innerHeight;
+            canvas.width = w;
+            canvas.height = h;
+            return { w, h };
+        }
+        const initSize = syncCanvasSize();
         const engine = new BudEngine({
             canvas: canvas,
-            width: initW,
-            height: initH,
+            width: initSize.w,
+            height: initSize.h,
             backgroundColor: '#0a0a14'
         });
-        // Ensure canvas pixel dimensions exactly match CSS display size
-        canvas.width = initW;
-        canvas.height = initH;
+        // Re-sync after engine constructor (it may override canvas.width/height)
+        canvas.width = initSize.w;
+        canvas.height = initSize.h;
 
         // Initialize physics
-        engine.physics.init(initW, initH, 3);
+        engine.physics.init(initSize.w, initSize.h, 3);
 
         // Initialize composition game
         engine.composition = new CompositionGame(engine);
@@ -552,13 +557,16 @@
 
         function getInputPos(e) {
             const rect = canvas.getBoundingClientRect();
-            // touchend has no touches, use changedTouches
             const touch = e.touches && e.touches[0] ? e.touches[0] : 
                           e.changedTouches && e.changedTouches[0] ? e.changedTouches[0] : e;
-            return {
-                x: (touch.clientX - rect.left) * (canvas.width / rect.width),
-                y: (touch.clientY - rect.top) * (canvas.height / rect.height)
-            };
+            // Use clientX/Y relative to canvas rect, scaled by pixel ratio
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const x = (touch.clientX - rect.left) * scaleX;
+            const y = (touch.clientY - rect.top) * scaleY;
+            // Update debug display
+            if (debugDiv) debugDiv.textContent = `touch:${Math.round(touch.clientX)},${Math.round(touch.clientY)} rect:${Math.round(rect.width)}x${Math.round(rect.height)} canvas:${canvas.width}x${canvas.height} scale:${scaleX.toFixed(1)},${scaleY.toFixed(1)} → ${Math.round(x)},${Math.round(y)}`;
+            return { x, y };
         }
 
         // Debug display for touch coordinates
@@ -712,12 +720,9 @@
 
         // Handle window resize
         window.addEventListener('resize', () => {
-            const rect = canvas.getBoundingClientRect();
-            const width = Math.round(rect.width);
-            const height = Math.round(rect.height);
-            
-            canvas.width = width;
-            canvas.height = height;
+            const size = syncCanvasSize();
+            const width = size.w;
+            const height = size.h;
             engine.config.width = width;
             engine.config.height = height;
 
