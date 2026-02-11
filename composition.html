@@ -64,7 +64,7 @@
             left: 0;
             right: 0;
             padding: env(safe-area-inset-top, 20px) 20px 15px 20px;
-            background: linear-gradient(to bottom, rgba(0,0,0,0.8) 0%, rgba(0,0,0,0) 100%);
+            background: linear-gradient(to bottom, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.4) 70%, rgba(0,0,0,0) 100%);
             pointer-events: none;
         }
 
@@ -75,21 +75,22 @@
             text-transform: uppercase;
             color: #fff;
             text-shadow: 0 0 20px rgba(255,255,255,0.5);
-            margin-bottom: 8px;
+            display: inline-block;
+            margin-right: 15px;
         }
 
         #score-display {
             font-size: 14px;
             color: rgba(255,255,255,0.7);
-            display: flex;
+            display: inline-flex;
             gap: 15px;
             align-items: center;
+            margin-bottom: 8px;
         }
 
         #ecosystem-hud {
             font-size: 12px;
             color: rgba(255,255,255,0.7);
-            margin-top: 8px;
             display: flex;
             gap: 12px;
             align-items: center;
@@ -127,15 +128,15 @@
             bottom: 0;
             left: 0;
             right: 0;
-            padding: 15px 0 calc(env(safe-area-inset-bottom, 20px) + 10px) 0;
+            padding: 15px 0 calc(env(safe-area-inset-bottom, 10px) + 10px) 0;
             background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0) 100%);
             pointer-events: none;
         }
 
         /* Material Palette */
         #material-palette {
-            display: flex;
-            gap: 8px;
+            display: block;
+            white-space: nowrap;
             padding: 0 20px 12px 20px;
             overflow-x: auto;
             overflow-y: hidden;
@@ -149,20 +150,22 @@
         }
 
         .material-btn {
-            flex-shrink: 0;
-            width: 50px;
-            height: 50px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 48px;
+            height: 48px;
+            min-width: 48px;
+            margin-right: 8px;
             border-radius: 8px;
             border: 2px solid rgba(255,255,255,0.3);
             background: rgba(0,0,0,0.6);
             backdrop-filter: blur(10px);
             cursor: pointer;
             transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
             font-size: 24px;
             pointer-events: all;
+            vertical-align: top;
         }
 
         .material-btn.selected {
@@ -211,6 +214,17 @@
 
         .mode-btn:active {
             transform: scale(0.95);
+        }
+
+        #garden-btn {
+            border-color: #4a7;
+            box-shadow: 0 0 15px rgba(68, 170, 119, 0.3);
+        }
+
+        #garden-btn.active {
+            border-color: #4a7;
+            background: rgba(68, 170, 119, 0.3);
+            box-shadow: 0 0 20px rgba(68, 170, 119, 0.5);
         }
 
         /* Score Breakdown Panel */
@@ -286,6 +300,60 @@
             line-height: 1.6;
         }
 
+        /* Welcome Overlay */
+        #welcome-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.95);
+            backdrop-filter: blur(10px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            pointer-events: all;
+            opacity: 1;
+            transition: opacity 0.5s ease;
+        }
+
+        #welcome-overlay.fade-out {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        #welcome-title {
+            font-size: 32px;
+            font-weight: 300;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            color: #fff;
+            margin-bottom: 20px;
+            text-shadow: 0 0 30px rgba(255,255,255,0.5);
+        }
+
+        #welcome-subtitle {
+            font-size: 16px;
+            font-weight: 300;
+            letter-spacing: 2px;
+            color: rgba(255,255,255,0.8);
+            margin-bottom: 60px;
+        }
+
+        #welcome-tap {
+            font-size: 16px;
+            color: rgba(255,255,255,0.6);
+            letter-spacing: 1px;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.4; }
+            50% { opacity: 1; }
+        }
+
         /* Sound Toggle */
         #sound-toggle {
             position: absolute;
@@ -347,26 +415,43 @@
         /* Responsive adjustments */
         @media (max-width: 600px) {
             #epoch-display {
-                font-size: 18px;
+                font-size: 16px;
+                letter-spacing: 1px;
             }
 
             #score-display {
-                font-size: 11px;
+                font-size: 12px;
                 gap: 8px;
+            }
+
+            #ecosystem-hud {
+                font-size: 11px;
+                gap: 10px;
             }
 
             .score-bar {
                 width: 30px;
             }
 
-            .material-btn {
-                width: 44px;
-                height: 44px;
+            .mode-btn {
+                height: 40px;
+                font-size: 13px;
+                padding: 0 8px;
+                max-width: 100px;
             }
 
             #score-panel {
                 width: 160px;
                 padding: 12px;
+            }
+
+            #welcome-title {
+                font-size: 28px;
+                letter-spacing: 3px;
+            }
+
+            #welcome-subtitle {
+                font-size: 14px;
             }
         }
     </style>
@@ -379,35 +464,22 @@
         <div id="ui-overlay">
             <!-- Top Bar -->
             <div id="top-bar">
-                <div id="epoch-display">Genesis</div>
-                <div id="score-display">
-                    <div class="score-item">
-                        <span>Score</span>
-                        <span id="score-value">0</span>
-                    </div>
-                    <div class="score-item">
-                        <span>Harmony</span>
-                        <div class="score-bar">
-                            <div class="score-bar-fill" id="harmony-bar" style="width: 0%"></div>
-                        </div>
-                    </div>
+                <div>
+                    <span id="epoch-display">Genesis</span>
+                    <span id="score-display">
+                        <span class="score-item">
+                            <span>Score</span>
+                            <span id="score-value">0</span>
+                        </span>
+                    </span>
                 </div>
                 <div id="ecosystem-hud">
-                    <div class="eco-stat">
-                        <span>🪱</span>
-                        <span id="worm-count">0</span>
-                    </div>
-                    <div class="eco-stat">
-                        <span>🐟</span>
-                        <span id="fish-count">0</span>
-                    </div>
-                    <div class="eco-stat">
-                        <span>🐛</span>
-                        <span id="bug-count">0</span>
-                    </div>
-                    <div class="eco-stat">
-                        <span>O₂</span>
-                        <span id="o2-level">0%</span>
+                    <span class="eco-stat">🪱<span id="worm-count">0</span></span>
+                    <span class="eco-stat">🐟<span id="fish-count">0</span></span>
+                    <span class="eco-stat">🐛<span id="bug-count">0</span></span>
+                    <span class="eco-stat">O₂<span id="o2-level">0%</span></span>
+                    <div class="score-bar">
+                        <div class="score-bar-fill" id="harmony-bar" style="width: 0%"></div>
                     </div>
                 </div>
             </div>
@@ -479,12 +551,19 @@
             <div id="tutorial-overlay">
                 <div id="tutorial-message"></div>
             </div>
+
+            <!-- Welcome Overlay -->
+            <div id="welcome-overlay" style="display: none;">
+                <div id="welcome-title">THE COMPOSITION</div>
+                <div id="welcome-subtitle">Your instrument is the Earth</div>
+                <div id="welcome-tap">[Tap to Begin]</div>
+            </div>
         </div>
     </div>
 
     <script src="bud.js?v=48"></script>
     <script>
-        // The Composition v4.0
+        // The Composition v4.2
         // Your instrument is the Earth
 
         // Material palette configuration
@@ -768,6 +847,35 @@
         engine.goTo('main');
         engine.start();
 
+        // First visit: show welcome overlay, then auto-load garden
+        if (!localStorage.getItem('composition_visited')) {
+            const welcomeOverlay = document.getElementById('welcome-overlay');
+            welcomeOverlay.style.display = 'flex';
+
+            welcomeOverlay.onclick = () => {
+                // Dismiss overlay
+                welcomeOverlay.classList.add('fade-out');
+                setTimeout(() => {
+                    welcomeOverlay.style.display = 'none';
+                }, 500);
+
+                // Mark as visited
+                localStorage.setItem('composition_visited', '1');
+
+                // Load garden after brief delay
+                setTimeout(() => {
+                    engine.test.clearWorld();
+                    engine.test.loadScenario('garden');
+                    document.getElementById('garden-btn').classList.add('active');
+                }, 1000);
+
+                // Initialize audio on tap (iOS requirement)
+                if (engine.physics.acoustics.ctx && engine.physics.acoustics.ctx.state === 'suspended') {
+                    engine.physics.acoustics.ctx.resume();
+                }
+            };
+        }
+
         // Handle window resize
         window.addEventListener('resize', () => {
             const size = syncCanvasSize();
@@ -814,8 +922,8 @@
             }
         }, { once: true });
 
-        console.log('[The Composition v4.1.5] Loaded - Build the world, compose music');
+        console.log('[The Composition v4.2] Loaded - Build the world, compose music');
     </script>
-<div id="version-stamp" style="position:fixed;bottom:5px;right:10px;color:rgba(255,255,255,0.5);font:10px monospace;z-index:9999;pointer-events:none;">v4.1</div>
+<div id="version-stamp" style="position:fixed;bottom:5px;right:10px;color:rgba(255,255,255,0.5);font:10px monospace;z-index:9999;pointer-events:none;">v4.2</div>
 </body>
 </html>
