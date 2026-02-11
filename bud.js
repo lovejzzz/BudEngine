@@ -1,11 +1,20 @@
 /**
- * BUD ENGINE v2.0
+ * BUD ENGINE v2.1
  * A 2D web game engine designed for AI-human collaboration
  * 
  * Philosophy: AI can write, TEST, and iterate on games independently.
  * Killer feature: AI Testing API + auto-playtest bot
  * 
  * Architecture: Single-file, no build tools, runs in browser
+ * 
+ * v2.1 Improvements:
+ * - Entity pool system for performance
+ * - Collision layers (bitmask filtering)
+ * - Camera deadzone, bounds, smooth zoom
+ * - Timer system (after/every/cancelTimer)
+ * - Comprehensive JSDoc comments
+ * - Smarter autoplay bot strategies
+ * - API cleanup (loadGame, entityCount, clear)
  * 
  * v2.0 Major Upgrade:
  * PRIORITY 1 - Core Systems:
@@ -36,8 +45,33 @@
  * - Wave announcements
  */
 
+// Collision layer constants
+BudEngine.LAYER = {
+    DEFAULT: 1,
+    PLAYER: 2,
+    ENEMY: 4,
+    BULLET: 8,
+    PICKUP: 16,
+    WALL: 32
+};
+
+BudEngine.VERSION = '2.1';
+
 class BudEngine {
+    /**
+     * Create a new BudEngine instance
+     * @param {Object} config - Configuration options
+     * @param {number} [config.width=1280] - Canvas width
+     * @param {number} [config.height=720] - Canvas height
+     * @param {string} [config.backgroundColor='#0a0a14'] - Background color
+     * @param {number} [config.gravity=0] - Global gravity (for platformers)
+     * @param {HTMLCanvasElement} [config.canvas] - Existing canvas element
+     * @param {HTMLElement} [config.parent] - Parent element to append canvas to
+     * @example
+     * const engine = new BudEngine({ width: 1280, height: 720, gravity: 800 });
+     */
     constructor(config = {}) {
+        console.log(`[BudEngine v${BudEngine.VERSION}] Initializing...`);
         this.config = {
             width: config.width || 1280,
             height: config.height || 720,
@@ -92,6 +126,13 @@ class BudEngine {
         this.nextEntityId = 1;
         this.entityTags = new Map(); // tag -> Set of entities
 
+        // Entity pool system (v2.1)
+        this.entityPools = new Map(); // type -> {available: [], inUse: Set()}
+
+        // Timer system (v2.1)
+        this.timers = [];
+        this.nextTimerId = 1;
+
         // Collision system
         this.collisionCallbacks = [];
         this.spatialGrid = new Map();
@@ -103,9 +144,14 @@ class BudEngine {
             width: this.config.width,
             height: this.config.height,
             zoom: 1,
+            targetZoom: 1,
+            zoomSpeed: 0,
             target: null,
             followSpeed: 0.1,
-            shake: { x: 0, y: 0, intensity: 0, decay: 0.9 }
+            shake: { x: 0, y: 0, intensity: 0, decay: 0.9 },
+            // v2.1 improvements
+            deadzone: null, // {x, y, width, height}
+            bounds: null // {minX, minY, maxX, maxY}
         };
 
         // Input system
@@ -158,6 +204,12 @@ class BudEngine {
 
     // ===== GAME LOOP =====
     
+    /**
+     * Start the game loop
+     * @example
+     * engine.goTo('menu');
+     * engine.start();
+     */
     start() {
         if (this.running) return;
         this.running = true;
@@ -165,10 +217,18 @@ class BudEngine {
         this.gameLoop();
     }
 
+    /**
+     * Stop the game loop
+     */
     stop() {
         this.running = false;
     }
 
+    /**
+     * Restart the current scene
+     * @example
+     * engine.restart(); // Reload current scene
+     */
     restart() {
         // Re-enter current scene
         if (this.currentScene && this.scenes[this.currentScene]) {
@@ -223,6 +283,9 @@ class BudEngine {
     }
 
     update(dt) {
+        // Update timers (v2.1)
+        this.updateTimers(dt);
+
         // Update scene transitions
         if (this.transition.active) {
             this.transition.progress += dt / this.transition.duration;
@@ -376,9 +439,48 @@ class BudEngine {
             const targetX = target.x || 0;
             const targetY = target.y || 0;
             
-            // Smooth follow
-            this.camera.x += (targetX - this.camera.x) * this.camera.followSpeed;
-            this.camera.y += (targetY - this.camera.y) * this.camera.followSpeed;
+            // Deadzone (v2.1) - don't move camera if target is within deadzone
+            if (this.camera.deadzone) {
+                const dz = this.camera.deadzone;
+                const dzLeft = this.camera.x + dz.x;
+                const dzRight = this.camera.x + dz.x + dz.width;
+                const dzTop = this.camera.y + dz.y;
+                const dzBottom = this.camera.y + dz.y + dz.height;
+                
+                let desiredX = this.camera.x;
+                let desiredY = this.camera.y;
+                
+                if (targetX < dzLeft) desiredX = targetX - dz.x;
+                if (targetX > dzRight) desiredX = targetX - dz.x - dz.width;
+                if (targetY < dzTop) desiredY = targetY - dz.y;
+                if (targetY > dzBottom) desiredY = targetY - dz.y - dz.height;
+                
+                this.camera.x += (desiredX - this.camera.x) * this.camera.followSpeed;
+                this.camera.y += (desiredY - this.camera.y) * this.camera.followSpeed;
+            } else {
+                // Smooth follow (normal behavior)
+                this.camera.x += (targetX - this.camera.x) * this.camera.followSpeed;
+                this.camera.y += (targetY - this.camera.y) * this.camera.followSpeed;
+            }
+            
+            // Camera bounds (v2.1) - clamp camera position
+            if (this.camera.bounds) {
+                const b = this.camera.bounds;
+                this.camera.x = Math.max(b.minX, Math.min(b.maxX, this.camera.x));
+                this.camera.y = Math.max(b.minY, Math.min(b.maxY, this.camera.y));
+            }
+        }
+
+        // Smooth zoom (v2.1)
+        if (this.camera.zoomSpeed > 0 && this.camera.zoom !== this.camera.targetZoom) {
+            const zoomDiff = this.camera.targetZoom - this.camera.zoom;
+            this.camera.zoom += zoomDiff * this.camera.zoomSpeed * dt;
+            
+            // Snap when close enough
+            if (Math.abs(zoomDiff) < 0.01) {
+                this.camera.zoom = this.camera.targetZoom;
+                this.camera.zoomSpeed = 0;
+            }
         }
 
         // Camera shake decay (frame-rate independent)
@@ -391,7 +493,9 @@ class BudEngine {
     /**
      * Enable slow-motion or fast-forward effect
      * @param {number} scale - Time scale multiplier (0.5 = half speed, 2.0 = double speed)
-     * @param {number} duration - Duration in seconds (optional, permanent if not specified)
+     * @param {number} [duration] - Duration in seconds (optional, permanent if not specified)
+     * @example
+     * engine.slowMo(0.3, 2); // Slow to 30% speed for 2 seconds
      */
     slowMo(scale, duration) {
         this.slowMoOriginalScale = this.timeScale;
@@ -401,12 +505,94 @@ class BudEngine {
         }
     }
 
+    // ===== TIMER SYSTEM (v2.1) =====
+
+    /**
+     * Execute a callback after a delay
+     * @param {number} seconds - Delay in seconds
+     * @param {function} callback - Function to execute
+     * @returns {number} Timer ID (use with cancelTimer)
+     * @example
+     * engine.after(3, () => { console.log('3 seconds later!'); });
+     */
+    after(seconds, callback) {
+        const timer = {
+            id: this.nextTimerId++,
+            time: seconds,
+            callback,
+            repeat: false
+        };
+        this.timers.push(timer);
+        return timer.id;
+    }
+
+    /**
+     * Execute a callback repeatedly at an interval
+     * @param {number} seconds - Interval in seconds
+     * @param {function} callback - Function to execute
+     * @returns {number} Timer ID (use with cancelTimer)
+     * @example
+     * const timerId = engine.every(1, () => { console.log('Every second'); });
+     */
+    every(seconds, callback) {
+        const timer = {
+            id: this.nextTimerId++,
+            time: seconds,
+            interval: seconds,
+            callback,
+            repeat: true
+        };
+        this.timers.push(timer);
+        return timer.id;
+    }
+
+    /**
+     * Cancel a timer
+     * @param {number} timerId - Timer ID returned by after() or every()
+     * @example
+     * const id = engine.every(1, callback);
+     * engine.cancelTimer(id);
+     */
+    cancelTimer(timerId) {
+        const index = this.timers.findIndex(t => t.id === timerId);
+        if (index >= 0) {
+            this.timers.splice(index, 1);
+        }
+    }
+
+    /**
+     * @private
+     * Update all active timers
+     */
+    updateTimers(dt) {
+        for (let i = this.timers.length - 1; i >= 0; i--) {
+            const timer = this.timers[i];
+            timer.time -= dt;
+            
+            if (timer.time <= 0) {
+                try {
+                    timer.callback();
+                } catch (e) {
+                    console.error('[BudEngine] Timer callback error:', e);
+                }
+                
+                if (timer.repeat) {
+                    timer.time = timer.interval;
+                } else {
+                    this.timers.splice(i, 1);
+                }
+            }
+        }
+    }
+
     // ===== EVENT SYSTEM (P1) =====
 
     /**
      * Register an event listener
-     * @param {string} event - Event name
+     * @param {string} event - Event name (e.g., 'entitySpawned', 'collisionStart', 'sceneChanged')
      * @param {function} callback - Callback function
+     * @example
+     * engine.on('entitySpawned', (entity) => { console.log('Spawned:', entity.type); });
      */
     on(event, callback) {
         if (!this.eventListeners.has(event)) {
@@ -419,6 +605,10 @@ class BudEngine {
      * Remove an event listener
      * @param {string} event - Event name
      * @param {function} callback - Callback function to remove
+     * @example
+     * const handler = (entity) => { console.log(entity); };
+     * engine.on('entitySpawned', handler);
+     * engine.off('entitySpawned', handler);
      */
     off(event, callback) {
         if (!this.eventListeners.has(event)) return;
@@ -433,6 +623,8 @@ class BudEngine {
      * Emit an event to all listeners
      * @param {string} event - Event name
      * @param {*} data - Event data
+     * @example
+     * engine.emit('playerDied', { score: 1000, wave: 5 });
      */
     emit(event, data) {
         if (!this.eventListeners.has(event)) return;
@@ -451,6 +643,9 @@ class BudEngine {
     /**
      * Mark an entity to persist across scene transitions
      * @param {object} entity - Entity to persist
+     * @example
+     * const player = engine.spawn('player', { ... });
+     * engine.persist(player); // Player survives scene changes
      */
     persist(entity) {
         if (!this.persistentEntities.includes(entity)) {
@@ -462,7 +657,11 @@ class BudEngine {
 
     /**
      * Save game state to localStorage
-     * @param {string} slot - Save slot name
+     * @param {string} [slot='default'] - Save slot name
+     * @returns {boolean} True if save succeeded
+     * @example
+     * engine.save('autosave');
+     * engine.on('gameSaved', ({ slot }) => { console.log('Saved to', slot); });
      */
     save(slot = 'default') {
         const saveData = {
@@ -503,9 +702,14 @@ class BudEngine {
 
     /**
      * Load game state from localStorage
-     * @param {string} slot - Save slot name
+     * @param {string} [slot='default'] - Save slot name
+     * @returns {boolean} True if load succeeded
+     * @example
+     * if (engine.loadGame('autosave')) {
+     *   console.log('Game loaded successfully');
+     * }
      */
-    load(slot = 'default') {
+    loadGame(slot = 'default') {
         try {
             const data = localStorage.getItem(`budengine_save_${slot}`);
             if (!data) {
@@ -540,7 +744,22 @@ class BudEngine {
         }
     }
 
+    /**
+     * @deprecated Use loadGame() instead
+     * @param {string} [slot='default'] - Save slot name
+     */
+    load(slot = 'default') {
+        console.warn('[BudEngine] load() is deprecated, use loadGame() instead');
+        return this.loadGame(slot);
+    }
+
     // Save/load custom data helpers
+    /**
+     * Save custom data to localStorage
+     * @param {string} key - Data key
+     * @param {*} value - Data to save (must be JSON-serializable)
+     * @returns {boolean} True if save succeeded
+     */
     static saveCustom(key, value) {
         try {
             localStorage.setItem(`budengine_custom_${key}`, JSON.stringify(value));
@@ -551,6 +770,12 @@ class BudEngine {
         }
     }
 
+    /**
+     * Load custom data from localStorage
+     * @param {string} key - Data key
+     * @param {*} [defaultValue=null] - Default value if not found
+     * @returns {*} Loaded data or default value
+     */
     static loadCustom(key, defaultValue = null) {
         try {
             const data = localStorage.getItem(`budengine_custom_${key}`);
@@ -568,13 +793,133 @@ class BudEngine {
      * @param {object} from - Start position {x, y}
      * @param {object} to - End position {x, y}
      * @returns {Array} Array of waypoints [{x, y}, ...]
+     * @example
+     * const path = engine.pathfind({ x: 100, y: 100 }, { x: 500, y: 400 });
+     * path.forEach(waypoint => console.log(waypoint.x, waypoint.y));
      */
     pathfind(from, to) {
         return this.pathfinding.findPath(from, to);
     }
 
+    // ===== ENTITY POOL SYSTEM (v2.1) =====
+
+    /**
+     * Pre-allocate entities of a given type to improve performance
+     * @param {string} type - Entity type
+     * @param {number} count - Number of entities to pre-allocate
+     * @param {object} [props={}] - Default properties for pooled entities
+     * @example
+     * engine.pool('bullet', 50, { collider: { type: 'circle', radius: 4 } });
+     */
+    pool(type, count, props = {}) {
+        if (!this.entityPools.has(type)) {
+            this.entityPools.set(type, { available: [], inUse: new Set() });
+        }
+        
+        const pool = this.entityPools.get(type);
+        for (let i = 0; i < count; i++) {
+            const entity = {
+                id: this.nextEntityId++,
+                type,
+                x: 0,
+                y: 0,
+                enabled: false,
+                pooled: true,
+                ...props
+            };
+            pool.available.push(entity);
+        }
+    }
+
+    /**
+     * @private
+     * Acquire an entity from the pool or create a new one
+     */
+    acquireFromPool(type, props) {
+        const pool = this.entityPools.get(type);
+        if (!pool || pool.available.length === 0) {
+            return null;
+        }
+        
+        const entity = pool.available.pop();
+        pool.inUse.add(entity);
+        
+        // Reset and apply new properties
+        Object.assign(entity, props);
+        entity.enabled = true;
+        
+        return entity;
+    }
+
+    /**
+     * Return an entity to its pool for reuse
+     * @param {object} entity - Entity to recycle
+     * @example
+     * engine.recycle(bullet);
+     */
+    recycle(entity) {
+        if (!entity.pooled || !entity.type) return;
+        
+        const pool = this.entityPools.get(entity.type);
+        if (!pool) return;
+        
+        // Remove from active entities
+        const idx = this.entities.indexOf(entity);
+        if (idx >= 0) {
+            this.entities.splice(idx, 1);
+        }
+        
+        // Remove from tag index
+        if (entity.tags && Array.isArray(entity.tags)) {
+            for (let tag of entity.tags) {
+                if (this.entityTags.has(tag)) {
+                    this.entityTags.get(tag).delete(entity);
+                }
+            }
+        }
+        
+        // Return to pool
+        pool.inUse.delete(entity);
+        pool.available.push(entity);
+        entity.enabled = false;
+    }
+
+    // ===== API CLEANUP (v2.1) =====
+
+    /**
+     * Get the current entity count
+     * @returns {number} Number of active entities
+     */
+    get entityCount() {
+        return this.entities.length;
+    }
+
+    /**
+     * Remove all entities from the game
+     * @example
+     * engine.clear(); // Start fresh
+     */
+    clear() {
+        this.entities = [];
+        this.entityTags.clear();
+        this.nextEntityId = 1;
+    }
+
     // ===== ENTITY SYSTEM =====
 
+    /**
+     * Spawn a new entity
+     * @param {string} type - Entity type identifier
+     * @param {object} [props={}] - Entity properties
+     * @returns {object} The spawned entity
+     * @example
+     * const player = engine.spawn('player', {
+     *   x: 100, y: 100,
+     *   sprite: engine.art.character({ color: '#00ffcc' }),
+     *   collider: { type: 'circle', radius: 16 },
+     *   health: 100
+     * });
+     */
     spawn(type, props = {}) {
         // Error handling: validate type
         if (!type || typeof type !== 'string') {
@@ -582,27 +927,49 @@ class BudEngine {
             return null;
         }
 
-        const entity = {
-            id: this.nextEntityId++,
-            type: type,
-            x: props.x || 0,
-            y: props.y || 0,
-            velocity: props.velocity || (props.speed !== undefined ? { x: 0, y: 0 } : null),
-            rotation: props.rotation || 0,
-            sprite: props.sprite || null,
-            collider: props.collider || null,
-            enabled: true,
-            tags: props.tags || [type],
-            layer: props.layer || 0,
-            parent: null,
-            children: [],
-            ...props
-        };
+        // Try to acquire from pool (v2.1)
+        let entity = this.acquireFromPool(type, props);
+        
+        if (!entity) {
+            // Create new entity if pool is empty or doesn't exist
+            entity = {
+                id: this.nextEntityId++,
+                type: type,
+                x: props.x || 0,
+                y: props.y || 0,
+                velocity: props.velocity || (props.speed !== undefined ? { x: 0, y: 0 } : null),
+                rotation: props.rotation || 0,
+                sprite: props.sprite || null,
+                collider: props.collider || null,
+                enabled: true,
+                tags: props.tags || [type],
+                layer: props.layer || 0,
+                parent: null,
+                children: [],
+                pooled: false,
+                destroyed: false, // v2.1: track destruction state
+                ...props
+            };
 
-        // Validate tags is an array
-        if (!Array.isArray(entity.tags)) {
-            console.warn('[BudEngine] Entity tags must be an array, converting:', entity.tags);
-            entity.tags = [String(entity.tags)];
+            // Validate tags is an array
+            if (!Array.isArray(entity.tags)) {
+                console.warn('[BudEngine] Entity tags must be an array, converting:', entity.tags);
+                entity.tags = [String(entity.tags)];
+            }
+        } else {
+            // Entity from pool - ensure tags are valid
+            if (!Array.isArray(entity.tags)) {
+                entity.tags = [type];
+            }
+            entity.destroyed = false;
+        }
+
+        // Set collision layer defaults (v2.1)
+        if (entity.collider && entity.collider.layer === undefined) {
+            entity.collider.layer = 0xFFFF; // All layers
+        }
+        if (entity.collider && entity.collider.mask === undefined) {
+            entity.collider.mask = 0xFFFF; // Collide with all layers
         }
 
         this.entities.push(entity);
@@ -621,12 +988,26 @@ class BudEngine {
         return entity;
     }
 
+    /**
+     * Destroy an entity (safe to call multiple times)
+     * @param {object} entity - Entity to destroy
+     * @example
+     * engine.onCollision('bullet', 'enemy', (bullet, enemy) => {
+     *   engine.destroy(bullet);
+     * });
+     */
     destroy(entity) {
         // Error handling: validate entity
         if (!entity) {
             console.warn('[BudEngine] destroy() called with null/undefined entity');
             return;
         }
+
+        // v2.1: Safe to call multiple times
+        if (entity.destroyed) {
+            return;
+        }
+        entity.destroyed = true;
 
         const idx = this.entities.indexOf(entity);
         if (idx >= 0) {
@@ -659,16 +1040,36 @@ class BudEngine {
         }
     }
 
+    /**
+     * Find entities by tag
+     * @param {string} tag - Tag to search for
+     * @returns {Array} Array of entities with the tag
+     * @example
+     * const enemies = engine.findByTag('enemy');
+     */
+
     findByTag(tag) {
         return this.entityTags.get(tag) ? Array.from(this.entityTags.get(tag)) : [];
     }
 
+    /**
+     * Find the first entity with a given tag
+     * @param {string} tag - Tag to search for
+     * @returns {object|null} First entity with the tag, or null
+     * @example
+     * const player = engine.findOne('player');
+     */
     findOne(tag) {
         const entities = this.findByTag(tag);
         return entities.length > 0 ? entities[0] : null;
     }
 
     // ===== COLLISION SYSTEM =====
+
+    /**
+     * @private
+     * Update collision detection and resolution
+     */
 
     updateCollisions() {
         // Clear spatial grid
@@ -709,6 +1110,17 @@ class BudEngine {
                         const pairKey = entity.id < other.id ? `${entity.id}-${other.id}` : `${other.id}-${entity.id}`;
                         if (checked.has(pairKey)) continue;
                         checked.add(pairKey);
+
+                        // v2.1: Collision layer filtering (bitmask)
+                        const aLayer = entity.collider.layer !== undefined ? entity.collider.layer : 0xFFFF;
+                        const aMask = entity.collider.mask !== undefined ? entity.collider.mask : 0xFFFF;
+                        const bLayer = other.collider.layer !== undefined ? other.collider.layer : 0xFFFF;
+                        const bMask = other.collider.mask !== undefined ? other.collider.mask : 0xFFFF;
+                        
+                        // Skip if layers don't match masks
+                        if ((aLayer & bMask) === 0 && (bLayer & aMask) === 0) {
+                            continue;
+                        }
 
                         if (this.checkCollision(entity, other)) {
                             this.handleCollision(entity, other);
@@ -842,6 +1254,17 @@ class BudEngine {
         }
     }
 
+    /**
+     * Register a collision callback between two entity tags
+     * @param {string} tagA - First entity tag
+     * @param {string} tagB - Second entity tag
+     * @param {function} fn - Callback function(entityA, entityB)
+     * @example
+     * engine.onCollision('bullet', 'enemy', (bullet, enemy) => {
+     *   enemy.health -= 25;
+     *   engine.destroy(bullet);
+     * });
+     */
     onCollision(tagA, tagB, fn) {
         // Error handling: validate parameters
         if (!tagA || !tagB) {
@@ -854,6 +1277,18 @@ class BudEngine {
         }
         this.collisionCallbacks.push({ tagA, tagB, fn });
     }
+
+    /**
+     * Cast a ray and find the first entity it hits
+     * @param {object} from - Start position {x, y}
+     * @param {object} direction - Direction vector {x, y}
+     * @param {number} distance - Maximum ray distance
+     * @param {Array} [tags=null] - Entity tags to check (null = all)
+     * @returns {object|null} {entity, distance} or null if no hit
+     * @example
+     * const hit = engine.raycast(player, {x: 1, y: 0}, 500, ['enemy']);
+     * if (hit) console.log('Hit enemy at distance', hit.distance);
+     */
 
     raycast(from, direction, distance, tags = null) {
         // Normalize direction
@@ -892,6 +1327,17 @@ class BudEngine {
 
     // ===== SCENE SYSTEM =====
 
+    /**
+     * Define a game scene
+     * @param {string} name - Scene name
+     * @param {object} definition - Scene definition with enter(), update(dt), draw(ctx), exit()
+     * @example
+     * engine.scene('gameplay', {
+     *   enter() { console.log('Starting game'); },
+     *   update(dt) { },
+     *   draw(ctx) { }
+     * });
+     */
     scene(name, definition) {
         // Error handling: validate parameters
         if (!name || typeof name !== 'string') {
@@ -905,6 +1351,13 @@ class BudEngine {
         this.scenes[name] = definition;
     }
 
+    /**
+     * Switch to a different scene
+     * @param {string} name - Scene name
+     * @param {boolean} [useTransition=false] - Use fade transition
+     * @example
+     * engine.goTo('gameover', true); // Go to gameover with fade
+     */
     goTo(name, useTransition = false) {
         // Error handling: validate scene exists
         if (!name || typeof name !== 'string') {
@@ -972,6 +1425,14 @@ class BudEngine {
 
     // ===== TILEMAP =====
 
+    /**
+     * Create a tilemap for grid-based levels
+     * @param {number} [tileSize=32] - Size of each tile in pixels
+     * @returns {Tilemap} Tilemap instance
+     * @example
+     * const map = engine.tilemap(32);
+     * map.room(0, 0, 10, 10, 'floor', 'wall');
+     */
     tilemap(tileSize = 32) {
         const tilemap = new Tilemap(this, tileSize);
         this.currentTilemap = tilemap;
@@ -980,15 +1441,41 @@ class BudEngine {
 
     // ===== CAMERA =====
 
+    /**
+     * Make the camera follow an entity
+     * @param {object} entity - Entity to follow
+     * @param {number} [speed=0.1] - Follow speed (0-1, higher = snappier)
+     * @example
+     * const player = engine.spawn('player', { ... });
+     * engine.cameraFollow(player, 0.1);
+     */
     cameraFollow(entity, speed = 0.1) {
         this.camera.target = entity;
         this.camera.followSpeed = speed;
     }
 
+    /**
+     * Shake the camera for impact effects
+     * @param {number} [intensity=10] - Shake intensity in pixels
+     * @example
+     * engine.cameraShake(15); // Big explosion
+     */
     cameraShake(intensity = 10) {
         this.camera.shake.intensity = intensity;
         this.camera.shake.x = (Math.random() - 0.5) * intensity;
         this.camera.shake.y = (Math.random() - 0.5) * intensity;
+    }
+
+    /**
+     * Smoothly zoom the camera (v2.1)
+     * @param {number} targetZoom - Target zoom level
+     * @param {number} speed - Zoom speed (0-1, higher = faster)
+     * @example
+     * engine.camera.smoothZoom(2.0, 0.05); // Zoom in 2x gradually
+     */
+    smoothZoom(targetZoom, speed) {
+        this.camera.targetZoom = targetZoom;
+        this.camera.zoomSpeed = speed;
     }
 
     // ===== ANIMATION HELPER (P1) =====
@@ -996,8 +1483,12 @@ class BudEngine {
     /**
      * Create an animation from sprite frames
      * @param {Array} frames - Array of sprites or {sprite, duration} objects
-     * @param {number} fps - Frames per second (default 12)
+     * @param {number} [fps=12] - Frames per second
      * @returns {Animation} Animation object
+     * @example
+     * const frames = [sprite1, sprite2, sprite3];
+     * const anim = engine.animation(frames, 12);
+     * entity.animation = anim;
      */
     animation(frames, fps = 12) {
         return new Animation(frames, fps);
@@ -1005,18 +1496,41 @@ class BudEngine {
 
     // ===== HELPERS =====
 
+    /**
+     * Convert screen coordinates to world coordinates
+     * @param {number} screenX - Screen X position
+     * @param {number} screenY - Screen Y position
+     * @returns {object} World coordinates {x, y}
+     * @example
+     * const world = engine.screenToWorld(engine.input.mouse.x, engine.input.mouse.y);
+     */
     screenToWorld(screenX, screenY) {
         const x = (screenX - this.canvas.width / 2) / this.camera.zoom + this.camera.x;
         const y = (screenY - this.canvas.height / 2) / this.camera.zoom + this.camera.y;
         return { x, y };
     }
 
+    /**
+     * Convert world coordinates to screen coordinates
+     * @param {number} worldX - World X position
+     * @param {number} worldY - World Y position
+     * @returns {object} Screen coordinates {x, y}
+     */
     worldToScreen(worldX, worldY) {
         const x = (worldX - this.camera.x) * this.camera.zoom + this.canvas.width / 2;
         const y = (worldY - this.camera.y) * this.camera.zoom + this.canvas.height / 2;
         return { x, y };
     }
 
+    /**
+     * Generate a random number between min and max
+     * @param {number} min - Minimum value (or max if only one parameter)
+     * @param {number} [max] - Maximum value
+     * @returns {number} Random number
+     * @example
+     * engine.random(10); // 0-10
+     * engine.random(5, 15); // 5-15
+     */
     random(min, max) {
         if (max === undefined) {
             max = min;
@@ -1025,6 +1539,13 @@ class BudEngine {
         return min + Math.random() * (max - min);
     }
 
+    /**
+     * Choose a random element from an array
+     * @param {Array} array - Array to choose from
+     * @returns {*} Random element
+     * @example
+     * const color = engine.choose(['red', 'blue', 'green']);
+     */
     choose(array) {
         return array[Math.floor(Math.random() * array.length)];
     }
@@ -1537,12 +2058,28 @@ class ArtSystem {
 
 // ===== PARTICLE SYSTEM =====
 
+/**
+ * Particle system for visual effects
+ */
 class ParticleSystem {
     constructor(engine) {
         this.engine = engine;
         this.particles = [];
     }
 
+    /**
+     * Emit particles at a position
+     * @param {number} x - World X position
+     * @param {number} y - World Y position
+     * @param {object} [opts={}] - Particle options (count, color, speed, life, size, gravity, fade)
+     * @example
+     * engine.particles.emit(player.x, player.y, {
+     *   count: 20,
+     *   color: ['#ff0000', '#ff8800'],
+     *   speed: [100, 200],
+     *   life: [0.5, 1.0]
+     * });
+     */
     emit(x, y, opts = {}) {
         const count = opts.count || 10;
         const colors = Array.isArray(opts.color) ? opts.color : [opts.color || '#ff8800'];
@@ -1600,6 +2137,9 @@ class ParticleSystem {
 
 // ===== SOUND SYSTEM =====
 
+/**
+ * Sound system for playing procedurally generated sound effects
+ */
 class SoundSystem {
     constructor(engine) {
         this.engine = engine;
@@ -2050,6 +2590,9 @@ class Tilemap {
 
 // ===== TESTING API =====
 
+/**
+ * Testing API for automated game testing and AI playtesting
+ */
 class TestingAPI {
     constructor(engine) {
         this.engine = engine;
@@ -2057,6 +2600,13 @@ class TestingAPI {
         this.recordingFrames = [];
     }
 
+    /**
+     * Get current game state snapshot
+     * @returns {object} State object with frame, time, entities, etc.
+     * @example
+     * const state = engine.test.getState();
+     * console.log('Frame:', state.frame, 'Entities:', state.entities.length);
+     */
     getState() {
         const player = this.engine.findOne('player');
         const enemies = this.engine.findByTag('enemy');
@@ -2173,7 +2723,21 @@ class TestingAPI {
         return true;
     }
 
-    // Auto-playtest bot
+    /**
+     * Run automated playtesting with AI bot
+     * @param {object} [opts={}] - Options (strategy, duration, runs, report)
+     * @param {string} [opts.strategy='survive'] - Bot strategy ('survive', 'balanced', 'aggressive', 'random', 'idle')
+     * @param {number} [opts.duration=60] - Test duration in seconds
+     * @param {number} [opts.runs=50] - Number of test runs
+     * @param {boolean} [opts.report=true] - Print results report
+     * @returns {object} Test results (avgSurvival, deaths, avgScore, bugs, balanceNotes)
+     * @example
+     * const results = engine.test.autoplay({
+     *   strategy: 'balanced',
+     *   duration: 60,
+     *   runs: 20
+     * });
+     */
     autoplay(opts = {}) {
         const strategy = opts.strategy || 'survive';
         const duration = opts.duration || 60;
@@ -2278,9 +2842,104 @@ class TestingAPI {
 
     executeStrategy(strategy, player) {
         const enemies = this.engine.findByTag('enemy');
+        const pickups = this.engine.findByTag('pickup').concat(this.engine.findByTag('speed-pickup'));
+        const walls = this.engine.findByTag('wall');
         
         if (strategy === 'survive') {
+            // v2.1: Smarter survival strategy
+            
             // Find nearest enemy
+            let nearest = null;
+            let nearestDist = Infinity;
+            
+            for (let enemy of enemies) {
+                const dx = enemy.x - player.x;
+                const dy = enemy.y - player.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < nearestDist) {
+                    nearestDist = dist;
+                    nearest = enemy;
+                }
+            }
+
+            // Find nearest pickup if health is low
+            let nearestPickup = null;
+            let nearestPickupDist = Infinity;
+            if (player.health && player.health < (player.maxHealth || 100) * 0.5) {
+                for (let pickup of pickups) {
+                    const dx = pickup.x - player.x;
+                    const dy = pickup.y - player.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < nearestPickupDist && dist < 300) {
+                        nearestPickupDist = dist;
+                        nearestPickup = pickup;
+                    }
+                }
+            }
+
+            // Check for nearby walls to avoid
+            let wallTooClose = false;
+            for (let wall of walls) {
+                const dx = wall.x - player.x;
+                const dy = wall.y - player.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < 60) {
+                    wallTooClose = true;
+                    // Move away from wall
+                    this.input('w', dy > 0);
+                    this.input('s', dy < 0);
+                    this.input('a', dx > 0);
+                    this.input('d', dx < 0);
+                    break;
+                }
+            }
+
+            if (!wallTooClose) {
+                // Prioritize pickup if health is low
+                if (nearestPickup) {
+                    const dx = nearestPickup.x - player.x;
+                    const dy = nearestPickup.y - player.y;
+                    this.input('w', dy < 0);
+                    this.input('s', dy > 0);
+                    this.input('a', dx < 0);
+                    this.input('d', dx > 0);
+                } else if (nearest) {
+                    const dx = nearest.x - player.x;
+                    const dy = nearest.y - player.y;
+                    
+                    // Kite enemies: move perpendicular + away
+                    if (nearestDist < 150) {
+                        // Move away and strafe
+                        const perpX = -dy;
+                        const perpY = dx;
+                        const awayX = -dx;
+                        const awayY = -dy;
+                        
+                        const moveX = awayX + perpX * 0.5;
+                        const moveY = awayY + perpY * 0.5;
+                        
+                        this.input('w', moveY < 0);
+                        this.input('s', moveY > 0);
+                        this.input('a', moveX < 0);
+                        this.input('d', moveX > 0);
+                    } else {
+                        // Move randomly but keep distance
+                        this.input('w', Math.random() > 0.5);
+                        this.input('s', Math.random() > 0.5);
+                        this.input('a', Math.random() > 0.5);
+                        this.input('d', Math.random() > 0.5);
+                    }
+
+                    // Shoot at closest enemy
+                    this.moveMouse(nearest.x, nearest.y);
+                    this.click(nearest.x, nearest.y);
+                }
+            }
+        }
+        
+        if (strategy === 'balanced') {
+            // v2.1: Balanced strategy - combines aggression with survival
+            
             let nearest = null;
             let nearestDist = Infinity;
             
@@ -2298,21 +2957,30 @@ class TestingAPI {
                 const dx = nearest.x - player.x;
                 const dy = nearest.y - player.y;
                 
-                // Move away from enemy if too close (FIXED: inverted logic)
-                if (nearestDist < 150) {
-                    this.input('w', dy < 0);  // W = move up, press when enemy is below
-                    this.input('s', dy > 0);  // S = move down, press when enemy is above
-                    this.input('a', dx < 0);  // A = move left, press when enemy is right
-                    this.input('d', dx > 0);  // D = move right, press when enemy is left
+                // Maintain optimal distance (100-200 units)
+                if (nearestDist < 100) {
+                    // Too close, back away
+                    this.input('w', dy > 0);
+                    this.input('s', dy < 0);
+                    this.input('a', dx > 0);
+                    this.input('d', dx < 0);
+                } else if (nearestDist > 250) {
+                    // Too far, move closer
+                    this.input('w', dy < 0);
+                    this.input('s', dy > 0);
+                    this.input('a', dx < 0);
+                    this.input('d', dx > 0);
                 } else {
-                    // Move randomly
-                    this.input('w', Math.random() > 0.5);
-                    this.input('s', Math.random() > 0.5);
-                    this.input('a', Math.random() > 0.5);
-                    this.input('d', Math.random() > 0.5);
+                    // Good distance, circle strafe
+                    const perpX = -dy;
+                    const perpY = dx;
+                    this.input('w', perpY < 0);
+                    this.input('s', perpY > 0);
+                    this.input('a', perpX < 0);
+                    this.input('d', perpX > 0);
                 }
 
-                // Shoot at enemy
+                // Always shoot at enemy
                 this.moveMouse(nearest.x, nearest.y);
                 this.click(nearest.x, nearest.y);
             }
@@ -2324,11 +2992,11 @@ class TestingAPI {
                 const dx = target.x - player.x;
                 const dy = target.y - player.y;
                 
-                // FIXED: Move TOWARDS enemy
-                this.input('w', dy < 0);  // Enemy is above, move up
-                this.input('s', dy > 0);  // Enemy is below, move down
-                this.input('a', dx < 0);  // Enemy is left, move left
-                this.input('d', dx > 0);  // Enemy is right, move right
+                // Move TOWARDS enemy
+                this.input('w', dy < 0);
+                this.input('s', dy > 0);
+                this.input('a', dx < 0);
+                this.input('d', dx > 0);
                 
                 this.moveMouse(target.x, target.y);
                 this.click(target.x, target.y);

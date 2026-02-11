@@ -56,7 +56,13 @@ engine.scene('gameplay', {
                 eyes: true,
                 glow: true
             }),
-            collider: { type: 'aabb', width: 32, height: 48 },
+            collider: { 
+                type: 'aabb', 
+                width: 32, 
+                height: 48,
+                layer: BudEngine.LAYER.PLAYER,
+                mask: BudEngine.LAYER.WALL | BudEngine.LAYER.PICKUP | BudEngine.LAYER.ENEMY
+            },
             speed: 250,
             jumpForce: 400,
             velocity: { x: 0, y: 0 },
@@ -93,14 +99,15 @@ engine.scene('gameplay', {
 
             // Check if level complete
             if (gameState.coins >= gameState.totalCoins) {
-                setTimeout(() => {
+                // v2.1: Use timer system instead of setTimeout
+                engine.after(0.5, () => {
                     if (gameState.level >= 3) {
                         winGame();
                     } else {
                         gameState.level++;
                         engine.goTo('gameplay', true); // Use transition
                     }
-                }, 500);
+                });
             }
         });
 
@@ -359,7 +366,13 @@ function createPlatform(x, y, width, height) {
         x: x + width / 2,
         y: y + height / 2,
         sprite: createPlatformSprite(width, height),
-        collider: { type: 'aabb', width, height },
+        collider: { 
+            type: 'aabb', 
+            width, 
+            height,
+            layer: BudEngine.LAYER.WALL,
+            mask: BudEngine.LAYER.PLAYER
+        },
         tags: ['platform', 'solid']
     });
 }
@@ -401,7 +414,12 @@ function createCoin(x, y) {
             size: 12,
             glow: true
         }),
-        collider: { type: 'circle', radius: 12 },
+        collider: { 
+            type: 'circle', 
+            radius: 12,
+            layer: BudEngine.LAYER.PICKUP,
+            mask: BudEngine.LAYER.PLAYER
+        },
         noGravity: true,
         tags: ['coin']
     });
@@ -416,7 +434,12 @@ function createSpike(x, y) {
             size: 16,
             spikes: true
         }),
-        collider: { type: 'circle', radius: 14 },
+        collider: { 
+            type: 'circle', 
+            radius: 14,
+            layer: BudEngine.LAYER.ENEMY,
+            mask: BudEngine.LAYER.PLAYER
+        },
         noGravity: true,
         tags: ['spike', 'hazard']
     });
@@ -432,7 +455,12 @@ function createGoal(x, y) {
             size: 24,
             glow: true
         }),
-        collider: { type: 'circle', radius: 20 },
+        collider: { 
+            type: 'circle', 
+            radius: 20,
+            layer: BudEngine.LAYER.PICKUP,
+            mask: BudEngine.LAYER.PLAYER
+        },
         noGravity: true,
         tags: ['goal']
     });

@@ -7,6 +7,10 @@ const engine = new BudEngine({
     backgroundColor: '#0a0a14'
 });
 
+// Pre-allocate entity pools for performance (v2.1)
+engine.pool('bullet', 100);
+engine.pool('enemy-bullet', 50);
+
 let gameState = {
     wave: 0,
     score: 0,
@@ -55,7 +59,12 @@ engine.scene('gameplay', {
                 eyes: true,
                 glow: true
             }),
-            collider: { type: 'circle', radius: 16 },
+            collider: { 
+                type: 'circle', 
+                radius: 16,
+                layer: BudEngine.LAYER.PLAYER,
+                mask: BudEngine.LAYER.ENEMY | BudEngine.LAYER.PICKUP | BudEngine.LAYER.WALL
+            },
             health: 100,
             maxHealth: 100,
             speed: 250,
@@ -70,8 +79,8 @@ engine.scene('gameplay', {
         // Camera follows player
         engine.cameraFollow(player, 0.1);
 
-        // Spawn first wave
-        setTimeout(() => spawnWave(), 3000);
+        // Spawn first wave (using timer system v2.1)
+        engine.after(3, () => spawnWave());
 
         // Collision handlers
         engine.onCollision('bullet', 'enemy', (bullet, enemy) => {
@@ -417,7 +426,12 @@ function spawnPatrolDrone(x, y) {
             color: '#ff3333', 
             size: 16 
         }),
-        collider: { type: 'circle', radius: 14 },
+        collider: { 
+            type: 'circle', 
+            radius: 14,
+            layer: BudEngine.LAYER.ENEMY,
+            mask: BudEngine.LAYER.PLAYER | BudEngine.LAYER.BULLET | BudEngine.LAYER.WALL
+        },
         health: 50,
         speed: 120,
         patrolAngle: Math.random() * Math.PI * 2,
@@ -434,7 +448,12 @@ function spawnChaser(x, y) {
             size: 18,
             spikes: true
         }),
-        collider: { type: 'circle', radius: 16 },
+        collider: { 
+            type: 'circle', 
+            radius: 16,
+            layer: BudEngine.LAYER.ENEMY,
+            mask: BudEngine.LAYER.PLAYER | BudEngine.LAYER.BULLET | BudEngine.LAYER.WALL
+        },
         health: 75,
         speed: 180,
         tags: ['enemy']
@@ -449,7 +468,12 @@ function spawnTurret(x, y) {
             color: '#8833ff', 
             size: 20 
         }),
-        collider: { type: 'circle', radius: 18 },
+        collider: { 
+            type: 'circle', 
+            radius: 18,
+            layer: BudEngine.LAYER.ENEMY,
+            mask: BudEngine.LAYER.PLAYER | BudEngine.LAYER.BULLET | BudEngine.LAYER.WALL
+        },
         health: 100,
         speed: 0,
         shootCooldown: 2,
@@ -466,7 +490,12 @@ function spawnBomber(x, y) {
             size: 22,
             glow: true
         }),
-        collider: { type: 'circle', radius: 20 },
+        collider: { 
+            type: 'circle', 
+            radius: 20,
+            layer: BudEngine.LAYER.ENEMY,
+            mask: BudEngine.LAYER.PLAYER | BudEngine.LAYER.BULLET | BudEngine.LAYER.WALL
+        },
         health: 150,
         speed: 80,
         tags: ['enemy']
@@ -524,22 +553,29 @@ function shootBullet(player, targetX, targetY) {
     
     if (dist === 0) return;
 
+    // v2.1: Use entity pool and collision layers
     const bullet = engine.spawn('bullet', {
         x: player.x,
         y: player.y,
         velocity: { x: (dx / dist) * 600, y: (dy / dist) * 600 },
         sprite: engine.art.particle({ color: '#00ffcc', size: 4 }),
-        collider: { type: 'circle', radius: 4 },
+        collider: { 
+            type: 'circle', 
+            radius: 4,
+            layer: BudEngine.LAYER.BULLET,
+            mask: BudEngine.LAYER.ENEMY | BudEngine.LAYER.WALL
+        },
         tags: ['bullet', 'friendly'],
-        layer: 1
+        layer: 1,
+        pooled: true
     });
 
-    // Auto-destroy after 2 seconds
-    setTimeout(() => {
+    // Auto-destroy after 2 seconds (using timer system v2.1)
+    engine.after(2, () => {
         if (engine.entities.includes(bullet)) {
-            engine.destroy(bullet);
+            engine.recycle(bullet);
         }
-    }, 2000);
+    });
 
     engine.sound.play('shoot');
 }
@@ -551,40 +587,54 @@ function shootEnemyBullet(enemy, targetX, targetY) {
     
     if (dist === 0) return;
 
+    // v2.1: Use entity pool and collision layers
     const bullet = engine.spawn('enemy-bullet', {
         x: enemy.x,
         y: enemy.y,
         velocity: { x: (dx / dist) * 300, y: (dy / dist) * 300 },
         sprite: engine.art.particle({ color: '#ff3333', size: 5 }),
-        collider: { type: 'circle', radius: 5 },
+        collider: { 
+            type: 'circle', 
+            radius: 5,
+            layer: BudEngine.LAYER.ENEMY,
+            mask: BudEngine.LAYER.PLAYER | BudEngine.LAYER.WALL
+        },
         tags: ['enemy-bullet'],
-        layer: 1
+        layer: 1,
+        pooled: true
     });
 
-    setTimeout(() => {
+    engine.after(3, () => {
         if (engine.entities.includes(bullet)) {
-            engine.destroy(bullet);
+            engine.recycle(bullet);
         }
-    }, 3000);
+    });
 
     engine.sound.play('shoot');
 }
 
 function shootEnemyBulletAngle(x, y, angle, speed) {
+    // v2.1: Use entity pool and collision layers
     const bullet = engine.spawn('enemy-bullet', {
         x, y,
         velocity: { x: Math.cos(angle) * speed, y: Math.sin(angle) * speed },
         sprite: engine.art.particle({ color: '#ff00ff', size: 6 }),
-        collider: { type: 'circle', radius: 6 },
+        collider: { 
+            type: 'circle', 
+            radius: 6,
+            layer: BudEngine.LAYER.ENEMY,
+            mask: BudEngine.LAYER.PLAYER | BudEngine.LAYER.WALL
+        },
         tags: ['enemy-bullet'],
-        layer: 1
+        layer: 1,
+        pooled: true
     });
 
-    setTimeout(() => {
+    engine.after(3, () => {
         if (engine.entities.includes(bullet)) {
-            engine.destroy(bullet);
+            engine.recycle(bullet);
         }
-    }, 3000);
+    });
 }
 
 // ===== PICKUPS =====
@@ -598,7 +648,12 @@ function spawnHealthPickup(x, y) {
             size: 12,
             glow: true
         }),
-        collider: { type: 'circle', radius: 10 },
+        collider: { 
+            type: 'circle', 
+            radius: 10,
+            layer: BudEngine.LAYER.PICKUP,
+            mask: BudEngine.LAYER.PLAYER
+        },
         tags: ['pickup']
     });
 }
@@ -612,7 +667,12 @@ function spawnSpeedPickup(x, y) {
             size: 14,
             glow: true
         }),
-        collider: { type: 'circle', radius: 10 },
+        collider: { 
+            type: 'circle', 
+            radius: 10,
+            layer: BudEngine.LAYER.PICKUP,
+            mask: BudEngine.LAYER.PLAYER
+        },
         tags: ['speed-pickup']
     });
 }
