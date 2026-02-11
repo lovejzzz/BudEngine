@@ -295,6 +295,12 @@ class BudEngine {
     // ===== ENTITY SYSTEM =====
 
     spawn(type, props = {}) {
+        // Error handling: validate type
+        if (!type || typeof type !== 'string') {
+            console.error('[BudEngine] spawn() requires a valid type string');
+            return null;
+        }
+
         const entity = {
             id: this.nextEntityId++,
             type: type,
@@ -312,6 +318,12 @@ class BudEngine {
             ...props
         };
 
+        // Validate tags is an array
+        if (!Array.isArray(entity.tags)) {
+            console.warn('[BudEngine] Entity tags must be an array, converting:', entity.tags);
+            entity.tags = [String(entity.tags)];
+        }
+
         this.entities.push(entity);
 
         // Add to tag index
@@ -326,21 +338,31 @@ class BudEngine {
     }
 
     destroy(entity) {
+        // Error handling: validate entity
+        if (!entity) {
+            console.warn('[BudEngine] destroy() called with null/undefined entity');
+            return;
+        }
+
         const idx = this.entities.indexOf(entity);
         if (idx >= 0) {
             this.entities.splice(idx, 1);
         }
 
         // Remove from tag index
-        for (let tag of entity.tags) {
-            if (this.entityTags.has(tag)) {
-                this.entityTags.get(tag).delete(entity);
+        if (entity.tags && Array.isArray(entity.tags)) {
+            for (let tag of entity.tags) {
+                if (this.entityTags.has(tag)) {
+                    this.entityTags.get(tag).delete(entity);
+                }
             }
         }
 
         // Destroy children
-        for (let child of entity.children) {
-            this.destroy(child);
+        if (entity.children && Array.isArray(entity.children)) {
+            for (let child of entity.children) {
+                this.destroy(child);
+            }
         }
     }
 
@@ -518,6 +540,15 @@ class BudEngine {
     }
 
     onCollision(tagA, tagB, fn) {
+        // Error handling: validate parameters
+        if (!tagA || !tagB) {
+            console.error('[BudEngine] onCollision() requires two tag strings');
+            return;
+        }
+        if (typeof fn !== 'function') {
+            console.error('[BudEngine] onCollision() requires a callback function');
+            return;
+        }
         this.collisionCallbacks.push({ tagA, tagB, fn });
     }
 
@@ -559,10 +590,29 @@ class BudEngine {
     // ===== SCENE SYSTEM =====
 
     scene(name, definition) {
+        // Error handling: validate parameters
+        if (!name || typeof name !== 'string') {
+            console.error('[BudEngine] scene() requires a name string');
+            return;
+        }
+        if (!definition || typeof definition !== 'object') {
+            console.error('[BudEngine] scene() requires a definition object');
+            return;
+        }
         this.scenes[name] = definition;
     }
 
     goTo(name, useTransition = false) {
+        // Error handling: validate scene exists
+        if (!name || typeof name !== 'string') {
+            console.error('[BudEngine] goTo() requires a scene name string');
+            return;
+        }
+        if (!this.scenes[name]) {
+            console.error(`[BudEngine] Scene '${name}' does not exist. Available scenes:`, Object.keys(this.scenes));
+            return;
+        }
+
         if (useTransition && !this.transition.active) {
             // Start fade out transition
             this.transition.active = true;
@@ -734,6 +784,10 @@ class InputSystem {
     injectMouse(x, y, down) {
         this.mouse.x = x;
         this.mouse.y = y;
+        // FIXED: Set mousePressed when transitioning to down state
+        if (down && !this.mouseDown) {
+            this.mousePressed = true;
+        }
         this.mouseDown = down;
         this.updateMouseWorld();
     }
@@ -1086,13 +1140,20 @@ class SoundSystem {
 
     ensureContext() {
         if (!this.audioContext) {
-            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            try {
+                this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            } catch (e) {
+                console.warn('[BudEngine] Audio context initialization failed:', e);
+                this.audioContext = null;
+            }
         }
     }
 
     play(type) {
-        this.ensureContext();
-        const ctx = this.audioContext;
+        try {
+            this.ensureContext();
+            if (!this.audioContext) return; // Audio not available
+            const ctx = this.audioContext;
         
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
@@ -1161,6 +1222,12 @@ class SoundSystem {
                 osc.start(now);
                 osc.stop(now + 0.2);
                 break;
+            
+            default:
+                console.warn(`[BudEngine] Unknown sound type: ${type}`);
+        }
+        } catch (e) {
+            console.warn('[BudEngine] Sound playback error:', e);
         }
     }
 
@@ -1638,12 +1705,12 @@ class TestingAPI {
                 const dx = nearest.x - player.x;
                 const dy = nearest.y - player.y;
                 
-                // Move away from enemy if too close
+                // Move away from enemy if too close (FIXED: inverted logic)
                 if (nearestDist < 150) {
-                    this.input('w', dy > 0);
-                    this.input('s', dy < 0);
-                    this.input('a', dx > 0);
-                    this.input('d', dx < 0);
+                    this.input('w', dy < 0);  // W = move up, press when enemy is below
+                    this.input('s', dy > 0);  // S = move down, press when enemy is above
+                    this.input('a', dx < 0);  // A = move left, press when enemy is right
+                    this.input('d', dx > 0);  // D = move right, press when enemy is left
                 } else {
                     // Move randomly
                     this.input('w', Math.random() > 0.5);
@@ -1664,10 +1731,11 @@ class TestingAPI {
                 const dx = target.x - player.x;
                 const dy = target.y - player.y;
                 
-                this.input('w', dy > 0);
-                this.input('s', dy < 0);
-                this.input('a', dx < 0);
-                this.input('d', dx > 0);
+                // FIXED: Move TOWARDS enemy
+                this.input('w', dy < 0);  // Enemy is above, move up
+                this.input('s', dy > 0);  // Enemy is below, move down
+                this.input('a', dx < 0);  // Enemy is left, move left
+                this.input('d', dx > 0);  // Enemy is right, move right
                 
                 this.moveMouse(target.x, target.y);
                 this.click(target.x, target.y);

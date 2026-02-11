@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Autoplay Test - Shooter</title>
+    <style>
+        body {
+            margin: 0;
+            background: #0a0a14;
+            font-family: monospace;
+            color: #00ffcc;
+        }
+        #output {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border: 2px solid #00ffcc;
+            max-width: 400px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        h2 { color: #ff3333; margin: 0 0 10px 0; }
+        .passed { color: #00ff88; }
+        .failed { color: #ff3333; }
+        .info { color: #ffcc00; }
+        pre { margin: 5px 0; }
+    </style>
+</head>
+<body>
+    <script src="../../bud.js"></script>
+    <script src="game.js"></script>
+    
+    <div id="output">
+        <h2>🤖 Autoplay Test</h2>
+        <div id="status">Starting...</div>
+    </div>
+
+    <script>
+        const output = document.getElementById('status');
+        
+        function log(msg, type = 'info') {
+            const div = document.createElement('div');
+            div.className = type;
+            div.textContent = msg;
+            output.appendChild(div);
+            console.log(msg);
+        }
+
+        // Wait for game to initialize
+        setTimeout(() => {
+            log('🎮 Starting autoplay test...', 'info');
+            log('Strategy: survive', 'info');
+            log('Duration: 60s', 'info');
+            log('Runs: 10', 'info');
+            log('---', 'info');
+            
+            // Go to gameplay scene
+            engine.goTo('gameplay');
+            
+            // Give it a moment to set up
+            setTimeout(() => {
+                // Run autoplay
+                const results = engine.test.autoplay({
+                    strategy: 'survive',
+                    duration: 60,
+                    runs: 10,
+                    report: true
+                });
+                
+                log('---', 'info');
+                log('📊 RESULTS:', 'info');
+                log(`Avg Survival: ${results.avgSurvival.toFixed(2)}s`, 
+                    results.avgSurvival >= 30 ? 'passed' : 'failed');
+                log(`Min/Max Survival: ${results.minSurvival.toFixed(2)}s / ${results.maxSurvival.toFixed(2)}s`, 'info');
+                log(`Deaths: ${results.deaths}/10`, 'info');
+                log(`Avg Score: ${results.avgScore.toFixed(0)}`, 'info');
+                
+                if (results.bugs.length > 0) {
+                    log('🐛 Bugs found:', 'failed');
+                    results.bugs.forEach(bug => log(`  - ${bug}`, 'failed'));
+                } else {
+                    log('✅ No bugs found', 'passed');
+                }
+                
+                if (results.balanceNotes.length > 0) {
+                    log('⚖️  Balance notes:', 'info');
+                    results.balanceNotes.forEach(note => log(`  - ${note}`, 'info'));
+                }
+                
+                const passed = results.avgSurvival >= 30 && results.bugs.length === 0;
+                log('---', 'info');
+                log(passed ? '✅ TEST PASSED' : '❌ TEST FAILED', passed ? 'passed' : 'failed');
+            }, 1000);
+        }, 500);
+    </script>
+</body>
+</html>

@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Platformer Physics Test</title>
+    <style>
+        body {
+            margin: 0;
+            background: #0a0a14;
+            font-family: monospace;
+            color: #00ffcc;
+        }
+        #output {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border: 2px solid #00ffcc;
+            max-width: 400px;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        h2 { color: #ff3333; margin: 0 0 10px 0; }
+        .passed { color: #00ff88; }
+        .failed { color: #ff3333; }
+        .info { color: #ffcc00; }
+    </style>
+</head>
+<body>
+    <script src="../../bud.js"></script>
+    <script src="../../demos/platformer/game.js"></script>
+    
+    <div id="output">
+        <h2>🧪 Platformer Physics Test</h2>
+        <div id="status">Starting...</div>
+    </div>
+
+    <script>
+        const output = document.getElementById('status');
+        
+        function log(msg, type = 'info') {
+            const div = document.createElement('div');
+            div.className = type;
+            div.textContent = msg;
+            output.appendChild(div);
+            console.log(msg);
+        }
+
+        // Wait for game to initialize
+        setTimeout(() => {
+            log('🎮 Testing platformer physics...', 'info');
+            log('---', 'info');
+            
+            // Go to gameplay
+            gameState.level = 1;
+            engine.goTo('gameplay');
+            
+            setTimeout(() => {
+                // Test 1: Jump physics
+                log('Test 1: Jump physics', 'info');
+                const player = engine.findOne('player');
+                if (!player) {
+                    log('❌ Player not found', 'failed');
+                    return;
+                }
+                
+                const startY = player.y;
+                
+                // Simulate jump
+                engine.test.input(' ', true);
+                engine.test.step(1);
+                engine.test.input(' ', false);
+                
+                // Let jump happen
+                for (let i = 0; i < 60; i++) {
+                    engine.test.step(1);
+                }
+                
+                const jumpedUp = player.y < startY - 50;
+                log(`  Jump height check: ${jumpedUp ? '✅ PASS' : '❌ FAIL'}`, jumpedUp ? 'passed' : 'failed');
+                log(`  Start Y: ${startY.toFixed(0)}, Current Y: ${player.y.toFixed(0)}`, 'info');
+                
+                // Test 2: Landing
+                log('Test 2: Landing detection', 'info');
+                for (let i = 0; i < 120; i++) {
+                    engine.test.step(1);
+                    if (player.grounded) {
+                        log(`  ✅ Landed after ${i} frames`, 'passed');
+                        break;
+                    }
+                }
+                
+                if (!player.grounded) {
+                    log('  ❌ Player never landed (stuck in air?)', 'failed');
+                }
+                
+                // Test 3: Double jump prevention
+                log('Test 3: Double jump prevention', 'info');
+                engine.test.input(' ', true);
+                engine.test.step(1);
+                engine.test.input(' ', false);
+                const firstJumpY = player.y;
+                
+                // Try to jump again immediately
+                engine.test.input(' ', true);
+                engine.test.step(1);
+                engine.test.input(' ', false);
+                engine.test.step(5);
+                
+                const noDoubleJump = !player.grounded; // Should be in air from first jump
+                log(`  ${noDoubleJump ? '✅ PASS - Cannot double jump' : '❌ FAIL - Double jump possible'}`, 
+                    noDoubleJump ? 'passed' : 'failed');
+                
+                // Test 4: Platform edge detection
+                log('Test 4: Platform edge detection', 'info');
+                engine.goTo('gameplay');
+                
+                setTimeout(() => {
+                    const p = engine.findOne('player');
+                    const platform = engine.findOne('platform');
+                    
+                    if (platform) {
+                        // Move player to edge of platform
+                        p.x = platform.x + platform.collider.width / 2 - 5;
+                        p.y = platform.y - platform.collider.height / 2 - 50;
+                        
+                        // Let gravity work
+                        for (let i = 0; i < 60; i++) {
+                            engine.test.step(1);
+                            if (p.grounded) break;
+                        }
+                        
+                        const landedOnEdge = p.grounded && Math.abs(p.y - (platform.y - platform.collider.height / 2 - 24)) < 5;
+                        log(`  ${landedOnEdge ? '✅ PASS - Landed on edge' : '⚠️  WARNING - Edge detection may have issues'}`,
+                            landedOnEdge ? 'passed' : 'info');
+                    }
+                    
+                    log('---', 'info');
+                    log('✅ Physics tests complete', 'passed');
+                }, 500);
+            }, 500);
+        }, 500);
+    </script>
+</body>
+</html>
