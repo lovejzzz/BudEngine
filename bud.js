@@ -7843,12 +7843,26 @@ class PixelPhysics {
         
         this.frameCount++;
         
-        // v4.1: Reset creature population counters every 60 frames
+        // v4.1: Reset creature population counters and wake creature chunks every 60 frames
         if (this.frameCount % 60 === 0) {
             this.creaturePopulation.worm = 0;
             this.creaturePopulation.fish = 0;
             this.creaturePopulation.bug = 0;
             this.totalCreatures = 0;
+            
+            // Scan grid for creatures and force their chunks active
+            // This prevents the chicken-and-egg problem where sleeping chunks kill creatures
+            var wormId = this.getMaterialId('worm');
+            var fishId = this.getMaterialId('fish');
+            var bugId = this.getMaterialId('bug');
+            for (var i = 0; i < this.grid.length; i++) {
+                var mid = this.grid[i];
+                if (mid === wormId || mid === fishId || mid === bugId) {
+                    var gx = i % this.gridWidth;
+                    var gy = Math.floor(i / this.gridWidth);
+                    this.activateChunk(gx, gy);
+                }
+            }
         }
         
         // v3.9: Update seasonal cycle and weather
