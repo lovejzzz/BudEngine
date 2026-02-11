@@ -472,15 +472,22 @@
 
         // Initialize engine
         const canvas = document.getElementById('gameCanvas');
+        // Use actual canvas display size for proper touch mapping
+        const initRect = canvas.getBoundingClientRect();
+        const initW = Math.round(initRect.width);
+        const initH = Math.round(initRect.height);
         const engine = new BudEngine({
             canvas: canvas,
-            width: window.innerWidth,
-            height: window.innerHeight,
+            width: initW,
+            height: initH,
             backgroundColor: '#0a0a14'
         });
+        // Ensure canvas pixel dimensions exactly match CSS display size
+        canvas.width = initW;
+        canvas.height = initH;
 
         // Initialize physics
-        engine.physics.init(window.innerWidth, window.innerHeight, 3);
+        engine.physics.init(initW, initH, 3);
 
         // Initialize composition game
         engine.composition = new CompositionGame(engine);
@@ -692,8 +699,9 @@
 
         // Handle window resize
         window.addEventListener('resize', () => {
-            const width = window.innerWidth;
-            const height = window.innerHeight;
+            const rect = canvas.getBoundingClientRect();
+            const width = Math.round(rect.width);
+            const height = Math.round(rect.height);
             
             canvas.width = width;
             canvas.height = height;
