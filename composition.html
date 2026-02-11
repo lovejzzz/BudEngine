@@ -584,8 +584,11 @@
             debugCtx.setTransform(1, 0, 0, 1, 0, 0);
             debugCtx.fillStyle = 'red';
             debugCtx.beginPath();
-            debugCtx.arc(pos.x, pos.y, 5, 0, Math.PI * 2);
+            debugCtx.arc(pos.x, pos.y, 8, 0, Math.PI * 2);
             debugCtx.fill();
+            debugCtx.font = '12px monospace';
+            debugCtx.fillStyle = 'yellow';
+            debugCtx.fillText(`cw:${canvas.width} rw:${Math.round(canvas.getBoundingClientRect().width)} pw:${engine.physics.width} gw:${engine.physics.gridWidth} pos:${Math.round(pos.x)},${Math.round(pos.y)}`, 10, 30);
             debugCtx.restore();
 
             // Place material
@@ -764,6 +767,6 @@
 
         console.log('[The Composition v4.0] Loaded - Build the world, compose music');
     </script>
-<div id="version-stamp" style="position:fixed;bottom:5px;right:10px;color:rgba(255,255,255,0.5);font:10px monospace;z-index:9999;pointer-events:none;">BUILD 13</div>
+<div id="version-stamp" style="position:fixed;bottom:5px;right:10px;color:rgba(255,255,255,0.5);font:10px monospace;z-index:9999;pointer-events:none;">BUILD 14</div>
 </body>
 </html>
