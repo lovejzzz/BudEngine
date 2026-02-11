@@ -565,26 +565,12 @@
             const x = (touch.clientX - rect.left) * scaleX;
             const y = (touch.clientY - rect.top) * scaleY;
             // Update debug display
-            if (debugDiv) debugDiv.textContent = `t:${Math.round(touch.clientX)},${Math.round(touch.clientY)} r:${Math.round(rect.left)},${Math.round(rect.top)} ${Math.round(rect.width)}x${Math.round(rect.height)} c:${canvas.width}x${canvas.height} s:${scaleX.toFixed(2)},${scaleY.toFixed(2)} →${Math.round(x)},${Math.round(y)}`;
             return { x, y };
         }
 
-        // Debug display for touch coordinates
-        let debugDiv = document.createElement('div');
-        debugDiv.id = 'touch-debug';
-        debugDiv.style.cssText = 'position:fixed;top:60px;left:10px;background:rgba(255,0,0,0.8);color:#fff;padding:8px;font-size:12px;z-index:9999;border-radius:4px;font-family:monospace;pointer-events:none;';
-        document.body.appendChild(debugDiv);
-
         function startDrawing(e) {
             e.preventDefault();
-            const rect = canvas.getBoundingClientRect();
-            const touch = e.touches && e.touches[0] ? e.touches[0] : e;
-            const rawX = touch.clientX;
-            const rawY = touch.clientY;
             const pos = getInputPos(e);
-            
-            debugDiv.textContent = `raw: ${Math.round(rawX)},${Math.round(rawY)} | rect: ${Math.round(rect.left)},${Math.round(rect.top)} ${Math.round(rect.width)}x${Math.round(rect.height)} | canvas: ${canvas.width}x${canvas.height} | mapped: ${Math.round(pos.x)},${Math.round(pos.y)} | ratio: ${(canvas.width/rect.width).toFixed(2)}`;
-
             isDrawing = true;
             lastDrawX = pos.x;
             lastDrawY = pos.y;
@@ -637,17 +623,14 @@
         }
 
         function placeMaterial(x, y) {
-            // Physics renders directly at canvas (0,0) with setTransform reset
-            // So canvas coords map directly to physics: gridPos = canvasPos / cellSize
-            const gridX = Math.floor(x / engine.physics.cellSize);
-            const gridY = Math.floor(y / engine.physics.cellSize);
+            // Physics renders with drawImage scaling: grid (0..gridWidth) maps to canvas (0..physics.width)
+            // So: gridX = (canvasX / physics.width) * gridWidth
+            const p = engine.physics;
+            const gridX = Math.floor((x / p.width) * p.gridWidth);
+            const gridY = Math.floor((y / p.height) * p.gridHeight);
 
-            // Place a small circle of material
             const radius = 3;
-            engine.physics.circle(gridX, gridY, radius, selectedMaterial);
-            
-            // Debug: show what we're actually placing
-            if (debugDiv) debugDiv.textContent += ` | grid:${gridX},${gridY} cs:${engine.physics.cellSize} gw:${engine.physics.gridWidth}x${engine.physics.gridHeight}`;
+            p.circle(gridX, gridY, radius, selectedMaterial);
         }
 
         // Touch events
