@@ -188,9 +188,17 @@
         </div>
 
         <div class="section">
-            <h2>✨ What's New in v2.1 — MAJOR UPGRADE!</h2>
+            <h2>✨ What's New in v2.2 — Mobile Controls!</h2>
             
-            <h3>🎮 Priority 1 — Core Game Systems</h3>
+            <h3>🕹️ v2.2 — Virtual Joystick</h3>
+            <ul class="feature-list">
+                <li><strong>Virtual Joystick</strong> — On-screen mobile controls with <code>engine.ui.joystick()</code></li>
+                <li><strong>Auto-Detection</strong> — Automatically appears on touch devices</li>
+                <li><strong>Normalized Output</strong> — Easy-to-use (-1 to 1) for movement: <code>player.x += joystick.value.x * speed</code></li>
+                <li><strong>Test It</strong> — <a href="test-mobile-controls.html" style="color: #ff3333;">Try the mobile controls demo</a></li>
+            </ul>
+
+            <h3>🎮 v2.1 — Core Game Systems</h3>
             <ul class="feature-list">
                 <li><strong>Time Scaling</strong> — Bullet-time effects with <code>engine.slowMo(0.3, 2)</code>, plus fixed timestep physics for stable gameplay</li>
                 <li><strong>Touch Input</strong> — Full mobile support! Games now work on phones and tablets</li>
@@ -346,7 +354,7 @@ console.log('Balance notes:', results.balanceNotes);</code></pre>
 
         <footer>
             <p>Built with ❤️ for AI-human collaboration</p>
-            <p>Bud Engine v2.1 | MIT License</p>
+            <p>Bud Engine v2.2 | MIT License</p>
         </footer>
     </div>
 </body>

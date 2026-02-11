@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Bud Engine v2.2 - Mobile Controls Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #0a0a14;
+            font-family: 'Courier New', monospace;
+            color: #00ffcc;
+            overflow: hidden;
+            touch-action: none; /* Prevent browser touch gestures */
+        }
+        
+        #info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(26, 26, 46, 0.8);
+            padding: 15px;
+            border: 2px solid #00ffcc;
+            border-radius: 5px;
+            z-index: 1000;
+            pointer-events: none;
+        }
+        
+        h1 {
+            margin: 0 0 10px 0;
+            color: #ff3333;
+            font-size: 18px;
+        }
+        
+        p {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+        
+        canvas {
+            display: block;
+            margin: 0 auto;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">
+        <h1>📱 MOBILE CONTROLS TEST</h1>
+        <p>🕹️ Virtual Joystick: <span id="joystick-status">Not Active</span></p>
+        <p>📍 Position: <span id="position">-</span></p>
+        <p>🎮 Value: <span id="value">-</span></p>
+        <p>👆 Touches: <span id="touches">0</span></p>
+        <p><small>🖱️ Use mouse/touch to control the player</small></p>
+        <p><small>Press ` to toggle debug overlay</small></p>
+    </div>
+    
+    <script src="bud.js"></script>
+    <script>
+        const engine = new BudEngine({ 
+            width: window.innerWidth,
+            height: window.innerHeight,
+            backgroundColor: '#0a0a14'
+        });
+
+        // Create virtual joystick (auto-shows on touch devices)
+        const joystick = engine.ui.joystick({
+            x: 120,
+            y: window.innerHeight - 120,
+            baseRadius: 60,
+            stickRadius: 30,
+            visible: true // Force visible for testing
+        });
+
+        engine.scene('game', {
+            enter() {
+                // Create a simple arena
+                const arenaSize = 800;
+                const centerX = 0;
+                const centerY = 0;
+                
+                // Spawn player in center
+                const player = engine.spawn('player', {
+                    x: centerX,
+                    y: centerY,
+                    sprite: engine.art.character({ 
+                        body: 'circle', 
+                        color: '#00ffcc', 
+                        size: 25,
+                        eyes: true,
+                        glow: true
+                    }),
+                    collider: { type: 'circle', radius: 20 },
+                    speed: 300,
+                    trail: [],
+                    tags: ['player']
+                });
+
+                // Camera follows player
+                engine.cameraFollow(player, 0.1);
+
+                // Spawn some collectibles
+                for (let i = 0; i < 20; i++) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const dist = 200 + Math.random() * 400;
+                    const x = centerX + Math.cos(angle) * dist;
+                    const y = centerY + Math.sin(angle) * dist;
+                    
+                    engine.spawn('coin', {
+                        x, y,
+                        sprite: engine.art.character({
+                            body: 'star',
+                            color: '#ffcc00',
+                            size: 12,
+                            glow: true
+                        }),
+                        collider: { type: 'circle', radius: 15, trigger: true },
+                        rotation: 0,
+                        rotationSpeed: 2,
+                        tags: ['coin', 'pickup'],
+                        update(dt) {
+                            this.rotation += this.rotationSpeed * dt;
+                        }
+                    });
+                }
+
+                // Collision: player picks up coins
+                engine.onCollision('player', 'coin', (player, coin) => {
+                    player.score = (player.score || 0) + 10;
+                    engine.sound.play('pickup');
+                    engine.particles.emit(coin.x, coin.y, {
+                        count: 15,
+                        color: ['#ffcc00', '#ffaa00'],
+                        speed: [80, 150],
+                        life: [0.4, 0.8],
+                        size: [3, 6],
+                        fade: true
+                    });
+                    engine.destroy(coin);
+                });
+
+                // UI
+                engine.ui.text('MOBILE CONTROLS DEMO', {
+                    x: engine.canvas.width / 2,
+                    y: 30,
+                    font: 'bold 24px monospace',
+                    color: '#ff3333',
+                    align: 'center'
+                });
+
+                engine.ui.healthBar(player, {
+                    x: 20,
+                    y: 100,
+                    width: 200,
+                    height: 20,
+                    color: '#00ffcc',
+                    bgColor: '#333333'
+                });
+            },
+
+            update(dt) {
+                const player = engine.findOne('player');
+                if (!player) return;
+
+                // Initialize score
+                if (player.score === undefined) player.score = 0;
+
+                // Movement from KEYBOARD (WASD)
+                let moveX = 0;
+                let moveY = 0;
+                
+                if (engine.input.key('w') || engine.input.key('ArrowUp')) moveY -= 1;
+                if (engine.input.key('s') || engine.input.key('ArrowDown')) moveY += 1;
+                if (engine.input.key('a') || engine.input.key('ArrowLeft')) moveX -= 1;
+                if (engine.input.key('d') || engine.input.key('ArrowRight')) moveX += 1;
+
+                // Movement from VIRTUAL JOYSTICK (mobile)
+                if (joystick.active) {
+                    moveX = joystick.value.x;
+                    moveY = joystick.value.y;
+                }
+
+                // Movement from GAMEPAD
+                if (engine.input.gamepad.connected) {
+                    moveX = engine.input.gamepad.leftStick.x;
+                    moveY = engine.input.gamepad.leftStick.y;
+                }
+
+                // Apply movement
+                const speed = player.speed * dt;
+                player.x += moveX * speed;
+                player.y += moveY * speed;
+
+                // Trail effect
+                if (Math.abs(moveX) > 0.1 || Math.abs(moveY) > 0.1) {
+                    if (engine.frame % 3 === 0) {
+                        engine.particles.emit(player.x, player.y, {
+                            count: 2,
+                            color: ['#00ffcc', '#00aa99'],
+                            speed: [10, 30],
+                            life: [0.3, 0.6],
+                            size: [3, 6],
+                            fade: true
+                        });
+                    }
+                }
+
+                // Update UI with joystick status
+                updateInfo();
+
+                // Update score text
+                const scoreText = engine.ui.elements.find(e => e.text && e.text.includes('Score:'));
+                if (scoreText) {
+                    scoreText.text = `Score: ${player.score}  |  Coins: ${engine.findByTag('coin').length}`;
+                } else {
+                    engine.ui.text('', {
+                        x: engine.canvas.width / 2,
+                        y: 60,
+                        font: '18px monospace',
+                        color: '#00ffcc',
+                        align: 'center'
+                    });
+                }
+                
+                // Update the score display
+                const uiScore = engine.ui.elements.find(e => e.y === 60);
+                if (uiScore) {
+                    uiScore.text = `Score: ${player.score}  |  Coins: ${engine.findByTag('coin').length}`;
+                }
+            },
+
+            draw(ctx) {
+                // Draw arena bounds
+                ctx.save();
+                ctx.translate(
+                    -engine.camera.x * engine.camera.zoom + engine.canvas.width / 2,
+                    -engine.camera.y * engine.camera.zoom + engine.canvas.height / 2
+                );
+                ctx.scale(engine.camera.zoom, engine.camera.zoom);
+                
+                ctx.strokeStyle = '#333333';
+                ctx.lineWidth = 3;
+                ctx.setLineDash([10, 10]);
+                const arenaSize = 800;
+                ctx.strokeRect(-arenaSize/2, -arenaSize/2, arenaSize, arenaSize);
+                ctx.setLineDash([]);
+                
+                ctx.restore();
+            }
+        });
+
+        function updateInfo() {
+            const joystickStatus = document.getElementById('joystick-status');
+            const position = document.getElementById('position');
+            const value = document.getElementById('value');
+            const touches = document.getElementById('touches');
+            
+            joystickStatus.textContent = joystick.active ? '✅ Active' : '⏸️ Inactive';
+            joystickStatus.style.color = joystick.active ? '#00ff00' : '#888888';
+            
+            position.textContent = `(${Math.round(joystick.stickX)}, ${Math.round(joystick.stickY)})`;
+            
+            const vx = joystick.value.x.toFixed(2);
+            const vy = joystick.value.y.toFixed(2);
+            value.textContent = `(${vx}, ${vy})`;
+            
+            touches.textContent = engine.input.touch.length;
+        }
+
+        engine.goTo('game');
+        engine.start();
+
+        // Resize canvas when window resizes
+        window.addEventListener('resize', () => {
+            engine.canvas.width = window.innerWidth;
+            engine.canvas.height = window.innerHeight;
+            joystick.y = window.innerHeight - 120;
+        });
+    </script>
+</body>
+</html>

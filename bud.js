@@ -1,11 +1,16 @@
 /**
- * BUD ENGINE v2.1
+ * BUD ENGINE v2.2
  * A 2D web game engine designed for AI-human collaboration
  * 
  * Philosophy: AI can write, TEST, and iterate on games independently.
  * Killer feature: AI Testing API + auto-playtest bot
  * 
  * Architecture: Single-file, no build tools, runs in browser
+ * 
+ * v2.2 Improvements:
+ * - Virtual joystick for mobile (on-screen controls)
+ * - Auto-shows on touch devices
+ * - Normalized output (-1 to 1) for easy movement
  * 
  * v2.1 Improvements:
  * - Entity pool system for performance
@@ -2357,12 +2362,111 @@ class SoundSystem {
     }
 }
 
+// ===== VIRTUAL JOYSTICK (P1: Mobile Controls) =====
+
+class VirtualJoystick {
+    constructor(engine, opts = {}) {
+        this.engine = engine;
+        this.active = false;
+        this.visible = opts.visible !== false;
+        this.x = opts.x || 120;
+        this.y = opts.y || engine.canvas.height - 120;
+        this.baseRadius = opts.baseRadius || 60;
+        this.stickRadius = opts.stickRadius || 30;
+        this.stickX = this.x;
+        this.stickY = this.y;
+        this.touchId = null;
+        this.value = { x: 0, y: 0 }; // Normalized -1 to 1
+        
+        // Auto-show on touch devices
+        if (opts.autoShow !== false) {
+            this.visible = 'ontouchstart' in window;
+        }
+    }
+
+    update() {
+        const input = this.engine.input;
+        
+        if (!this.visible) {
+            this.active = false;
+            this.value = { x: 0, y: 0 };
+            return;
+        }
+        
+        // Check for touch in joystick area
+        let touchFound = false;
+        
+        for (let touch of input.touch) {
+            const dx = touch.x - this.x;
+            const dy = touch.y - this.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            
+            // Start tracking if touch is in base area
+            if (this.touchId === null && dist < this.baseRadius * 1.5) {
+                this.touchId = touch.id;
+                this.active = true;
+            }
+            
+            // Update stick position if this is our tracked touch
+            if (this.touchId === touch.id) {
+                touchFound = true;
+                const angle = Math.atan2(dy, dx);
+                const clampedDist = Math.min(dist, this.baseRadius);
+                
+                this.stickX = this.x + Math.cos(angle) * clampedDist;
+                this.stickY = this.y + Math.sin(angle) * clampedDist;
+                
+                // Calculate normalized value
+                this.value.x = (this.stickX - this.x) / this.baseRadius;
+                this.value.y = (this.stickY - this.y) / this.baseRadius;
+                break;
+            }
+        }
+        
+        // Reset if touch released
+        if (!touchFound && this.touchId !== null) {
+            this.touchId = null;
+            this.active = false;
+            this.stickX = this.x;
+            this.stickY = this.y;
+            this.value = { x: 0, y: 0 };
+        }
+    }
+
+    render(ctx) {
+        if (!this.visible) return;
+        
+        // Base circle
+        ctx.save();
+        ctx.globalAlpha = 0.4;
+        ctx.fillStyle = '#333333';
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.baseRadius, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Base outline
+        ctx.strokeStyle = '#00ffcc';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        
+        // Stick
+        ctx.globalAlpha = this.active ? 0.8 : 0.6;
+        ctx.fillStyle = '#00ffcc';
+        ctx.beginPath();
+        ctx.arc(this.stickX, this.stickY, this.stickRadius, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.restore();
+    }
+}
+
 // ===== UI SYSTEM =====
 
 class UISystem {
     constructor(engine) {
         this.engine = engine;
         this.elements = [];
+        this.virtualJoystick = null;
     }
 
     healthBar(entity, opts = {}) {
@@ -2398,6 +2502,23 @@ class UISystem {
             subtitle: opts.subtitle || '',
             button: opts.button || null
         });
+    }
+
+    /**
+     * Create a virtual joystick for mobile controls
+     * @param {object} [opts={}] - Joystick options (x, y, baseRadius, stickRadius, visible, autoShow)
+     * @returns {VirtualJoystick} Virtual joystick instance
+     * @example
+     * const joystick = engine.ui.joystick({ x: 120, y: 600 });
+     * // In update loop:
+     * player.x += joystick.value.x * speed * dt;
+     * player.y += joystick.value.y * speed * dt;
+     */
+    joystick(opts = {}) {
+        if (!this.virtualJoystick) {
+            this.virtualJoystick = new VirtualJoystick(this.engine, opts);
+        }
+        return this.virtualJoystick;
     }
 
     render(ctx) {
@@ -2467,10 +2588,17 @@ class UISystem {
                 }
             }
         }
+        
+        // Render virtual joystick (P1: Mobile controls)
+        if (this.virtualJoystick) {
+            this.virtualJoystick.update();
+            this.virtualJoystick.render(ctx);
+        }
     }
 
     clear() {
         this.elements = [];
+        // Don't clear joystick - it's persistent across scenes
     }
 }
 
@@ -3415,7 +3543,7 @@ class PathfindingSystem {
 }
 
 // Static properties (must be set AFTER class definition)
-BudEngine.VERSION = '2.1';
+BudEngine.VERSION = '2.2';
 BudEngine.LAYER = {
     DEFAULT: 1,
     PLAYER: 2,
