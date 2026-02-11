@@ -578,18 +578,8 @@
             // Gesture tracking for composition game
             engine.composition.onGestureStart(pos.x, pos.y);
 
-            // Draw debug red dot at raw canvas position
-            const debugCtx = canvas.getContext('2d');
-            debugCtx.save();
-            debugCtx.setTransform(1, 0, 0, 1, 0, 0);
-            debugCtx.fillStyle = 'red';
-            debugCtx.beginPath();
-            debugCtx.arc(pos.x, pos.y, 8, 0, Math.PI * 2);
-            debugCtx.fill();
-            debugCtx.font = '12px monospace';
-            debugCtx.fillStyle = 'yellow';
-            debugCtx.fillText(`cw:${canvas.width} rw:${Math.round(canvas.getBoundingClientRect().width)} pw:${engine.physics.width} gw:${engine.physics.gridWidth} pos:${Math.round(pos.x)},${Math.round(pos.y)}`, 10, 30);
-            debugCtx.restore();
+            // Show debug in HTML element (survives engine render loop)
+            document.getElementById('version-stamp').textContent = `B15 cw:${canvas.width}x${canvas.height} rw:${Math.round(canvas.getBoundingClientRect().width)}x${Math.round(canvas.getBoundingClientRect().height)} pw:${engine.physics.width}x${engine.physics.height} gw:${engine.physics.gridWidth}x${engine.physics.gridHeight} t:${Math.round(pos.x)},${Math.round(pos.y)}`;
 
             // Place material
             if (engine.composition.mode === 'creation') {
@@ -767,6 +757,6 @@
 
         console.log('[The Composition v4.0] Loaded - Build the world, compose music');
     </script>
-<div id="version-stamp" style="position:fixed;bottom:5px;right:10px;color:rgba(255,255,255,0.5);font:10px monospace;z-index:9999;pointer-events:none;">BUILD 14</div>
+<div id="version-stamp" style="position:fixed;bottom:5px;right:10px;color:rgba(255,255,255,0.5);font:10px monospace;z-index:9999;pointer-events:none;">BUILD 15</div>
 </body>
 </html>
