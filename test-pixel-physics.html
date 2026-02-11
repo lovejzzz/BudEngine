@@ -88,13 +88,13 @@
         
         .tab {
             flex: 1;
-            min-width: 48px;
-            padding: 6px 4px;
+            min-width: 42px;
+            padding: 8px 4px;
             background: #1a1a2e;
             border: 1px solid #444;
             color: #888;
             cursor: pointer;
-            font-size: 10px;
+            font-size: 18px;
             text-align: center;
             transition: all 0.2s;
             white-space: nowrap;
@@ -445,12 +445,12 @@
         
         <!-- Material Tabs -->
         <div class="tabs">
-            <div class="tab" data-tab="elements">🌊 Elements</div>
-            <div class="tab active" data-tab="earth">🪨 Earth</div>
-            <div class="tab" data-tab="energy">🔥 Energy</div>
-            <div class="tab" data-tab="gases">💨 Gases</div>
-            <div class="tab" data-tab="reactive">⚗️ Reactive</div>
-            <div class="tab" data-tab="life">🌿 Life</div>
+            <div class="tab" data-tab="elements" title="Elements (Water, Ice, Steam)">🌊</div>
+            <div class="tab active" data-tab="earth" title="Earth Materials (Sand, Stone, Metals)">🪨</div>
+            <div class="tab" data-tab="energy" title="Energy & Fuels (Fire, Wood, Oil)">🔥</div>
+            <div class="tab" data-tab="gases" title="Gases (Oxygen, Hydrogen, Smoke)">💨</div>
+            <div class="tab" data-tab="reactive" title="Reactive Materials (Acid, Salt, Sulfur)">⚗️</div>
+            <div class="tab" data-tab="life" title="Living Materials (Plants, Fungus)">🌿</div>
         </div>
         
         <!-- Material Grids -->
@@ -745,7 +745,7 @@
             <h3>👁️ View</h3>
             <div class="toggle-row">
                 <button class="action-btn toggle" id="heatBtn" onclick="toggleHeat()">🌡️ Heat</button>
-                <button class="action-btn toggle active" id="lightBtn" onclick="toggleLighting()">🌙 Light</button>
+                <button class="action-btn toggle" id="lightBtn" onclick="toggleLighting()">🌙 Light</button>
                 <button class="action-btn toggle" id="soundBtn" onclick="toggleSound()">🔊 Sound</button>
             </div>
         </div>
@@ -1036,92 +1036,124 @@
         function loadScenario(name) {
             clearWorld();
             
+            const w = engine.canvas.width;
+            const h = engine.canvas.height;
+            
             if (name === 'volcano') {
-                // Lava chamber
-                engine.physics.fill(300, 400, 500, 500, 'lava');
+                // Lava chamber (centered, lower half)
+                engine.physics.fill(w*0.3, h*0.65, w*0.7, h*0.85, 'lava');
                 // Stone walls
-                engine.physics.fill(200, 300, 280, 550, 'stone');
-                engine.physics.fill(520, 300, 600, 550, 'stone');
+                engine.physics.fill(w*0.2, h*0.5, w*0.25, h*0.9, 'stone');
+                engine.physics.fill(w*0.75, h*0.5, w*0.8, h*0.9, 'stone');
                 // Water pool
-                engine.physics.fill(50, 450, 150, 550, 'water');
+                engine.physics.fill(w*0.05, h*0.75, w*0.15, h*0.9, 'water');
                 
                 console.log('🌋 Volcano scenario loaded');
             } else if (name === 'lab') {
-                // Test tubes
-                engine.physics.fill(150, 450, 170, 550, 'glass');
-                engine.physics.fill(150, 480, 170, 530, 'acid');
+                // Test tubes (spaced across canvas)
+                const tubeY = h*0.75;
+                const tubeH = h*0.9;
                 
-                engine.physics.fill(250, 450, 270, 550, 'glass');
-                engine.physics.fill(250, 480, 270, 530, 'water');
+                engine.physics.fill(w*0.15, tubeY, w*0.18, tubeH, 'glass');
+                engine.physics.fill(w*0.15, h*0.8, w*0.18, h*0.88, 'acid');
                 
-                engine.physics.fill(350, 450, 370, 550, 'glass');
-                engine.physics.fill(350, 480, 370, 530, 'hydrogen');
+                engine.physics.fill(w*0.3, tubeY, w*0.33, tubeH, 'glass');
+                engine.physics.fill(w*0.3, h*0.8, w*0.33, h*0.88, 'water');
                 
-                engine.physics.fill(450, 450, 470, 550, 'glass');
-                engine.physics.fill(450, 480, 470, 530, 'oxygen');
+                engine.physics.fill(w*0.45, tubeY, w*0.48, tubeH, 'glass');
+                engine.physics.fill(w*0.45, h*0.8, w*0.48, h*0.88, 'hydrogen');
+                
+                engine.physics.fill(w*0.6, tubeY, w*0.63, tubeH, 'glass');
+                engine.physics.fill(w*0.6, h*0.8, w*0.63, h*0.88, 'oxygen');
                 
                 // Metal samples
-                engine.physics.fill(600, 480, 640, 500, 'iron');
+                engine.physics.fill(w*0.75, h*0.8, w*0.8, h*0.83, 'iron');
                 
                 console.log('🧪 Lab scenario loaded');
             } else if (name === 'forest') {
-                // Trees (wood)
-                for (let i = 0; i < 8; i++) {
-                    const x = 100 + i * 90;
-                    engine.physics.fill(x, 350, x + 40, 550, 'wood');
+                // Trees (wood) - spaced across width
+                const treeCount = Math.min(8, Math.floor(w / 100));
+                for (let i = 0; i < treeCount; i++) {
+                    const x = (w * 0.1) + (i * (w * 0.8 / treeCount));
+                    engine.physics.fill(x, h*0.55, x + (w*0.05), h*0.9, 'wood');
                 }
                 // Ground
-                engine.physics.fill(0, 550, 800, 600, 'dirt');
+                engine.physics.fill(0, h*0.9, w, h, 'dirt');
                 // Some vegetation
                 for (let i = 0; i < 10; i++) {
-                    const x = Math.random() * 800;
-                    engine.physics.circle(x, 530, 10, 'vegetation');
+                    const x = Math.random() * w;
+                    engine.physics.circle(x, h*0.88, 10, 'vegetation');
                 }
                 // Starting fire
-                engine.physics.circle(100, 400, 15, 'fire');
+                engine.physics.circle(w*0.15, h*0.6, 15, 'fire');
                 
                 console.log('🔥 Forest fire scenario loaded');
             } else if (name === 'garden') {
-                // Soil base
-                engine.physics.fill(0, 500, 800, 600, 'dirt');
-                // Water channels
-                engine.physics.fill(200, 480, 220, 600, 'water');
-                engine.physics.fill(580, 480, 600, 600, 'water');
-                // Plant some seeds
-                for (let i = 0; i < 15; i++) {
-                    const x = Math.random() * 800;
-                    engine.physics.circle(x, 490, 3, 'plant');
+                // Thick soil base (bottom 30%)
+                engine.physics.fill(0, h*0.7, w, h, 'dirt');
+                
+                // Water pools (two channels)
+                engine.physics.fill(w*0.25, h*0.65, w*0.28, h, 'water');
+                engine.physics.fill(w*0.72, h*0.65, w*0.75, h, 'water');
+                
+                // Stone overhangs for fungus
+                engine.physics.fill(w*0.05, h*0.6, w*0.15, h*0.7, 'stone');
+                engine.physics.fill(w*0.85, h*0.55, w*0.95, h*0.68, 'stone');
+                
+                // Pre-warm the soil to perfect growing temperature (25°C)
+                for (let x = 0; x < w; x += 2) {
+                    for (let y = Math.floor(h*0.7); y < h; y += 2) {
+                        const idx = engine.physics.index(x, y);
+                        if (engine.physics.grid[idx] === engine.physics.getMaterialId('dirt')) {
+                            engine.physics.temperatureGrid[idx] = 25; // Perfect growing temp
+                        }
+                    }
                 }
-                // Some vegetation
-                for (let i = 0; i < 10; i++) {
-                    const x = Math.random() * 800;
-                    engine.physics.circle(x, 490, 8, 'vegetation');
+                
+                // Plant seeds scattered across soil
+                for (let i = 0; i < 20; i++) {
+                    const x = Math.random() * w;
+                    const y = h*0.68 + Math.random() * (h*0.08);
+                    engine.physics.circle(x, y, 3, 'plant');
                 }
-                // Add fungus in shaded areas
-                engine.physics.fill(50, 450, 100, 500, 'stone');
-                for (let i = 0; i < 5; i++) {
-                    const x = 50 + Math.random() * 50;
-                    engine.physics.circle(x, 440, 5, 'fungus');
+                
+                // Some initial vegetation clusters
+                for (let i = 0; i < 12; i++) {
+                    const x = Math.random() * w;
+                    const y = h*0.68 + Math.random() * (h*0.08);
+                    engine.physics.circle(x, y, 8, 'vegetation');
+                }
+                
+                // Add fungus under the stone overhangs (dark areas)
+                for (let i = 0; i < 8; i++) {
+                    const x = w*0.05 + Math.random() * (w*0.1);
+                    const y = h*0.65 + Math.random() * (h*0.05);
+                    engine.physics.circle(x, y, 5, 'fungus');
+                }
+                for (let i = 0; i < 8; i++) {
+                    const x = w*0.85 + Math.random() * (w*0.1);
+                    const y = h*0.63 + Math.random() * (h*0.05);
+                    engine.physics.circle(x, y, 5, 'fungus');
                 }
                 
                 console.log('🌿 Garden scenario loaded - Watch life grow!');
             } else if (name === 'underwater') {
-                // Water
-                engine.physics.fill(0, 100, 800, 600, 'water');
-                // Sand bottom
-                engine.physics.fill(0, 550, 800, 600, 'sand');
+                // Water (upper 85%)
+                engine.physics.fill(0, h*0.15, w, h, 'water');
+                // Sand bottom (lower 8%)
+                engine.physics.fill(0, h*0.92, w, h, 'sand');
                 // Underwater volcano
-                engine.physics.fill(350, 500, 450, 550, 'stone');
-                engine.physics.circle(400, 520, 30, 'lava');
+                engine.physics.fill(w*0.4, h*0.83, w*0.6, h*0.92, 'stone');
+                engine.physics.circle(w*0.5, h*0.87, w*0.04, 'lava');
                 
                 console.log('🌊 Underwater scenario loaded');
             } else if (name === 'arctic') {
-                // Ice shelf
-                engine.physics.fill(0, 300, 800, 400, 'ice');
+                // Ice shelf (thick middle layer)
+                engine.physics.fill(0, h*0.4, w, h*0.6, 'ice');
                 // Water below
-                engine.physics.fill(0, 400, 800, 600, 'water');
+                engine.physics.fill(0, h*0.6, w, h, 'water');
                 // Some lava to melt it
-                engine.physics.circle(400, 350, 40, 'lava');
+                engine.physics.circle(w*0.5, h*0.5, w*0.05, 'lava');
                 
                 console.log('❄️ Arctic scenario loaded');
             }
@@ -1129,23 +1161,29 @@
 
         // Build initial world
         function buildInitialWorld() {
-            // Bottom stone floor
-            engine.physics.fill(0, engine.canvas.height - 40, engine.canvas.width, engine.canvas.height, 'stone');
-            
-            // Stone walls on sides
-            engine.physics.fill(0, 0, 25, engine.canvas.height, 'stone');
-            engine.physics.fill(engine.canvas.width - 25, 0, engine.canvas.width, engine.canvas.height, 'stone');
-            
-            // Wooden platforms
+            const w = engine.canvas.width;
             const h = engine.canvas.height;
-            engine.physics.fill(100, h - 120, 280, h - 105, 'wood');
-            engine.physics.fill(520, h - 200, 700, h - 185, 'wood');
+            
+            // Bottom stone floor (5% height at bottom)
+            engine.physics.fill(0, h - h*0.05, w, h, 'stone');
+            
+            // Stone walls on sides (3% of width)
+            const wallW = Math.max(25, w*0.03);
+            engine.physics.fill(0, 0, wallW, h, 'stone');
+            engine.physics.fill(w - wallW, 0, w, h, 'stone');
+            
+            // Wooden platforms (proportional to canvas size)
+            engine.physics.fill(w*0.1, h*0.85, w*0.35, h*0.87, 'wood');
+            engine.physics.fill(w*0.55, h*0.75, w*0.8, h*0.77, 'wood');
             
             // Some dirt patches
-            engine.physics.fill(300, h - 80, 500, h - 60, 'dirt');
+            engine.physics.fill(w*0.35, h*0.9, w*0.55, h*0.94, 'dirt');
             
             // Plant a seed
-            engine.physics.circle(400, h - 90, 5, 'plant');
+            engine.physics.circle(w*0.45, h*0.88, 5, 'plant');
+            
+            // Add some initial vegetation
+            engine.physics.circle(w*0.5, h*0.88, 8, 'vegetation');
         }
 
         // Initialize world

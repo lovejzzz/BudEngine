@@ -5086,8 +5086,8 @@ class PixelPhysics {
         this.showHeat = false;
         
         // v3.5: Cell-Based Dynamic Lighting System (OPTIMIZED)
-        this.lighting = true; // Enable by default
-        this.ambientLight = 0.2; // 0 = pitch black, 1 = full bright
+        this.lighting = false; // Start with lighting OFF (user can toggle)
+        this.ambientLight = 0.6; // Backup: if lighting is enabled, this provides visibility
         this.lightSources = new Set(); // Track light-emitting cells
         this.lightMap = null; // Uint8ClampedArray - light level per cell (0-255)
         this.lightColorMap = null; // Uint8ClampedArray - RGB per cell (3 values per cell)
@@ -6035,7 +6035,7 @@ class PixelPhysics {
             ambientSound: null,
             phaseChangeSound: 'crack',
             // Biology properties
-            growthRate: 0.005,
+            growthRate: 0.01,
             needsWater: true,
             needsLight: true,
             needsDirt: true,
@@ -6077,7 +6077,7 @@ class PixelPhysics {
             ambientSound: null,
             phaseChangeSound: 'crack',
             // Biology properties
-            growthRate: 0.005,
+            growthRate: 0.01,
             needsWater: true,
             needsLight: true,
             needsDirt: true,
@@ -6931,8 +6931,8 @@ class PixelPhysics {
                     const hasWater = this.hasWaterNearby(x, y, 3);
                     const hasLight = this.hasLightAbove(x, y);
                     
-                    // Very low chance to spawn plant
-                    if (tempOk && hasWater && hasLight && Math.random() < 0.001) {
+                    // Low chance to spawn plant (increased for visibility)
+                    if (tempOk && hasWater && hasLight && Math.random() < 0.005) {
                         this.grid[idx] = this.getMaterialId('plant');
                         this.temperatureGrid[idx] = 20;
                         this.activateChunk(x, y);
