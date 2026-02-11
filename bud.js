@@ -7376,6 +7376,11 @@ class PixelPhysics {
      * @param {number} radius - Circle radius in world units
      * @param {string} material - Material name
      */
+    /**
+     * NOTE: All public PixelPhysics methods (circle, set, get, explode) take
+     * PIXEL/WORLD coordinates, NOT grid coordinates. They divide by cellSize internally.
+     * Canvas pixel coords can be passed directly — do NOT pre-divide by cellSize.
+     */
     circle(cx, cy, radius, material) {
         const gcx = Math.floor(cx / this.cellSize);
         const gcy = Math.floor(cy / this.cellSize);
