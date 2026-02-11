@@ -1,11 +1,18 @@
 /**
- * BUD ENGINE v2.4
+ * BUD ENGINE v2.5
  * A 2D web game engine designed for AI-human collaboration
  * 
  * Philosophy: AI can write, TEST, and iterate on games independently.
  * Killer feature: AI Testing API + auto-playtest bot
  * 
  * Architecture: Single-file, no build tools, runs in browser
+ * 
+ * v2.5 Improvements (Neon Ronin - Camera & Feel):
+ * - Native camera lookahead system (cameraLookahead)
+ * - Lookahead can use target rotation or manual {x,y} offset
+ * - Scene transitions with automatic fade (goTo with fade parameter improved)
+ * - Combat impact helper (impact) - unified shake + freeze + flash
+ * - Particle presets system for common patterns
  * 
  * v2.4 Improvements (Neon Ronin Polish):
  * - Freeze frames / hit pause (freezeFrame)
@@ -158,7 +165,9 @@ class BudEngine {
             shake: { x: 0, y: 0, intensity: 0, decay: 0.9 },
             // v2.1 improvements
             deadzone: null, // {x, y, width, height}
-            bounds: null // {minX, minY, maxX, maxY}
+            bounds: null, // {minX, minY, maxX, maxY}
+            // v2.5 improvements
+            lookahead: null // number (uses target.rotation) or {x, y} for manual offset
         };
 
         // Input system
@@ -514,8 +523,25 @@ class BudEngine {
     updateCamera(dt) {
         if (this.camera.target) {
             const target = this.camera.target;
-            const targetX = target.x || 0;
-            const targetY = target.y || 0;
+            let targetX = target.x || 0;
+            let targetY = target.y || 0;
+            
+            // v2.5: Camera lookahead - offset camera in direction of target's rotation/facing
+            // Allows games to "look ahead" in the direction the player is facing
+            if (this.camera.lookahead !== undefined && this.camera.lookahead !== null) {
+                // If lookahead is a number, use target's rotation to calculate offset
+                if (typeof this.camera.lookahead === 'number') {
+                    const angle = target.rotation || 0;
+                    const dist = this.camera.lookahead;
+                    targetX += Math.cos(angle) * dist;
+                    targetY += Math.sin(angle) * dist;
+                } 
+                // If lookahead is an object with x/y, use it as direct offset
+                else if (typeof this.camera.lookahead === 'object') {
+                    targetX += this.camera.lookahead.x || 0;
+                    targetY += this.camera.lookahead.y || 0;
+                }
+            }
             
             // Deadzone (v2.1) - don't move camera if target is within deadzone
             if (this.camera.deadzone) {
@@ -592,6 +618,50 @@ class BudEngine {
      */
     freezeFrame(frames) {
         this.freezeFrames = Math.max(this.freezeFrames, frames); // Don't reduce existing freeze
+    }
+
+    /**
+     * Combined impact feedback - shake, freeze, and flash in one call
+     * Useful for combat hits, explosions, and impactful events
+     * @param {number} [intensity=5] - Impact intensity (1-10, affects all effects)
+     * @param {object} [options] - Optional configuration
+     * @param {string} [options.flashColor='#ffffff'] - Flash color
+     * @param {boolean} [options.noShake=false] - Disable camera shake
+     * @param {boolean} [options.noFreeze=false] - Disable freeze frames
+     * @param {boolean} [options.noFlash=false] - Disable screen flash
+     * @example
+     * engine.impact(5); // Medium impact - default white flash
+     * engine.impact(8, { flashColor: '#ff0000' }); // Heavy red impact (damage)
+     * engine.impact(3, { noShake: true }); // Light impact, no shake
+     */
+    impact(intensity = 5, options = {}) {
+        const {
+            flashColor = '#ffffff',
+            noShake = false,
+            noFreeze = false,
+            noFlash = false
+        } = options;
+
+        // Clamp intensity to reasonable range
+        intensity = Math.max(1, Math.min(10, intensity));
+
+        // Camera shake (scaled by intensity)
+        if (!noShake) {
+            this.cameraShake(intensity * 1.5);
+        }
+
+        // Freeze frames (scaled by intensity)
+        if (!noFreeze) {
+            const freezeFrames = Math.floor(intensity * 0.6); // 1-6 frames
+            this.freezeFrame(freezeFrames);
+        }
+
+        // Screen flash (scaled by intensity)
+        if (!noFlash) {
+            const flashIntensity = Math.min(1, intensity / 12); // 0.08 - 0.83
+            const flashDuration = 0.1 + (intensity / 50); // 0.12 - 0.3s
+            this.screenFlash(flashColor, flashIntensity, flashDuration);
+        }
     }
 
     // ===== SCREEN EFFECTS (v2.3) =====
@@ -1617,6 +1687,18 @@ class BudEngine {
     }
 
     /**
+     * Enable camera lookahead - camera offsets in the direction of target's facing
+     * @param {number|object|null} lookahead - Distance (uses target.rotation) or {x,y} offset, or null to disable
+     * @example
+     * engine.cameraLookahead(80); // Look 80px ahead in direction player faces
+     * engine.cameraLookahead({x: 50, y: 0}); // Manual offset
+     * engine.cameraLookahead(null); // Disable lookahead
+     */
+    cameraLookahead(lookahead) {
+        this.camera.lookahead = lookahead;
+    }
+
+    /**
      * Smoothly zoom the camera (v2.1)
      * @param {number} targetZoom - Target zoom level
      * @param {number} speed - Zoom speed (0-1, higher = faster)
@@ -2259,6 +2341,154 @@ class ParticleSystem {
                 fade: opts.fade !== false
             });
         }
+    }
+
+    /**
+     * Create an explosion burst effect
+     * @param {number} x - World X position
+     * @param {number} y - World Y position
+     * @param {string} [preset='fire'] - Preset type: 'fire', 'electric', 'magic', 'dust'
+     * @param {number} [intensity=1.0] - Effect intensity multiplier (0.5-2.0)
+     * @example
+     * engine.particles.burst(enemy.x, enemy.y, 'fire', 1.5); // Big fire explosion
+     * engine.particles.burst(x, y, 'electric'); // Electric burst
+     */
+    burst(x, y, preset = 'fire', intensity = 1.0) {
+        const presets = {
+            fire: {
+                count: Math.floor(25 * intensity),
+                color: ['#ff3333', '#ff8800', '#ffff00'],
+                speed: [100 * intensity, 250 * intensity],
+                life: [0.4, 0.9],
+                size: [3, 8]
+            },
+            electric: {
+                count: Math.floor(30 * intensity),
+                color: ['#00ffff', '#0088ff', '#ffffff'],
+                speed: [120 * intensity, 300 * intensity],
+                life: [0.2, 0.5],
+                size: [2, 6]
+            },
+            magic: {
+                count: Math.floor(20 * intensity),
+                color: ['#ff00ff', '#ff66ff', '#ffffff'],
+                speed: [80 * intensity, 200 * intensity],
+                life: [0.5, 1.2],
+                size: [4, 10]
+            },
+            dust: {
+                count: Math.floor(15 * intensity),
+                color: ['#888888', '#aaaaaa', '#cccccc'],
+                speed: [40 * intensity, 100 * intensity],
+                life: [0.6, 1.0],
+                size: [2, 4]
+            }
+        };
+
+        const config = presets[preset] || presets.fire;
+        this.emit(x, y, config);
+    }
+
+    /**
+     * Create a trailing effect (for moving objects)
+     * @param {number} x - World X position
+     * @param {number} y - World Y position
+     * @param {string} [preset='cyan'] - Preset color: 'cyan', 'red', 'purple', 'white'
+     * @param {number} [intensity=1.0] - Trail intensity (affects count and size)
+     * @example
+     * // In entity update:
+     * if (engine.frame % 2 === 0) {
+     *   engine.particles.trail(this.x, this.y, 'cyan', 0.8);
+     * }
+     */
+    trail(x, y, preset = 'cyan', intensity = 1.0) {
+        const presets = {
+            cyan: ['#00ffcc', '#00ffff', '#88ffff'],
+            red: ['#ff3333', '#ff6666', '#ff9999'],
+            purple: ['#ff00ff', '#ff66ff', '#cc66ff'],
+            white: ['#ffffff', '#cccccc', '#aaaaaa'],
+            orange: ['#ff8800', '#ffaa00', '#ffcc66']
+        };
+
+        const colors = presets[preset] || presets.cyan;
+        
+        this.emit(x, y, {
+            count: Math.max(1, Math.floor(3 * intensity)),
+            color: colors,
+            speed: [0, 30 * intensity],
+            life: [0.3, 0.6],
+            size: [2, 5 * intensity]
+        });
+    }
+
+    /**
+     * Create ambient floating particles
+     * @param {number} x - World X position
+     * @param {number} y - World Y position
+     * @param {string} [preset='dust'] - Preset type: 'dust', 'sparks', 'magic', 'smoke'
+     * @example
+     * // Call periodically (e.g., in an emitter entity):
+     * engine.particles.ambient(torch.x, torch.y, 'sparks');
+     */
+    ambient(x, y, preset = 'dust') {
+        const presets = {
+            dust: {
+                count: this.engine.random(1, 3),
+                color: ['#888888', '#999999', '#aaaaaa'],
+                speed: [5, 20],
+                life: [2, 4],
+                size: [1, 3],
+                gravity: -10 // Float upward
+            },
+            sparks: {
+                count: this.engine.random(2, 5),
+                color: ['#ffaa00', '#ff8800', '#ffff00'],
+                speed: [10, 40],
+                life: [1, 2],
+                size: [1, 2],
+                gravity: 30 // Fall slowly
+            },
+            magic: {
+                count: this.engine.random(1, 3),
+                color: ['#ff00ff', '#00ffff', '#ffffff'],
+                speed: [5, 15],
+                life: [3, 5],
+                size: [2, 4],
+                gravity: -15 // Float upward gently
+            },
+            smoke: {
+                count: this.engine.random(1, 2),
+                color: ['#444444', '#666666', '#888888'],
+                speed: [10, 25],
+                life: [2, 3],
+                size: [4, 8],
+                gravity: -20 // Rise
+            }
+        };
+
+        const config = presets[preset] || presets.dust;
+        this.emit(x, y, config);
+    }
+
+    /**
+     * Create an impact effect on hit
+     * @param {number} x - World X position
+     * @param {number} y - World Y position
+     * @param {string} [color='#ffffff'] - Impact color
+     * @param {number} [intensity=1.0] - Impact intensity
+     * @example
+     * engine.particles.impact(bullet.x, bullet.y, '#00ffff', 1.2);
+     */
+    impact(x, y, color = '#ffffff', intensity = 1.0) {
+        const colors = Array.isArray(color) ? color : [color, this.engine.art.lightenColor(color, 40)];
+        
+        this.emit(x, y, {
+            count: Math.floor(8 * intensity),
+            color: colors,
+            speed: [60 * intensity, 150 * intensity],
+            life: [0.2, 0.4],
+            size: [2, 5 * intensity]
+        });
     }
 
     update(dt) {

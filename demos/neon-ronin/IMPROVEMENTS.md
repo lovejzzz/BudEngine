@@ -23,14 +23,96 @@
 
 ## Engine Improvements (bud.js)
 
-*(Engine changes will be tracked here as they're made)*
+### v2.5 - Camera & Combat Feel (Feb 11, 2026)
+
+#### 1. Native Camera Lookahead System
+**What:** Camera now natively offsets in direction of target's facing
+**Why:** Game was manually applying lookahead - this should be an engine feature
+**API:**
+```javascript
+engine.cameraLookahead(80);           // Auto-offset 80px in target.rotation direction
+engine.cameraLookahead({x: 50, y: 0}); // Manual offset
+engine.cameraLookahead(null);          // Disable
+```
+**Implementation:** Enhanced `updateCamera()` to apply lookahead before deadzone/bounds checks
+**Files:** `bud.js` lines ~420-475
+
+#### 2. Combat Impact Helper
+**What:** Unified `engine.impact()` combines shake + freeze + flash
+**Why:** Game repeated `cameraShake() + freezeFrame() + screenFlash()` pattern everywhere
+**API:**
+```javascript
+engine.impact(5);                              // Medium impact, white flash
+engine.impact(8, { flashColor: '#ff0000' });  // Heavy red impact (damage)
+engine.impact(3, { noShake: true });          // Light, no shake
+```
+**Features:**
+- Intensity scales all effects (1-10)
+- Individual effects can be disabled
+- Smart defaults for combat feel
+**Files:** `bud.js` lines ~545-590
+
+#### 3. Particle Preset System
+**What:** Common particle patterns as engine methods
+**Why:** Game had repeated particle.emit() calls with similar configs
+**API:**
+```javascript
+engine.particles.burst(x, y, 'fire', 1.5);     // Explosion burst
+engine.particles.trail(x, y, 'cyan', 0.8);     // Movement trail
+engine.particles.ambient(x, y, 'dust');        // Floating ambient
+engine.particles.impact(x, y, '#ff0000', 1.0); // Hit impact
+```
+**Presets:**
+- **Burst:** fire, electric, magic, dust (explosions/deaths)
+- **Trail:** cyan, red, purple, white, orange (moving objects)
+- **Ambient:** dust, sparks, magic, smoke (environmental)
+- **Impact:** Any color, variable intensity (hits/collisions)
+**Files:** `bud.js` lines ~2340-2480
+
+### Game Simplifications Using New Engine Features:
+
+**Before:**
+```javascript
+// Manual lookahead (in gameplay scene update)
+if (engine.camera.lookahead) {
+    engine.camera.x += engine.camera.lookahead.x * 0.3;
+    engine.camera.y += engine.camera.lookahead.y * 0.3;
+}
+
+// Manual impact feedback (repeated everywhere)
+engine.cameraShake(8);
+engine.screenFlash('#ff0000', 0.5, 0.2);
+engine.freezeFrame(4);
+
+// Custom particle configs (repeated)
+engine.particles.emit(x, y, {
+    count: 20,
+    color: ['#00ffcc', '#00ffff', '#ffffff'],
+    speed: [50, 150],
+    life: [0.4, 0.8],
+    size: [3, 8]
+});
+```
+
+**After:**
+```javascript
+// Native lookahead (set once)
+engine.cameraLookahead(80);
+
+// Unified impact
+engine.impact(6, { flashColor: '#ff0000' });
+
+// Preset particles
+engine.particles.burst(x, y, 'electric', 1.2);
+```
+
+**Lines of code reduced:** ~150+ lines across game.js
+**Readability:** Significantly improved - intent is clear
 
 ### Planned Engine Features:
-- [ ] Fade transition system for room changes
-- [ ] Particle effects enhancements (directional emission)
-- [ ] Animation system for death effects
-- [ ] Screen shake improvements (directional shake)
-- [ ] Color palette utilities
+- [ ] Scene fade transitions (improve goTo with better fade handling)
+- [ ] Directional screen shake (shake in hit direction)
+- [ ] Entity state machine helpers (simplify enemy AI)
 
 ---
 

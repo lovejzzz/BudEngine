@@ -139,14 +139,6 @@ function createPlayer(x, y) {
             const mouseWorld = engine.input.mouseWorld;
             this.rotation = Math.atan2(mouseWorld.y - this.y, mouseWorld.x - this.x);
             
-            // Camera lookahead - offset camera in direction player is facing
-            if (!engine.camera.lookahead) engine.camera.lookahead = { x: 0, y: 0 };
-            const lookaheadDist = 80;
-            const targetLookaheadX = Math.cos(this.rotation) * lookaheadDist;
-            const targetLookaheadY = Math.sin(this.rotation) * lookaheadDist;
-            engine.camera.lookahead.x += (targetLookaheadX - engine.camera.lookahead.x) * dt * 2;
-            engine.camera.lookahead.y += (targetLookaheadY - engine.camera.lookahead.y) * dt * 2;
-            
             // Dash (Space key)
             if (engine.input.keyPressed(' ') && this.dashCooldown <= 0 && this.energy >= CONFIG.DASH_COST) {
                 this.energy -= CONFIG.DASH_COST;
@@ -166,13 +158,7 @@ function createPlayer(x, y) {
                 this.velocity.y = dashY * CONFIG.PLAYER_DASH_SPEED;
                 
                 // Dash particles
-                engine.particles.emit(this.x, this.y, {
-                    count: 20,
-                    color: ['#00ffcc', '#00ffff', '#ffffff'],
-                    speed: [50, 150],
-                    life: [0.4, 0.8],
-                    size: [3, 8]
-                });
+                engine.particles.burst(this.x, this.y, 'electric', 1.2);
                 
                 engine.sound.play('jump');
                 engine.slowMo(0.3, 0.1); // Brief slow-mo for dash
@@ -185,13 +171,7 @@ function createPlayer(x, y) {
             
             // Dash trail effect
             if (this.isDashing && engine.frame % 1 === 0) {
-                engine.particles.emit(this.x, this.y, {
-                    count: 3,
-                    color: ['#00ffcc', '#00ffff'],
-                    speed: [0, 30],
-                    life: [0.3, 0.5],
-                    size: [4, 8]
-                });
+                engine.particles.trail(this.x, this.y, 'cyan', 1.2);
             }
             
             // Melee attack (Left click or E key when close to enemies)
@@ -212,13 +192,7 @@ function createPlayer(x, y) {
             // Trail effect when moving fast
             if (this.velocity.x !== 0 || this.velocity.y !== 0) {
                 if (engine.frame % 3 === 0) {
-                    engine.particles.emit(this.x, this.y, {
-                        count: 1,
-                        color: ['#00ffcc'],
-                        speed: [0, 20],
-                        life: [0.3, 0.5],
-                        size: [3, 6]
-                    });
+                    engine.particles.trail(this.x, this.y, 'cyan', 0.5);
                 }
             }
         },
@@ -231,9 +205,7 @@ function createPlayer(x, y) {
             
             // Hit feedback
             engine.sound.play('hurt');
-            engine.cameraShake(8);
-            engine.screenFlash('#ff0000', 0.5, 0.2);
-            engine.freezeFrame(4); // Hit pause!
+            engine.impact(6, { flashColor: '#ff0000' });
             
             // Visual feedback on sprite
             this.flash = 1.0; // Flash white
@@ -243,13 +215,7 @@ function createPlayer(x, y) {
             });
             
             // Damage particles
-            engine.particles.emit(this.x, this.y, {
-                count: 10,
-                color: ['#ff3333', '#ff8800'],
-                speed: [100, 200],
-                life: [0.4, 0.7],
-                size: [3, 6]
-            });
+            engine.particles.burst(this.x, this.y, 'fire', 0.7);
             
             if (this.health <= 0) {
                 playerDeath();
@@ -332,13 +298,7 @@ function performMeleeAttack(player) {
     });
     
     // Enhanced slash particles
-    engine.particles.emit(slashX, slashY, {
-        count: 18,
-        color: ['#00ffcc', '#00ffff', '#ffffff'],
-        speed: [100, 220],
-        life: [0.3, 0.6],
-        size: [3, 7]
-    });
+    engine.particles.burst(slashX, slashY, 'electric', 1.0);
     
     // Check for enemies in range
     const enemies = engine.findByTag('enemy');
@@ -364,8 +324,7 @@ function performMeleeAttack(player) {
     
     // Extra feedback if we hit something
     if (hitEnemy) {
-        engine.freezeFrame(5); // Longer freeze on successful hit
-        engine.cameraShake(6);
+        engine.impact(5, { noFlash: true }); // Impact feel on successful hit
     }
 }
 
@@ -458,13 +417,7 @@ function shootProjectile(player) {
             
             // Enhanced trail
             if (engine.frame % 2 === 0) {
-                engine.particles.emit(this.x, this.y, {
-                    count: 2,
-                    color: ['#00ffff', '#ffffff'],
-                    speed: [0, 15],
-                    life: [0.2, 0.4],
-                    size: [2, 5]
-                });
+                engine.particles.trail(this.x, this.y, 'cyan', 0.8);
             }
         }
     });
@@ -589,7 +542,7 @@ function createMeleeRusher(x, y, variant = 0) {
             createDamageNumber(this.x, this.y, amount);
             
             // Hit feedback
-            engine.freezeFrame(2); // Smaller freeze for enemy hits
+            engine.impact(3, { noFlash: true });
             this.flash = 1.0;
             this.scale = 1.15;
             engine.after(0.08, () => {
@@ -597,13 +550,7 @@ function createMeleeRusher(x, y, variant = 0) {
             });
             
             // Hit effect
-            engine.particles.emit(this.x, this.y, {
-                count: 5,
-                color: ['#ff3333', '#ff6666'],
-                speed: [60, 120],
-                life: [0.3, 0.5],
-                size: [3, 5]
-            });
+            engine.particles.impact(this.x, this.y, '#ff3333', 0.8);
             
             if (this.health <= 0) {
                 enemyDeath(this);
@@ -745,20 +692,14 @@ function createRangedEnemy(x, y, variant = 0) {
             createDamageNumber(this.x, this.y, amount);
             
             // Hit feedback
-            engine.freezeFrame(2);
+            engine.impact(3, { noFlash: true });
             this.flash = 1.0;
             this.scale = 1.15;
             engine.after(0.08, () => {
                 this.scale = 1.0;
             });
             
-            engine.particles.emit(this.x, this.y, {
-                count: 5,
-                color: ['#ff8800', '#ffaa00'],
-                speed: [60, 120],
-                life: [0.3, 0.5],
-                size: [3, 5]
-            });
+            engine.particles.impact(this.x, this.y, '#ff8800', 0.8);
             
             if (this.health <= 0) {
                 enemyDeath(this);
@@ -860,17 +801,10 @@ function enemyDeath(enemy) {
     });
     
     // Explosion particles
-    engine.particles.emit(enemy.x, enemy.y, {
-        count: 30,
-        color: [enemyColor, engine.art.lightenColor(enemyColor, 40), '#ffff00'],
-        speed: [120, 250],
-        life: [0.5, 1.2],
-        size: [4, 8]
-    });
+    engine.particles.burst(enemy.x, enemy.y, 'fire', 1.5);
     
     engine.sound.play('explode');
-    engine.cameraShake(5);
-    engine.freezeFrame(3); // Brief pause on death
+    engine.impact(4, { noFlash: true }); // Brief pause on death
     
     // Chance to drop pickup
     const roll = Math.random();
@@ -1436,21 +1370,14 @@ function createBoss(x, y) {
             });
             
             // Boss hit feedback - more dramatic
-            engine.cameraShake(5);
-            engine.freezeFrame(3); // Longer freeze for boss hits
+            engine.impact(5, { flashColor: '#ff00ff' });
             this.flash = 1.2; // Extra bright flash
             this.scale = 1.08;
             engine.after(0.1, () => {
                 this.scale = 1.0;
             });
             
-            engine.particles.emit(this.x, this.y, {
-                count: 12,
-                color: ['#ff00ff', '#ff66ff', '#ffffff'],
-                speed: [100, 200],
-                life: [0.5, 0.9],
-                size: [5, 10]
-            });
+            engine.particles.burst(this.x, this.y, 'magic', 1.2);
             
             if (this.health <= 0) {
                 bossDeath(this);
@@ -1507,16 +1434,10 @@ function shootBossProjectile(boss, angle) {
 }
 
 function bossDeath(boss) {
-    engine.particles.emit(boss.x, boss.y, {
-        count: 50,
-        color: ['#ff00ff', '#ff66ff', '#ffff00'],
-        speed: [150, 300],
-        life: [0.8, 1.5],
-        size: [4, 10]
-    });
+    engine.particles.burst(boss.x, boss.y, 'magic', 2.5);
     
     engine.sound.play('explode');
-    engine.cameraShake(20);
+    engine.impact(10, { flashColor: '#ff00ff' }); // Maximum impact!
     
     engine.destroy(boss);
     
@@ -1535,14 +1456,7 @@ function setupCollisions() {
             enemy.takeDamage(bullet.damage);
         }
         engine.destroy(bullet);
-        
-        engine.particles.emit(bullet.x, bullet.y, {
-            count: 5,
-            color: ['#00ffff', '#ffffff'],
-            speed: [50, 100],
-            life: [0.2, 0.4],
-            size: [2, 4]
-        });
+        engine.particles.impact(bullet.x, bullet.y, '#00ffff', 0.8);
     });
     
     // Enemy bullets hit player
@@ -1551,14 +1465,7 @@ function setupCollisions() {
             player.takeDamage(bullet.damage);
         }
         engine.destroy(bullet);
-        
-        engine.particles.emit(bullet.x, bullet.y, {
-            count: 5,
-            color: ['#ff3333', '#ff6666'],
-            speed: [50, 100],
-            life: [0.2, 0.4],
-            size: [2, 4]
-        });
+        engine.particles.impact(bullet.x, bullet.y, '#ff3333', 0.8);
     });
     
     // Player picks up health
@@ -1566,13 +1473,7 @@ function setupCollisions() {
         player.health = Math.min(player.maxHealth, player.health + pickup.healAmount);
         engine.sound.play('pickup');
         
-        engine.particles.emit(pickup.x, pickup.y, {
-            count: 10,
-            color: ['#33ff33', '#66ff66'],
-            speed: [80, 150],
-            life: [0.4, 0.7],
-            size: [3, 6]
-        });
+        engine.particles.burst(pickup.x, pickup.y, 'dust', 1.0);
         
         engine.destroy(pickup);
     });
@@ -1582,13 +1483,7 @@ function setupCollisions() {
         player.energy = Math.min(player.maxEnergy, player.energy + pickup.energyAmount);
         engine.sound.play('pickup');
         
-        engine.particles.emit(pickup.x, pickup.y, {
-            count: 10,
-            color: ['#3333ff', '#6666ff'],
-            speed: [80, 150],
-            life: [0.4, 0.7],
-            size: [3, 6]
-        });
+        engine.particles.burst(pickup.x, pickup.y, 'electric', 0.8);
         
         engine.destroy(pickup);
     });
@@ -1662,13 +1557,7 @@ function setupCollisions() {
             }
         });
         
-        engine.particles.emit(pickup.x, pickup.y, {
-            count: 30,
-            color: ['#ffff00', '#ffaa00', '#ffffff'],
-            speed: [120, 250],
-            life: [0.8, 1.4],
-            size: [4, 10]
-        });
+        engine.particles.burst(pickup.x, pickup.y, 'magic', 1.5);
         
         engine.destroy(pickup);
     });
@@ -1734,6 +1623,7 @@ function transitionToRoom(roomName, spawnSide) {
         engine.camera.x = newPlayer.x;
         engine.camera.y = newPlayer.y;
         engine.cameraFollow(newPlayer, 0.1);
+        engine.cameraLookahead(80); // Re-enable lookahead after transition
         
         const halfW = engine.canvas.width / 2;
         const halfH = engine.canvas.height / 2;
@@ -1936,8 +1826,8 @@ engine.scene('gameplay', {
             // Snap camera to player immediately
             engine.camera.x = player.x;
             engine.camera.y = player.y;
-            engine.camera.lookahead = { x: 0, y: 0 };
             engine.cameraFollow(player, 0.1);
+            engine.cameraLookahead(80); // Look 80px ahead in direction player faces
             
             // Set camera bounds to room dimensions
             const roomSizes = {
@@ -1962,14 +1852,7 @@ engine.scene('gameplay', {
     },
     
     update(dt) {
-        // Apply camera lookahead
-        const player = engine.findOne('player');
-        if (player && engine.camera.lookahead) {
-            engine.camera.x += engine.camera.lookahead.x * 0.3;
-            engine.camera.y += engine.camera.lookahead.y * 0.3;
-        }
-        
-        // Save game (S key)
+        // Save game (P key)
         if (engine.input.keyPressed('p')) {
             saveGame();
         }
@@ -2032,13 +1915,7 @@ function saveGame() {
     localStorage.setItem('neonronin_save', JSON.stringify(saveData));
     
     // Visual feedback
-    engine.particles.emit(player.x, player.y, {
-        count: 20,
-        color: ['#00ffcc', '#00ffff'],
-        speed: [100, 200],
-        life: [0.5, 1],
-        size: [3, 6]
-    });
+    engine.particles.burst(player.x, player.y, 'electric', 1.2);
     
     console.log('Game saved!');
 }
