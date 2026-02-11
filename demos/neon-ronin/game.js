@@ -42,7 +42,7 @@ const game = {
 // ===== PLAYER CONTROLLER =====
 
 function createPlayer(x, y) {
-    const sprite = engine.art.character({
+    const baseSprite = engine.art.character({
         size: 16,
         color: '#00ffcc',
         body: 'capsule',
@@ -52,7 +52,24 @@ function createPlayer(x, y) {
 
     const player = engine.spawn('player', {
         x, y,
-        sprite,
+        sprite: (ctx, entity) => {
+            // Procedural bob animation
+            const bobAmount = 2;
+            const bobSpeed = 12;
+            const isMoving = Math.abs(entity.velocity.x) > 10 || Math.abs(entity.velocity.y) > 10;
+            
+            if (isMoving) {
+                entity.bobPhase += engine.dt * bobSpeed;
+            }
+            
+            const yOffset = isMoving ? Math.sin(entity.bobPhase) * bobAmount : 0;
+            
+            // Squash and stretch
+            const squash = isMoving ? 1 + Math.cos(entity.bobPhase * 2) * 0.05 : 1;
+            ctx.scale(1 / squash, squash);
+            
+            ctx.drawImage(baseSprite, -baseSprite.width / 2, -baseSprite.height / 2 + yOffset);
+        },
         collider: { type: 'circle', radius: 14 },
         velocity: { x: 0, y: 0 },
         health: game.playerData.health,
@@ -64,6 +81,7 @@ function createPlayer(x, y) {
         meleeCooldown: 0,
         rangedCooldown: 0,
         invulnerable: 0,
+        bobPhase: 0, // For movement animation
         tags: ['player'],
         
         update(dt) {
@@ -75,6 +93,26 @@ function createPlayer(x, y) {
             if (this.meleeCooldown > 0) this.meleeCooldown -= dt;
             if (this.rangedCooldown > 0) this.rangedCooldown -= dt;
             if (this.invulnerable > 0) this.invulnerable -= dt;
+            
+            // Dynamic combat camera zoom
+            const enemies = engine.findByTag('enemy');
+            let nearbyEnemies = 0;
+            for (let enemy of enemies) {
+                const dx = enemy.x - this.x;
+                const dy = enemy.y - this.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < 300) nearbyEnemies++;
+            }
+            
+            // Zoom out when surrounded
+            let targetZoom = 1.0;
+            if (nearbyEnemies >= 4) {
+                targetZoom = 0.85;
+            } else if (nearbyEnemies >= 2) {
+                targetZoom = 0.92;
+            }
+            
+            engine.camera.zoom += (targetZoom - engine.camera.zoom) * dt * 3;
             
             // Movement input
             let moveX = 0;
@@ -183,9 +221,18 @@ function createPlayer(x, y) {
             this.health -= amount;
             this.invulnerable = 0.5;
             
+            // Hit feedback
             engine.sound.play('hurt');
             engine.cameraShake(8);
-            engine.screenFlash('#ff0000', 0.5, 0.2); // Red damage flash
+            engine.screenFlash('#ff0000', 0.5, 0.2);
+            engine.freezeFrame(4); // Hit pause!
+            
+            // Visual feedback on sprite
+            this.flash = 1.0; // Flash white
+            this.scale = 1.2; // Briefly enlarge
+            engine.after(0.1, () => {
+                this.scale = 1.0;
+            });
             
             // Damage particles
             engine.particles.emit(this.x, this.y, {
@@ -208,16 +255,62 @@ function createPlayer(x, y) {
 function performMeleeAttack(player) {
     engine.sound.play('hit');
     
-    // Visual slash effect
+    // Create visual slash arc
     const slashAngle = player.rotation;
-    const slashDist = 40;
+    const slashDist = 35;
     const slashX = player.x + Math.cos(slashAngle) * slashDist;
     const slashY = player.y + Math.sin(slashAngle) * slashDist;
     
+    // Spawn slash effect entity
+    engine.spawn('slash-effect', {
+        x: slashX,
+        y: slashY,
+        rotation: slashAngle,
+        lifetime: 0.15,
+        startAngle: slashAngle - Math.PI / 3,
+        endAngle: slashAngle + Math.PI / 3,
+        radius: 50,
+        alpha: 1.0,
+        layer: 10,
+        tags: ['effect'],
+        
+        sprite: (ctx, entity) => {
+            // Draw arc slash
+            const progress = 1 - (entity.lifetime / 0.15);
+            const arcStart = entity.startAngle + progress * (entity.endAngle - entity.startAngle);
+            
+            ctx.strokeStyle = '#00ffff';
+            ctx.lineWidth = 6;
+            ctx.lineCap = 'round';
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#00ffcc';
+            
+            ctx.beginPath();
+            ctx.arc(0, 0, entity.radius, entity.startAngle, arcStart, false);
+            ctx.stroke();
+            
+            // Inner glow
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(0, 0, entity.radius, entity.startAngle, arcStart, false);
+            ctx.stroke();
+        },
+        
+        update(dt) {
+            this.lifetime -= dt;
+            this.alpha = this.lifetime / 0.15;
+            if (this.lifetime <= 0) {
+                engine.destroy(this);
+            }
+        }
+    });
+    
+    // Particles
     engine.particles.emit(slashX, slashY, {
-        count: 8,
+        count: 12,
         color: ['#00ffcc', '#00ffff', '#ffffff'],
-        speed: [80, 150],
+        speed: [80, 180],
         life: [0.2, 0.4],
         size: [4, 8]
     });
@@ -225,6 +318,7 @@ function performMeleeAttack(player) {
     // Check for enemies in range
     const enemies = engine.findByTag('enemy');
     const meleeRange = 60;
+    let hitEnemy = false;
     
     for (let enemy of enemies) {
         const dx = enemy.x - player.x;
@@ -238,8 +332,15 @@ function performMeleeAttack(player) {
         if (dist < meleeRange && angleDiff < Math.PI / 3) {
             if (enemy.takeDamage) {
                 enemy.takeDamage(CONFIG.MELEE_DAMAGE);
+                hitEnemy = true;
             }
         }
+    }
+    
+    // Extra feedback if we hit something
+    if (hitEnemy) {
+        engine.freezeFrame(5); // Longer freeze on successful hit
+        engine.cameraShake(6);
     }
 }
 
@@ -294,7 +395,7 @@ function shootProjectile(player) {
 // ===== ENEMY SYSTEM =====
 
 function createMeleeRusher(x, y) {
-    const sprite = engine.art.enemy({
+    const baseSprite = engine.art.enemy({
         size: 14,
         color: '#ff3333',
         body: 'diamond',
@@ -303,7 +404,12 @@ function createMeleeRusher(x, y) {
     
     const enemy = engine.spawn('enemy', {
         x, y,
-        sprite,
+        sprite: (ctx, entity) => {
+            // Animated breathing/pulsing
+            const pulse = Math.sin(engine.time * 4) * 0.08 + 1;
+            ctx.scale(pulse, pulse);
+            ctx.drawImage(baseSprite, -baseSprite.width / 2, -baseSprite.height / 2);
+        },
         collider: { type: 'circle', radius: 12 },
         velocity: { x: 0, y: 0 },
         health: 50,
@@ -387,6 +493,14 @@ function createMeleeRusher(x, y) {
             this.health -= amount;
             engine.sound.play('hit');
             
+            // Hit feedback
+            engine.freezeFrame(2); // Smaller freeze for enemy hits
+            this.flash = 1.0;
+            this.scale = 1.15;
+            engine.after(0.08, () => {
+                this.scale = 1.0;
+            });
+            
             // Hit effect
             engine.particles.emit(this.x, this.y, {
                 count: 5,
@@ -406,7 +520,7 @@ function createMeleeRusher(x, y) {
 }
 
 function createRangedEnemy(x, y) {
-    const sprite = engine.art.enemy({
+    const baseSprite = engine.art.enemy({
         size: 14,
         color: '#ff8800',
         body: 'hexagon',
@@ -415,7 +529,14 @@ function createRangedEnemy(x, y) {
     
     const enemy = engine.spawn('enemy', {
         x, y,
-        sprite,
+        sprite: (ctx, entity) => {
+            // Spinning animation
+            const spin = engine.time * 2;
+            ctx.rotate(spin);
+            const pulse = Math.sin(engine.time * 3) * 0.06 + 1;
+            ctx.scale(pulse, pulse);
+            ctx.drawImage(baseSprite, -baseSprite.width / 2, -baseSprite.height / 2);
+        },
         collider: { type: 'circle', radius: 12 },
         velocity: { x: 0, y: 0 },
         health: 35,
@@ -510,6 +631,14 @@ function createRangedEnemy(x, y) {
         takeDamage(amount) {
             this.health -= amount;
             engine.sound.play('hit');
+            
+            // Hit feedback
+            engine.freezeFrame(2);
+            this.flash = 1.0;
+            this.scale = 1.15;
+            engine.after(0.08, () => {
+                this.scale = 1.0;
+            });
             
             engine.particles.emit(this.x, this.y, {
                 count: 5,
@@ -744,7 +873,7 @@ function createDoorTrigger(x, y, targetRoom, spawnSide) {
 }
 
 function createBoss(x, y) {
-    const sprite = engine.art.enemy({
+    const baseSprite = engine.art.enemy({
         size: 32,
         color: '#ff00ff',
         body: 'star',
@@ -754,7 +883,21 @@ function createBoss(x, y) {
     
     const boss = engine.spawn('boss', {
         x, y,
-        sprite,
+        sprite: (ctx, entity) => {
+            // Menacing pulsing and rotation
+            const pulse = Math.sin(engine.time * 2) * 0.15 + 1;
+            const rotation = Math.sin(engine.time * 1.5) * 0.3;
+            
+            // Extra pulse in phase 2
+            if (entity.phase === 2) {
+                const fastPulse = Math.sin(engine.time * 8) * 0.08 + 1;
+                ctx.scale(fastPulse, fastPulse);
+            }
+            
+            ctx.rotate(rotation);
+            ctx.scale(pulse, pulse);
+            ctx.drawImage(baseSprite, -baseSprite.width / 2, -baseSprite.height / 2);
+        },
         collider: { type: 'circle', radius: 30 },
         velocity: { x: 0, y: 0 },
         health: 300,
@@ -832,14 +975,22 @@ function createBoss(x, y) {
         takeDamage(amount) {
             this.health -= amount;
             engine.sound.play('hit');
-            engine.cameraShake(3);
+            
+            // Boss hit feedback - more dramatic
+            engine.cameraShake(5);
+            engine.freezeFrame(3); // Longer freeze for boss hits
+            this.flash = 1.2; // Extra bright flash
+            this.scale = 1.08;
+            engine.after(0.1, () => {
+                this.scale = 1.0;
+            });
             
             engine.particles.emit(this.x, this.y, {
-                count: 8,
-                color: ['#ff00ff', '#ff66ff'],
-                speed: [80, 150],
-                life: [0.4, 0.7],
-                size: [4, 8]
+                count: 12,
+                color: ['#ff00ff', '#ff66ff', '#ffffff'],
+                speed: [100, 200],
+                life: [0.5, 0.9],
+                size: [5, 10]
             });
             
             if (this.health <= 0) {

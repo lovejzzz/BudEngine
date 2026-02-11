@@ -1,11 +1,17 @@
 /**
- * BUD ENGINE v2.3
+ * BUD ENGINE v2.4
  * A 2D web game engine designed for AI-human collaboration
  * 
  * Philosophy: AI can write, TEST, and iterate on games independently.
  * Killer feature: AI Testing API + auto-playtest bot
  * 
  * Architecture: Single-file, no build tools, runs in browser
+ * 
+ * v2.4 Improvements (Neon Ronin Polish):
+ * - Freeze frames / hit pause (freezeFrame)
+ * - Sprite effects: flash, alpha, scale on entities
+ * - Automatic flash decay system
+ * - Better hit feedback foundation
  * 
  * v2.3 Improvements (Neon Ronin):
  * - Screen flash effects (screenFlash, screenFade)
@@ -93,6 +99,10 @@ class BudEngine {
         this.slowMoTimer = 0;
         this.slowMoTargetScale = 1.0;
         this.slowMoOriginalScale = 1.0;
+        
+        // Freeze frames (v2.4) - Hit pause for impact
+        this.freezeFrames = 0;
+        this.freezeFrameDuration = 0;
         
         // Fixed timestep accumulator for physics
         this.accumulator = 0;
@@ -262,6 +272,14 @@ class BudEngine {
             }
         }
 
+        // Handle freeze frames (v2.4)
+        if (this.freezeFrames > 0) {
+            this.freezeFrames--;
+            this.render(); // Still render during freeze
+            requestAnimationFrame((t) => this.gameLoop(t));
+            return; // Skip update
+        }
+
         this.render(); // Render first so UI can process input
 
         if (!this.paused) {
@@ -334,6 +352,12 @@ class BudEngine {
                 entity.y += entity.velocity.y * dt;
             }
 
+            // Update visual effects (v2.4)
+            if (entity.flash !== undefined && entity.flash > 0) {
+                entity.flash -= dt * 8; // Decay flash quickly
+                if (entity.flash < 0) entity.flash = 0;
+            }
+
             // Update animation (P1: Sprite animation)
             if (entity.animation && entity.animation.playing) {
                 entity.animation.update(dt);
@@ -403,12 +427,31 @@ class BudEngine {
             ctx.translate(entity.x, entity.y);
             if (entity.rotation) ctx.rotate(entity.rotation);
             
+            // Apply sprite effects (v2.4)
+            if (entity.alpha !== undefined) {
+                ctx.globalAlpha = entity.alpha;
+            }
+            
+            const scale = entity.scale || 1;
+            if (scale !== 1) {
+                ctx.scale(scale, scale);
+            }
+            
+            // Flash effect (v2.4) - Override colors when flashing
+            if (entity.flash && entity.flash > 0) {
+                ctx.globalCompositeOperation = 'lighter';
+                ctx.globalAlpha = Math.min(1, entity.flash);
+            }
+            
             const sprite = entity.sprite;
             if (sprite.tagName === 'CANVAS') {
                 ctx.drawImage(sprite, -sprite.width / 2, -sprite.height / 2);
             } else if (typeof sprite === 'function') {
                 sprite(ctx, entity);
             }
+            
+            // Reset composite operation
+            ctx.globalCompositeOperation = 'source-over';
             
             ctx.restore();
         }
@@ -538,6 +581,17 @@ class BudEngine {
         if (duration) {
             this.slowMoTimer = duration;
         }
+    }
+
+    /**
+     * Freeze the game for impact frames (hit pause)
+     * @param {number} frames - Number of frames to freeze (60fps = 1 second)
+     * @example
+     * engine.freezeFrame(3); // Freeze for 3 frames (~0.05s hit pause)
+     * engine.freezeFrame(8); // Freeze for 8 frames (~0.13s heavy hit)
+     */
+    freezeFrame(frames) {
+        this.freezeFrames = Math.max(this.freezeFrames, frames); // Don't reduce existing freeze
     }
 
     // ===== SCREEN EFFECTS (v2.3) =====
@@ -3646,7 +3700,7 @@ class PathfindingSystem {
 }
 
 // Static properties (must be set AFTER class definition)
-BudEngine.VERSION = '2.3';
+BudEngine.VERSION = '2.4';
 BudEngine.LAYER = {
     DEFAULT: 1,
     PLAYER: 2,

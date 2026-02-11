@@ -4,18 +4,43 @@ This document tracks all engine improvements made while building Neon Ronin.
 
 ## Engine Improvements Made
 
+### ✅ v2.4 - Hit Pause & Sprite Effects (POLISH PASS)
+**Problem:** Combat felt floaty and lacked impact. Static sprites looked lifeless.  
+**Solution:** 
+- Added `freezeFrame(frames)` for hit pause on attacks (2-5 frames)
+- Added sprite effects: `entity.flash`, `entity.alpha`, `entity.scale`
+- Automatic flash decay system in entity update loop
+- Visual melee attack arcs (slash effects with procedural rendering)
+- Procedural sprite animation (bob, squash-stretch, pulse, spin)
+- Dynamic combat camera (zooms out 0.85x when surrounded by 4+ enemies)
+
+**Impact:** Combat now feels **CHUNKY** and satisfying. Every hit has weight. Characters feel alive.
+
+**Files Modified:** 
+- `bud.js` - Added freeze frames, sprite effect rendering, auto-decay
+- `game.js` - Applied to all combat, added slash arcs, procedural animation
+
+**API:**
+```javascript
+engine.freezeFrame(5); // 5-frame hit pause (~0.08s)
+entity.flash = 1.0;    // Flash bright white
+entity.scale = 1.2;    // Briefly enlarge
+entity.alpha = 0.5;    // Semi-transparent
+
+// Sprite as function for procedural animation
+sprite: (ctx, entity) => {
+    const bob = Math.sin(engine.time * 5) * 2;
+    ctx.drawImage(baseSprite, 0, bob);
+}
+```
+
+---
+
 ### ✅ v2.3 - Screen Flash Effects
 **Problem:** Game needed visual feedback for damage, hits, and impactful moments.  
 **Solution:** Added `screenFlash(color, intensity, duration)` and `screenFade(color, alpha, duration)` methods.  
 **Impact:** Much better player feedback - red flash on damage, purple flash on boss phase change.  
 **Files Modified:** `bud.js` - Added screen effects system with rendering and update logic.
-
-**API:**
-```javascript
-engine.screenFlash('#ff0000', 0.5, 0.2); // Red damage flash
-engine.screenFlash('#ff00ff', 0.8, 0.3); // Purple boss phase change
-engine.screenFade('#000000', 1, 0.5);    // Fade to black
-```
 
 ---
 
@@ -23,8 +48,7 @@ engine.screenFade('#000000', 1, 0.5);    // Fade to black
 **Problem:** Enemies walked through walls and had simplistic movement.  
 **Solution:** Integrated existing A* pathfinding system into enemy AI. Enemies now calculate paths around obstacles.  
 **Impact:** Smarter, more challenging enemy behavior. Enemies navigate rooms properly.  
-**Files Modified:** `game.js` - Updated `createMeleeRusher()` and `createRangedEnemy()` with pathfinding logic.  
-**Note:** Engine already had A* pathfinding (v2.0), just wasn't being used in game!
+**Files Modified:** `game.js` - Updated `createMeleeRusher()` and `createRangedEnemy()` with pathfinding logic.
 
 ---
 
