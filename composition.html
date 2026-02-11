@@ -636,9 +636,21 @@
             engine.composition.onGestureEnd(pos.x, pos.y);
         }
 
+        function canvasToWorld(cx, cy) {
+            // Reverse the engine's camera transform:
+            // ctx.translate(-cam.x * zoom + canvas.width/2, -cam.y * zoom + canvas.height/2)
+            // ctx.scale(zoom, zoom)
+            const cam = engine.camera;
+            const zoom = cam.zoom || 1;
+            const worldX = (cx - canvas.width / 2) / zoom + cam.x;
+            const worldY = (cy - canvas.height / 2) / zoom + cam.y;
+            return { x: worldX, y: worldY };
+        }
+
         function placeMaterial(x, y) {
-            const gridX = Math.floor(x / engine.physics.cellSize);
-            const gridY = Math.floor(y / engine.physics.cellSize);
+            const world = canvasToWorld(x, y);
+            const gridX = Math.floor(world.x / engine.physics.cellSize);
+            const gridY = Math.floor(world.y / engine.physics.cellSize);
 
             // Place a small circle of material
             const radius = 3;
