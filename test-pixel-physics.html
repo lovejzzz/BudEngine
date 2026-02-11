@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pixel Physics System - Bud Engine v3.0</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #0a0a14;
+            font-family: 'Courier New', monospace;
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+        
+        h1 {
+            margin: 0;
+            font-size: 24px;
+            text-align: center;
+            color: #00ffcc;
+            text-shadow: 0 0 10px #00ffcc;
+        }
+        
+        .subtitle {
+            margin: 0;
+            font-size: 14px;
+            color: #888;
+            text-align: center;
+        }
+        
+        #gameCanvas {
+            border: 2px solid #00ffcc;
+            box-shadow: 0 0 20px rgba(0, 255, 204, 0.3);
+            cursor: crosshair;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+            max-width: 800px;
+        }
+        
+        .material-btn {
+            padding: 10px 20px;
+            background: #1a1a2e;
+            border: 2px solid #444;
+            color: #fff;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            transition: all 0.2s;
+            position: relative;
+        }
+        
+        .material-btn:hover {
+            border-color: #00ffcc;
+            box-shadow: 0 0 10px rgba(0, 255, 204, 0.3);
+        }
+        
+        .material-btn.active {
+            background: #00ffcc;
+            color: #0a0a14;
+            border-color: #00ffcc;
+            box-shadow: 0 0 20px rgba(0, 255, 204, 0.5);
+        }
+        
+        .material-btn::before {
+            content: '';
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            margin-right: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        .material-btn[data-material="sand"]::before { background: #c2b280; }
+        .material-btn[data-material="water"]::before { background: #1a6bff; }
+        .material-btn[data-material="fire"]::before { background: #ff4400; }
+        .material-btn[data-material="wood"]::before { background: #8b4513; }
+        .material-btn[data-material="oil"]::before { background: #1a1a1a; }
+        .material-btn[data-material="stone"]::before { background: #4a4a4a; }
+        .material-btn[data-material="dirt"]::before { background: #654321; }
+        .material-btn[data-material="smoke"]::before { background: #3a3a3a; }
+        
+        .action-btn {
+            padding: 10px 30px;
+            background: #ff4400;
+            border: 2px solid #ff6600;
+            color: #fff;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+        
+        .action-btn:hover {
+            background: #ff6600;
+            box-shadow: 0 0 20px rgba(255, 68, 0, 0.5);
+        }
+        
+        .clear-btn {
+            background: #333;
+            border-color: #555;
+        }
+        
+        .clear-btn:hover {
+            background: #555;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+        }
+        
+        .info {
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+            max-width: 600px;
+        }
+        
+        .info strong {
+            color: #00ffcc;
+        }
+        
+        .brush-size {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px;
+            background: #1a1a2e;
+            border: 2px solid #444;
+        }
+        
+        .brush-size label {
+            font-size: 14px;
+        }
+        
+        .brush-size input {
+            width: 100px;
+        }
+        
+        .stats {
+            font-size: 12px;
+            color: #888;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <h1>🔥 Pixel Physics System 🔥</h1>
+    <p class="subtitle">Bud Engine v3.0 - "Falling Everything" Cellular Automata</p>
+    
+    <canvas id="gameCanvas"></canvas>
+    
+    <div class="controls">
+        <button class="material-btn active" data-material="sand">Sand</button>
+        <button class="material-btn" data-material="water">Water</button>
+        <button class="material-btn" data-material="fire">Fire</button>
+        <button class="material-btn" data-material="wood">Wood</button>
+        <button class="material-btn" data-material="oil">Oil</button>
+        <button class="material-btn" data-material="stone">Stone</button>
+        <button class="material-btn" data-material="dirt">Dirt</button>
+        <button class="material-btn" data-material="smoke">Smoke</button>
+    </div>
+    
+    <div class="controls">
+        <div class="brush-size">
+            <label>Brush Size:</label>
+            <input type="range" id="brushSize" min="5" max="50" value="15">
+            <span id="brushSizeValue">15</span>px
+        </div>
+    </div>
+    
+    <div class="controls">
+        <button class="action-btn" onclick="createExplosion()">💥 EXPLODE!</button>
+        <button class="action-btn clear-btn" onclick="clearWorld()">🗑️ Clear All</button>
+    </div>
+    
+    <div class="info">
+        <strong>How to use:</strong><br>
+        Click or drag to place materials. Watch them interact!<br>
+        • Water flows and fills containers<br>
+        • Sand falls and piles up<br>
+        • Fire burns wood and oil, produces smoke<br>
+        • Oil floats on water and is very flammable<br>
+        • Explosions destroy and scatter debris<br>
+        • Smoke rises and dissipates
+    </div>
+    
+    <div class="stats">
+        <div>Press <strong>`</strong> for debug overlay • FPS: <span id="fps">60</span></div>
+    </div>
+
+    <script src="bud.js"></script>
+    <script>
+        // Create engine
+        const engine = new BudEngine({
+            width: 800,
+            height: 600,
+            backgroundColor: '#1a1a2e'
+        });
+
+        // Initialize pixel physics
+        engine.physics.init(engine.canvas.width, engine.canvas.height, 2);
+
+        // Current selected material and brush size
+        let selectedMaterial = 'sand';
+        let brushSize = 15;
+        let isMouseDown = false;
+        let lastMouseX = 0;
+        let lastMouseY = 0;
+
+        // Material button selection
+        document.querySelectorAll('.material-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.material-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                selectedMaterial = btn.dataset.material;
+            });
+        });
+
+        // Brush size slider
+        const brushSizeSlider = document.getElementById('brushSize');
+        const brushSizeValue = document.getElementById('brushSizeValue');
+        brushSizeSlider.addEventListener('input', (e) => {
+            brushSize = parseInt(e.target.value);
+            brushSizeValue.textContent = brushSize;
+        });
+
+        // Mouse interaction for placing materials
+        engine.canvas.addEventListener('mousedown', (e) => {
+            isMouseDown = true;
+            const rect = engine.canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            lastMouseX = x;
+            lastMouseY = y;
+            engine.physics.circle(x, y, brushSize, selectedMaterial);
+        });
+
+        engine.canvas.addEventListener('mousemove', (e) => {
+            if (!isMouseDown) return;
+            
+            const rect = engine.canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            // Draw line from last position to current (for smooth drawing)
+            const dx = x - lastMouseX;
+            const dy = y - lastMouseY;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const steps = Math.ceil(dist / (brushSize / 2));
+            
+            for (let i = 0; i <= steps; i++) {
+                const t = i / steps;
+                const px = lastMouseX + dx * t;
+                const py = lastMouseY + dy * t;
+                engine.physics.circle(px, py, brushSize, selectedMaterial);
+            }
+            
+            lastMouseX = x;
+            lastMouseY = y;
+        });
+
+        engine.canvas.addEventListener('mouseup', () => {
+            isMouseDown = false;
+        });
+
+        engine.canvas.addEventListener('mouseleave', () => {
+            isMouseDown = false;
+        });
+
+        // Touch support for mobile
+        engine.canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            const rect = engine.canvas.getBoundingClientRect();
+            const x = touch.clientX - rect.left;
+            const y = touch.clientY - rect.top;
+            lastMouseX = x;
+            lastMouseY = y;
+            isMouseDown = true;
+            engine.physics.circle(x, y, brushSize, selectedMaterial);
+        });
+
+        engine.canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (!isMouseDown) return;
+            
+            const touch = e.touches[0];
+            const rect = engine.canvas.getBoundingClientRect();
+            const x = touch.clientX - rect.left;
+            const y = touch.clientY - rect.top;
+            
+            const dx = x - lastMouseX;
+            const dy = y - lastMouseY;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const steps = Math.ceil(dist / (brushSize / 2));
+            
+            for (let i = 0; i <= steps; i++) {
+                const t = i / steps;
+                const px = lastMouseX + dx * t;
+                const py = lastMouseY + dy * t;
+                engine.physics.circle(px, py, brushSize, selectedMaterial);
+            }
+            
+            lastMouseX = x;
+            lastMouseY = y;
+        });
+
+        engine.canvas.addEventListener('touchend', () => {
+            isMouseDown = false;
+        });
+
+        // Explosion function
+        function createExplosion() {
+            const x = engine.canvas.width / 2 + (Math.random() - 0.5) * 200;
+            const y = engine.canvas.height / 2 + (Math.random() - 0.5) * 200;
+            engine.physics.explode(x, y, 60, 150);
+            
+            // Camera shake for impact
+            engine.cameraShake(10);
+        }
+
+        // Clear world function
+        function clearWorld() {
+            engine.physics.clearArea(0, 0, engine.canvas.width, engine.canvas.height);
+        }
+
+        // Build some initial structures
+        function buildInitialWorld() {
+            // Bottom stone floor
+            engine.physics.fill(0, 550, 800, 600, 'stone');
+            
+            // Stone walls on sides
+            engine.physics.fill(0, 0, 30, 600, 'stone');
+            engine.physics.fill(770, 0, 800, 600, 'stone');
+            
+            // Some wooden platforms
+            engine.physics.fill(100, 450, 300, 470, 'wood');
+            engine.physics.fill(500, 350, 700, 370, 'wood');
+            engine.physics.fill(200, 250, 400, 270, 'wood');
+            
+            // Stone pillars
+            engine.physics.fill(150, 380, 180, 450, 'stone');
+            engine.physics.fill(620, 280, 650, 350, 'stone');
+            
+            // Small pool at bottom
+            engine.physics.fill(350, 520, 450, 550, 'stone');
+        }
+
+        // Initialize world
+        buildInitialWorld();
+
+        // Main scene
+        engine.scene('main', {
+            enter() {
+                console.log('[PixelPhysics Demo] Welcome to the Falling Everything engine!');
+            },
+            
+            update(dt) {
+                // Update FPS display
+                document.getElementById('fps').textContent = engine.fps;
+                
+                // Random fire sparks occasionally
+                if (Math.random() < 0.01) {
+                    const x = 100 + Math.random() * 600;
+                    const y = 50 + Math.random() * 200;
+                    engine.physics.set(x, y, 'fire');
+                }
+            }
+        });
+
+        // Start engine
+        engine.goTo('main');
+        engine.start();
+
+        console.log('[PixelPhysics Demo] v3.0 loaded successfully!');
+        console.log('- Paint materials by clicking and dragging');
+        console.log('- Light wood on fire and watch it burn');
+        console.log('- Pour water to extinguish fires');
+        console.log('- Create explosive chain reactions with oil');
+        console.log('- Press ` for debug overlay');
+    </script>
+</body>
+</html>
