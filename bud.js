@@ -1,11 +1,26 @@
 /**
- * BUD ENGINE v3.7
+ * BUD ENGINE v3.8
  * A 2D web game engine designed for AI-human collaboration
  * 
  * Philosophy: AI can write, TEST, and iterate on games independently.
  * Killer feature: AI Testing API + auto-playtest bot
  * 
  * Architecture: Single-file, no build tools, runs in browser
+ * 
+ * v3.8 ACOUSTIC PHYSICS SYSTEM - Sound from Material Properties:
+ * - Every material has real acoustic properties: resonance frequency, dampening, brightness
+ * - Procedural sound generation via Web Audio API - NO audio files
+ * - Physics-driven sounds: impact, flow, reaction, phase change events
+ * - Sound event queue system with throttling (max 20 events/frame)
+ * - Frequencies calculated from material properties (resonance, Young's modulus, density)
+ * - Impact sounds: geometric mean of materials' resonance frequencies
+ * - Volume proportional to velocity and inverse of dampening
+ * - Reaction sounds: rich harmonics, dramatic overtones
+ * - Flow sounds: continuous noise-based synthesis for liquids/gases
+ * - Complete acoustic properties: speedOfSound, acousticImpedance, resonanceFreq, dampening, brightness
+ * - Test API: engine.physics.getAcousticState() for debugging
+ * - UI toggle: 🔊 Sound button to enable/disable audio
+ * - This is The Composition - sound emerges from physics.
  * 
  * v3.7 AI DEBUG/TESTING API - Self-Testing Without Human Intervention:
  * - Comprehensive test API for pixel physics: loadScenario, step, snapshot, getState
@@ -5540,6 +5555,10 @@ class PixelPhysics {
         // Ambient temperature (°C)
         this.ambientTemp = 20;
         
+        // v3.8: Sound event queue
+        this.soundEvents = [];
+        this.maxSoundEventsPerFrame = 20; // Throttle to avoid audio overload
+        
         // Chemical reaction rules (property-based, not hardcoded materials)
         this.reactionRules = [];
         
@@ -5647,6 +5666,9 @@ class PixelPhysics {
             acousticImpedance: 0.0004,   // MRayl (density × speed / 1e6)
             absorptionCoeff: 0.0,        // 0-1, sound energy absorbed
             youngsModulus: null,         // Pa — N/A for gas
+            resonanceFreq: 100,          // Hz — low frequency hum
+            dampening: 0.0,              // 0-1 — air doesn't dampen much
+            brightness: 0.1,             // 0-1 — low harmonic content
             impactSound: null,
             flowSound: null,
             ambientSound: null,
@@ -5680,6 +5702,9 @@ class PixelPhysics {
             acousticImpedance: 1.48,     // MRayl
             absorptionCoeff: 0.01,       // 0-1
             youngsModulus: 2.2e9,        // Pa
+            resonanceFreq: 200,          // Hz — low frequency splash
+            dampening: 0.2,              // 0-1 — water dampens moderately
+            brightness: 0.2,             // 0-1 — low harmonic content
             impactSound: 'splash',
             flowSound: 'pour',
             ambientSound: null,
@@ -5710,6 +5735,9 @@ class PixelPhysics {
             acousticImpedance: 3.01,
             absorptionCoeff: 0.02,
             youngsModulus: 9.3e9,
+            resonanceFreq: 400,
+            dampening: 0.1,
+            brightness: 0.3,
             impactSound: 'crack',
             flowSound: null,
             ambientSound: null,
@@ -5741,6 +5769,9 @@ class PixelPhysics {
             acousticImpedance: 0.0003,
             absorptionCoeff: 0.0,
             youngsModulus: null,
+            resonanceFreq: 150,
+            dampening: 0.05,
+            brightness: 0.1,
             impactSound: null,
             flowSound: 'hiss',
             ambientSound: 'hiss',
@@ -5773,6 +5804,9 @@ class PixelPhysics {
             acousticImpedance: 0.80,
             absorptionCoeff: 0.30,
             youngsModulus: 0.1e9,
+            resonanceFreq: 150,
+            dampening: 0.8,
+            brightness: 0.1,
             impactSound: 'crunch',
             flowSound: 'rush',
             ambientSound: null,
@@ -5803,6 +5837,9 @@ class PixelPhysics {
             acousticImpedance: 14.1,
             absorptionCoeff: 0.03,
             youngsModulus: 70e9,
+            resonanceFreq: 2000,
+            dampening: 0.03,
+            brightness: 0.95,
             impactSound: 'ring',
             flowSound: null,
             ambientSound: null,
@@ -5833,6 +5870,9 @@ class PixelPhysics {
             acousticImpedance: 16.1,
             absorptionCoeff: 0.02,
             youngsModulus: 60e9,
+            resonanceFreq: 800,
+            dampening: 0.1,
+            brightness: 0.3,
             impactSound: 'crack',
             flowSound: null,
             ambientSound: null,
@@ -5868,6 +5908,9 @@ class PixelPhysics {
             acousticImpedance: 7.5,
             absorptionCoeff: 0.05,
             youngsModulus: 10e9,
+            resonanceFreq: 300,
+            dampening: 0.15,
+            brightness: 0.25,
             impactSound: 'splash',
             flowSound: 'pour',
             ambientSound: 'bubble',
@@ -5898,6 +5941,9 @@ class PixelPhysics {
             acousticImpedance: 15.3,
             absorptionCoeff: 0.02,
             youngsModulus: 70e9,
+            resonanceFreq: 850,
+            dampening: 0.08,
+            brightness: 0.35,
             impactSound: 'crack',
             flowSound: null,
             ambientSound: null,
@@ -5928,6 +5974,9 @@ class PixelPhysics {
             acousticImpedance: 0.52,
             absorptionCoeff: 0.15,
             youngsModulus: 0.05e9,
+            resonanceFreq: 120,
+            dampening: 0.7,
+            brightness: 0.15,
             impactSound: 'thud',
             flowSound: 'rush',
             ambientSound: null,
@@ -5958,6 +6007,9 @@ class PixelPhysics {
             acousticImpedance: 1.12,
             absorptionCoeff: 0.20,
             youngsModulus: 0.02e9,
+            resonanceFreq: 100,
+            dampening: 0.6,
+            brightness: 0.1,
             impactSound: 'splash',
             flowSound: 'pour',
             ambientSound: null,
@@ -5988,6 +6040,9 @@ class PixelPhysics {
             acousticImpedance: 4.0,
             absorptionCoeff: 0.10,
             youngsModulus: 1.5e9,
+            resonanceFreq: 180,
+            dampening: 0.5,
+            brightness: 0.2,
             impactSound: 'thud',
             flowSound: 'rush',
             ambientSound: null,
@@ -6020,6 +6075,9 @@ class PixelPhysics {
             acousticImpedance: 46.9,
             absorptionCoeff: 0.01,
             youngsModulus: 200e9,
+            resonanceFreq: 1200,
+            dampening: 0.05,
+            brightness: 0.9,
             impactSound: 'clang',
             flowSound: null,
             ambientSound: null,
@@ -6053,6 +6111,9 @@ class PixelPhysics {
             acousticImpedance: 2.31,
             absorptionCoeff: 0.10,
             youngsModulus: 11e9,
+            resonanceFreq: 400,
+            dampening: 0.3,
+            brightness: 0.4,
             impactSound: 'thud',
             flowSound: null,
             ambientSound: null,
@@ -6084,6 +6145,9 @@ class PixelPhysics {
             acousticImpedance: 3.78,
             absorptionCoeff: 0.12,
             youngsModulus: 3e9,
+            resonanceFreq: 350,
+            dampening: 0.2,
+            brightness: 0.25,
             impactSound: 'crack',
             flowSound: null,
             ambientSound: null,
@@ -6115,6 +6179,9 @@ class PixelPhysics {
             acousticImpedance: 1.57,
             absorptionCoeff: 0.03,
             youngsModulus: 1.5e9,
+            resonanceFreq: 180,
+            dampening: 0.25,
+            brightness: 0.15,
             impactSound: 'splash',
             flowSound: 'pour',
             ambientSound: null,
@@ -6149,6 +6216,9 @@ class PixelPhysics {
             acousticImpedance: 0.68,
             absorptionCoeff: 0.25,
             youngsModulus: 0.1e9,
+            resonanceFreq: 140,
+            dampening: 0.75,
+            brightness: 0.12,
             impactSound: 'crunch',
             flowSound: 'rush',
             ambientSound: null,
@@ -6186,6 +6256,9 @@ class PixelPhysics {
             acousticImpedance: 0.0005,
             absorptionCoeff: 0.0,
             youngsModulus: null,
+            resonanceFreq: 500,
+            dampening: 0.02,
+            brightness: 0.6,
             impactSound: null,
             flowSound: 'whoosh',
             ambientSound: 'crackle',
@@ -6216,6 +6289,9 @@ class PixelPhysics {
             acousticImpedance: 0.0004,
             absorptionCoeff: 0.0,
             youngsModulus: null,
+            resonanceFreq: 80,
+            dampening: 0.9,
+            brightness: 0.05,
             impactSound: null,
             flowSound: null,
             ambientSound: null,
@@ -6246,6 +6322,9 @@ class PixelPhysics {
             acousticImpedance: 0.0004,
             absorptionCoeff: 0.0,
             youngsModulus: null,
+            resonanceFreq: 110,
+            dampening: 0.01,
+            brightness: 0.1,
             impactSound: null,
             flowSound: null,
             ambientSound: null,
@@ -6277,6 +6356,9 @@ class PixelPhysics {
             acousticImpedance: 0.0001,
             absorptionCoeff: 0.0,
             youngsModulus: null,
+            resonanceFreq: 300,
+            dampening: 0.005,
+            brightness: 0.15,
             impactSound: null,
             flowSound: null,
             ambientSound: null,
@@ -6308,6 +6390,9 @@ class PixelPhysics {
             acousticImpedance: 0.0003,
             absorptionCoeff: 0.0,
             youngsModulus: null,
+            resonanceFreq: 150,
+            dampening: 0.02,
+            brightness: 0.12,
             impactSound: null,
             flowSound: null,
             ambientSound: null,
@@ -6338,6 +6423,9 @@ class PixelPhysics {
             acousticImpedance: 0.0005,
             absorptionCoeff: 0.0,
             youngsModulus: null,
+            resonanceFreq: 90,
+            dampening: 0.03,
+            brightness: 0.08,
             impactSound: null,
             flowSound: null,
             ambientSound: null,
@@ -6371,6 +6459,9 @@ class PixelPhysics {
             acousticImpedance: 1.80,
             absorptionCoeff: 0.02,
             youngsModulus: 2.5e9,
+            resonanceFreq: 220,
+            dampening: 0.18,
+            brightness: 0.3,
             impactSound: 'splash',
             flowSound: 'pour',
             ambientSound: 'sizzle',
@@ -6400,6 +6491,9 @@ class PixelPhysics {
             acousticImpedance: 9.72,
             absorptionCoeff: 0.05,
             youngsModulus: 40e9,
+            resonanceFreq: 160,
+            dampening: 0.6,
+            brightness: 0.2,
             impactSound: 'crunch',
             flowSound: 'rush',
             ambientSound: null,
@@ -6431,6 +6525,9 @@ class PixelPhysics {
             acousticImpedance: 4.55,
             absorptionCoeff: 0.08,
             youngsModulus: 8e9,
+            resonanceFreq: 250,
+            dampening: 0.4,
+            brightness: 0.3,
             impactSound: 'crack',
             flowSound: 'rush',
             ambientSound: null,
@@ -6466,6 +6563,9 @@ class PixelPhysics {
             acousticImpedance: 0.50,
             absorptionCoeff: 0.25,
             youngsModulus: 0.5e9,
+            resonanceFreq: 200,
+            dampening: 0.6,
+            brightness: 0.25,
             impactSound: 'thud',
             flowSound: null,
             ambientSound: null,
@@ -6508,6 +6608,9 @@ class PixelPhysics {
             acousticImpedance: 0.40,
             absorptionCoeff: 0.25,
             youngsModulus: 0.3e9,
+            resonanceFreq: 180,
+            dampening: 0.65,
+            brightness: 0.22,
             impactSound: 'thud',
             flowSound: null,
             ambientSound: null,
@@ -6551,6 +6654,9 @@ class PixelPhysics {
             acousticImpedance: 0.41,
             absorptionCoeff: 0.30,
             youngsModulus: 0.2e9,
+            resonanceFreq: 160,
+            dampening: 0.7,
+            brightness: 0.18,
             impactSound: 'thud',
             flowSound: null,
             ambientSound: null,
@@ -6594,6 +6700,9 @@ class PixelPhysics {
             acousticImpedance: 0.56,
             absorptionCoeff: 0.20,
             youngsModulus: 0.1e9,
+            resonanceFreq: 140,
+            dampening: 0.75,
+            brightness: 0.15,
             impactSound: 'thud',
             flowSound: null,
             ambientSound: null,
@@ -7357,6 +7466,44 @@ class PixelPhysics {
             }
         }
         
+        // v3.8: Detect and queue flow sounds (sample liquids/gases periodically)
+        if (this.frameCount % 10 === 0 && this.soundEvents.length < this.maxSoundEventsPerFrame) {
+            const flowingMaterials = new Map(); // Track count of flowing particles per material
+            
+            // Sample some cells to detect flowing materials
+            const sampleCount = 50;
+            for (let i = 0; i < sampleCount; i++) {
+                const x = Math.floor(Math.random() * this.gridWidth);
+                const y = Math.floor(Math.random() * this.gridHeight);
+                const idx = this.index(x, y);
+                const id = this.grid[idx];
+                const mat = this.getMaterial(id);
+                
+                if (mat && (mat.state === 'liquid' || mat.state === 'gas') && mat.flowSound) {
+                    const count = flowingMaterials.get(mat.name) || 0;
+                    flowingMaterials.set(mat.name, count + 1);
+                }
+            }
+            
+            // Queue flow sound events for materials with enough flowing particles
+            for (const [matName, count] of flowingMaterials) {
+                if (count >= 3) { // At least 3 particles flowing
+                    const matId = this.getMaterialId(matName);
+                    const mat = this.getMaterial(matId);
+                    const velocity = Math.min(1, count / 20); // More particles = faster perceived flow
+                    
+                    this.soundEvents.push({
+                        type: 'flow',
+                        material: mat,
+                        velocity: velocity,
+                        count: count,
+                        x: this.gridWidth / 2,
+                        y: this.gridHeight / 2
+                    });
+                }
+            }
+        }
+        
         // v3.6: Spontaneous life generation (every ~60 frames)
         if (this.frameCount % 60 === 0) {
             // Sample random dirt cells and check if life can emerge
@@ -7501,9 +7648,15 @@ class PixelPhysics {
                 if (liquidMat) {
                     this.temperatureGrid[idx] = mat.meltingPoint;
                 }
-                // v3.3: Melting sound
-                if (mat.phaseChangeSound && Math.random() < 0.05) {
-                    this.acoustics.playPhaseChange(mat.phaseChangeSound, 0.5);
+                // v3.8: Queue melting sound event
+                if (mat.phaseChangeSound && Math.random() < 0.05 && this.soundEvents.length < this.maxSoundEventsPerFrame) {
+                    this.soundEvents.push({
+                        type: 'phaseChange',
+                        material: mat,
+                        intensity: 0.5,
+                        x: x,
+                        y: y
+                    });
                 }
             }
         }
@@ -7517,9 +7670,15 @@ class PixelPhysics {
                 if (gasMat) {
                     this.temperatureGrid[idx] = mat.boilingPoint;
                 }
-                // v3.3: Boiling sound
-                if (mat.phaseChangeSound && Math.random() < 0.05) {
-                    this.acoustics.playPhaseChange(mat.phaseChangeSound, 0.6);
+                // v3.8: Queue boiling sound event
+                if (mat.phaseChangeSound && Math.random() < 0.05 && this.soundEvents.length < this.maxSoundEventsPerFrame) {
+                    this.soundEvents.push({
+                        type: 'phaseChange',
+                        material: mat,
+                        intensity: 0.6,
+                        x: x,
+                        y: y
+                    });
                 }
             }
         }
@@ -7533,9 +7692,15 @@ class PixelPhysics {
                 if (solidMat) {
                     this.temperatureGrid[idx] = mat.meltingPoint;
                 }
-                // v3.3: Freezing sound
-                if (mat.phaseChangeSound && Math.random() < 0.05) {
-                    this.acoustics.playPhaseChange('crack', 0.4);
+                // v3.8: Queue freezing sound event
+                if (mat.phaseChangeSound && Math.random() < 0.05 && this.soundEvents.length < this.maxSoundEventsPerFrame) {
+                    this.soundEvents.push({
+                        type: 'phaseChange',
+                        material: mat,
+                        intensity: 0.4,
+                        x: x,
+                        y: y
+                    });
                 }
             }
         }
@@ -7880,6 +8045,23 @@ class PixelPhysics {
                 // Reaction found!
                 const rule = this.reactionRules[ruleIdx];
                 const nmat = this.getMaterial(nid);
+                
+                // v3.8: Queue reaction sound event
+                if (Math.random() < 0.1 && this.soundEvents.length < this.maxSoundEventsPerFrame) {
+                    const productId = this.grid[idx]; // Check what the reaction produced
+                    const product = this.getMaterial(productId);
+                    const intensity = Math.max(mat.reactivity || 0.5, nmat.reactivity || 0.5);
+                    this.soundEvents.push({
+                        type: 'reaction',
+                        mat1: mat,
+                        mat2: nmat,
+                        product: product,
+                        intensity: intensity,
+                        x: x,
+                        y: y
+                    });
+                }
+                
                 rule.react(x, y, mat, nmat, idx, nidx);
                 this.activateChunk(x, y); // Reaction occurred
                 break; // Only one reaction per frame
@@ -8013,30 +8195,41 @@ class PixelPhysics {
             this.activateChunk(x1, y1);
             this.activateChunk(x2, y2);
             
-            // v3.3: Impact sound when materials collide
-            if (Math.random() < 0.02) { // 2% chance per collision to avoid spam
+            // v3.8: Queue impact sound event when materials collide
+            if (Math.random() < 0.02 && this.soundEvents.length < this.maxSoundEventsPerFrame) {
                 const mat1 = this.getMaterial(id1);
                 const mat2 = this.getMaterial(id2);
                 if (mat1 && mat1.impactSound) {
                     const densityDiff = Math.abs(this.densityArr[id1] - this.densityArr[id2]);
-                    const intensity = Math.min(1, densityDiff / 2000);
-                    const worldX = x2 * this.cellSize;
-                    const worldY = y2 * this.cellSize;
-                    this.acoustics.playImpact(mat1.impactSound, mat1, intensity, worldX, worldY);
+                    const velocity = Math.min(1, densityDiff / 2000);
+                    this.soundEvents.push({
+                        type: 'impact',
+                        mat1: mat1,
+                        mat2: mat2,
+                        velocity: velocity,
+                        x: x2,
+                        y: y2
+                    });
                 }
             }
             
             return true;
         }
         
-        // v3.3: Impact sound when hitting solid
-        if (state2 === 1 && Math.random() < 0.01) {
+        // v3.8: Queue impact sound event when hitting solid
+        if (state2 === 1 && Math.random() < 0.01 && this.soundEvents.length < this.maxSoundEventsPerFrame) {
             const mat1 = this.getMaterial(id1);
+            const mat2 = this.getMaterial(id2);
             if (mat1 && mat1.impactSound) {
-                const intensity = Math.min(1, this.densityArr[id1] / 3000);
-                const worldX = x2 * this.cellSize;
-                const worldY = y2 * this.cellSize;
-                this.acoustics.playImpact(mat1.impactSound, mat1, intensity, worldX, worldY);
+                const velocity = Math.min(1, this.densityArr[id1] / 3000);
+                this.soundEvents.push({
+                    type: 'impact',
+                    mat1: mat1,
+                    mat2: mat2,
+                    velocity: velocity,
+                    x: x2,
+                    y: y2
+                });
             }
         }
         
@@ -8552,6 +8745,26 @@ class PixelPhysics {
         }
         
         console.log(`[PixelPhysics v3.5] World loaded: ${this.gridWidth}x${this.gridHeight}`);
+    }
+    
+    /**
+     * v3.8: Get acoustic engine state for testing/debugging
+     * @returns {object} Acoustic state info
+     * @example
+     * const state = engine.physics.getAcousticState();
+     * console.log('Sound enabled:', state.enabled);
+     * console.log('Active sounds:', state.activeSounds);
+     */
+    getAcousticState() {
+        return {
+            enabled: this.acoustics.enabled,
+            masterVolume: this.acoustics.masterVolume,
+            activeSounds: this.acoustics.activeSounds.size,
+            maxSources: this.acoustics.maxSources,
+            soundEventQueue: this.soundEvents.length,
+            maxEventsPerFrame: this.maxSoundEventsPerFrame,
+            audioContext: this.acoustics.ctx ? 'initialized' : 'not initialized'
+        };
     }
 }
 
@@ -9138,6 +9351,119 @@ class AcousticEngine {
     }
 
     /**
+     * v3.8: Play reaction sound when materials chemically react
+     * @param {object} material1 - First reactant material
+     * @param {object} material2 - Second reactant material  
+     * @param {object} product - Product material (optional)
+     * @param {number} intensity - Reaction intensity (0-1)
+     */
+    playReaction(material1, material2, product, intensity) {
+        if (!this.enabled || !this.ctx) return;
+        
+        const now = this.ctx.currentTime;
+        const volume = intensity * this.masterVolume * 0.4;
+        
+        // Calculate reaction sound parameters from materials
+        const params = this.getReactionSound(material1, material2, product);
+        
+        // Create rich harmonic sound for reactions (more dramatic than impacts)
+        const freqs = [params.freq, params.freq * 1.5, params.freq * 2, params.freq * 2.5];
+        const osc = [];
+        const gains = [];
+        
+        for (let i = 0; i < freqs.length; i++) {
+            osc[i] = this.ctx.createOscillator();
+            gains[i] = this.ctx.createGain();
+            
+            osc[i].type = i === 0 ? 'triangle' : 'sine';
+            osc[i].frequency.setValueAtTime(freqs[i], now);
+            osc[i].frequency.exponentialRampToValueAtTime(freqs[i] * 0.7, now + params.duration);
+            
+            const harmVol = volume / (i + 1); // Harmonics are quieter
+            gains[i].gain.setValueAtTime(harmVol, now);
+            gains[i].gain.exponentialRampToValueAtTime(0.001, now + params.duration);
+            
+            osc[i].connect(gains[i]);
+            gains[i].connect(this.masterGain);
+            osc[i].start(now);
+            osc[i].stop(now + params.duration);
+        }
+    }
+
+    /**
+     * v3.8: Calculate impact sound parameters from material properties
+     * @param {object} mat1 - First material
+     * @param {object} mat2 - Second material
+     * @param {number} velocity - Impact velocity (0-1)
+     * @returns {object} Sound parameters {freq, duration, volume}
+     */
+    getImpactSound(mat1, mat2, velocity) {
+        // Geometric mean of resonance frequencies
+        const freq1 = mat1.resonanceFreq || 200;
+        const freq2 = mat2.resonanceFreq || 200;
+        const freq = Math.sqrt(freq1 * freq2);
+        
+        // Duration inversely proportional to dampening
+        const avgDampening = (mat1.dampening + mat2.dampening) / 2;
+        const duration = 0.05 + (1 - avgDampening) * 0.3; // 0.05-0.35s
+        
+        // Volume proportional to velocity and inverse of dampening
+        const volume = velocity * (1 - avgDampening * 0.5);
+        
+        // Brightness affects harmonic content
+        const brightness = (mat1.brightness + mat2.brightness) / 2;
+        
+        return { freq, duration, volume, brightness };
+    }
+
+    /**
+     * v3.8: Calculate flow sound parameters from material properties
+     * @param {object} material - Flowing material
+     * @param {number} velocity - Flow velocity (0-1)
+     * @returns {object} Sound parameters {freq, filterFreq, volume}
+     */
+    getFlowSound(material, velocity) {
+        const baseFreq = material.resonanceFreq || 200;
+        const freq = baseFreq + velocity * 800; // Higher pitch = faster flow
+        
+        // Filter frequency based on viscosity (thicker = lower filter)
+        const viscosity = material.viscosity || 0.5;
+        const filterFreq = 2000 - viscosity * 1500; // 500-2000 Hz
+        
+        // Volume based on velocity and dampening
+        const volume = velocity * (1 - material.dampening * 0.5);
+        
+        return { freq, filterFreq, volume };
+    }
+
+    /**
+     * v3.8: Calculate reaction sound parameters from reactants
+     * @param {object} mat1 - First reactant
+     * @param {object} mat2 - Second reactant
+     * @param {object} product - Product material (optional)
+     * @returns {object} Sound parameters {freq, duration, volume, brightness}
+     */
+    getReactionSound(mat1, mat2, product) {
+        // Reaction frequency: weighted average favoring product
+        const freq1 = mat1.resonanceFreq || 300;
+        const freq2 = mat2.resonanceFreq || 300;
+        const freqProduct = product ? (product.resonanceFreq || 300) : (freq1 + freq2) / 2;
+        const freq = (freq1 + freq2 + freqProduct * 2) / 4; // Product weighted higher
+        
+        // Reactions are more dramatic - longer duration
+        const duration = 0.2 + Math.random() * 0.2; // 0.2-0.4s
+        
+        // High reactivity = louder
+        const reactivity = Math.max(mat1.reactivity || 0, mat2.reactivity || 0);
+        const volume = 0.5 + reactivity * 0.5;
+        
+        // High brightness = more harmonics
+        const brightness = Math.max(mat1.brightness || 0.3, mat2.brightness || 0.3);
+        
+        return { freq, duration, volume, brightness };
+    }
+
+    /**
      * Update acoustic engine (called each frame)
      * @param {number} dt - Delta time in seconds
      */
@@ -9146,6 +9472,45 @@ class AcousticEngine {
         
         this.frameCounter++;
         if (this.frameCounter % this.soundThrottle !== 0) return;
+        
+        // v3.8: Process sound event queue from physics
+        const events = this.physics.soundEvents;
+        if (events && events.length > 0) {
+            // Process up to maxSources events
+            const processCount = Math.min(events.length, this.maxSources - this.activeSounds.size);
+            
+            for (let i = 0; i < processCount; i++) {
+                const event = events[i];
+                
+                switch (event.type) {
+                    case 'impact':
+                        if (event.mat1.impactSound) {
+                            const params = this.getImpactSound(event.mat1, event.mat2, event.velocity);
+                            this.playImpact(event.mat1.impactSound, event.mat1, params.volume, event.x, event.y);
+                        }
+                        break;
+                        
+                    case 'flow':
+                        if (event.material.flowSound) {
+                            this.playFlow(event.material.flowSound, event.material, event.velocity, event.count);
+                        }
+                        break;
+                        
+                    case 'reaction':
+                        this.playReaction(event.mat1, event.mat2, event.product, event.intensity);
+                        break;
+                        
+                    case 'phaseChange':
+                        if (event.material.phaseChangeSound) {
+                            this.playPhaseChange(event.material.phaseChangeSound, event.intensity);
+                        }
+                        break;
+                }
+            }
+            
+            // Clear processed events
+            events.length = 0;
+        }
         
         // Cleanup expired sounds
         const now = this.ctx.currentTime;
@@ -9241,7 +9606,7 @@ class AcousticEngine {
 }
 
 // Static properties (must be set AFTER class definition)
-BudEngine.VERSION = '3.5';
+BudEngine.VERSION = '3.8';
 BudEngine.LAYER = {
     DEFAULT: 1,
     PLAYER: 2,

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pixel Physics v3.7 - AI Debug/Testing API - Bud Engine</title>
+    <title>Pixel Physics v3.8 - Acoustic Physics - Bud Engine</title>
     <style>
         * {
             margin: 0;
@@ -440,7 +440,7 @@
         <!-- Header -->
         <div class="header">
             <h1>⚛️ Pixel Physics ⚛️</h1>
-            <div class="version">v3.7 • AI DEBUG/TESTING API</div>
+            <div class="version">v3.8 • ACOUSTIC PHYSICS</div>
         </div>
         
         <!-- Material Tabs -->
@@ -747,10 +747,11 @@
                 <button class="action-btn toggle" id="heatBtn" onclick="toggleHeat()">🌡️ Heat</button>
                 <button class="action-btn toggle" id="lightBtn" onclick="toggleLighting()">🌙 Light</button>
                 <button class="action-btn toggle" id="soundBtn" onclick="toggleSound()">🔊 Sound</button>
+                <button class="action-btn toggle" id="soundBtn" onclick="toggleSound()">🔊 Sound</button>
             </div>
         </div>
         
-        <!-- Debug Controls (v3.7) -->
+        <!-- Debug Controls (v3.8) -->
         <div class="control-section">
             <h3>🤖 AI Debug</h3>
             <div class="toggle-row">
@@ -769,7 +770,7 @@
         <!-- Status Bar -->
         <div class="status-bar">
             FPS: <span id="fps">60</span> • 
-            v3.7 • 
+            v3.8 • 
             Materials: <span>30</span> • 
             🤖 <span>AI Debug API</span>
         </div>
@@ -1037,7 +1038,29 @@
             document.getElementById('lightBtn').classList.toggle('active');
         }
 
-        // Debug toggle (v3.7)
+        // Sound toggle (v3.8: Acoustic Physics)
+        function toggleSound() {
+            if (!engine.physics.acoustics.ctx) {
+                // Initialize Web Audio on first click (requires user interaction)
+                if (engine.physics.acoustics.init()) {
+                    console.log('🔊 Acoustic Physics System activated');
+                    console.log('   Sound generation from real material properties');
+                    console.log('   Impact, flow, reaction, and phase change sounds');
+                    document.getElementById('soundBtn').classList.add('active');
+                    document.getElementById('soundBtn').textContent = '🔊 Sound On';
+                } else {
+                    console.error('❌ Failed to initialize Web Audio API');
+                }
+            } else {
+                // Toggle enabled state
+                engine.physics.acoustics.enabled = !engine.physics.acoustics.enabled;
+                document.getElementById('soundBtn').classList.toggle('active');
+                document.getElementById('soundBtn').textContent = engine.physics.acoustics.enabled ? '🔊 Sound On' : '🔇 Sound Off';
+                console.log('🔊 Acoustic Physics:', engine.physics.acoustics.enabled ? 'enabled' : 'disabled');
+            }
+        }
+
+        // Debug toggle (v3.8)
         function toggleDebug() {
             engine.debugSystem.enabled = !engine.debugSystem.enabled;
             document.getElementById('debugBtn').classList.toggle('active');
@@ -1231,9 +1254,11 @@
         engine.scene('main', {
             enter() {
                 console.log('═════════════════════════════════════════════════════════════');
-                console.log('⚛️ PIXEL PHYSICS v3.7 - AI DEBUG/TESTING API');
+                console.log('⚛️ PIXEL PHYSICS v3.8 - ACOUSTIC PHYSICS SYSTEM');
+                console.log('🔊 Sound generation from real material properties');
+                console.log('   Click "🔊 Sound" button to enable audio');
                 console.log('═════════════════════════════════════════════════════════════');
-                console.log('NEW IN v3.7:');
+                console.log('NEW IN v3.8:');
                 console.log('  🤖 Comprehensive testing API for AI developers');
                 console.log('  📊 Debug overlay: FPS, materials, chunks, frame counter');
                 console.log('  🧪 Scenario loading: engine.test.loadScenario(name)');
