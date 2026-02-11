@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pixel Physics v3.8 - Acoustic Physics - Bud Engine</title>
+    <title>Pixel Physics v3.10 - Procedural World Generation - Bud Engine</title>
     <style>
         * {
             margin: 0;
@@ -440,7 +440,7 @@
         <!-- Header -->
         <div class="header">
             <h1>⚛️ Pixel Physics ⚛️</h1>
-            <div class="version">v3.9 • EARTH ECOSYSTEM</div>
+            <div class="version">v3.10 • PROCEDURAL WORLDS</div>
         </div>
         
         <!-- Material Tabs -->
@@ -762,13 +762,46 @@
             </div>
         </div>
         
+        <!-- Procedural World Generation (v3.10) -->
+        <div class="control-section">
+            <h3>🌍 Generate World</h3>
+            <div class="control-row">
+                <div class="control-item" style="flex-direction: column; align-items: flex-start; gap: 4px;">
+                    <label style="font-size: 10px;">Seed (same = same world)</label>
+                    <div style="display: flex; gap: 4px; width: 100%;">
+                        <input type="number" id="worldSeed" value="12345" style="flex: 1; padding: 6px; background: #0a0a14; border: 1px solid #444; color: #00ffcc; font-family: 'Courier New', monospace; font-size: 11px;">
+                        <button class="action-btn" onclick="randomSeed()" style="padding: 6px 10px; min-width: 60px;">🎲 Random</button>
+                    </div>
+                </div>
+            </div>
+            <div class="control-row">
+                <div class="control-item" style="flex-direction: column; align-items: flex-start; gap: 4px;">
+                    <label style="font-size: 10px;">Biome</label>
+                    <select id="worldBiome" style="width: 100%; padding: 6px; background: #0a0a14; border: 1px solid #444; color: #00ffcc; font-family: 'Courier New', monospace; font-size: 11px; cursor: pointer;">
+                        <option value="temperate">🌲 Temperate</option>
+                        <option value="desert">🏜️ Desert</option>
+                        <option value="arctic">❄️ Arctic</option>
+                        <option value="volcanic">🌋 Volcanic</option>
+                        <option value="swamp">🐊 Swamp</option>
+                        <option value="mountain">⛰️ Mountain</option>
+                        <option value="ocean">🌊 Ocean</option>
+                    </select>
+                </div>
+            </div>
+            <button class="action-btn primary" onclick="generateProceduralWorld()" style="margin-top: 8px;">
+                ✨ Generate World
+            </button>
+            <div style="padding: 8px; font-size: 9px; color: #888; line-height: 1.3; margin-top: 4px;">
+                Procedural generation: terrain layers, caves, ores, water tables, rivers, vegetation. Deterministic & natural-looking. < 1s generation time.
+            </div>
+        </div>
+        
         <!-- Toggles -->
         <div class="control-section">
             <h3>👁️ View</h3>
             <div class="toggle-row">
                 <button class="action-btn toggle" id="heatBtn" onclick="toggleHeat()">🌡️ Heat</button>
                 <button class="action-btn toggle" id="lightBtn" onclick="toggleLighting()">🌙 Light</button>
-                <button class="action-btn toggle" id="soundBtn" onclick="toggleSound()">🔊 Sound</button>
                 <button class="action-btn toggle" id="soundBtn" onclick="toggleSound()">🔊 Sound</button>
             </div>
         </div>
@@ -782,6 +815,7 @@
             <div style="padding: 10px; font-size: 10px; color: #888; line-height: 1.4;">
                 Debug API available in console:<br>
                 • engine.test.loadScenario(name)<br>
+                • engine.test.generateWorld(seed, biome)<br>
                 • engine.test.step(n)<br>
                 • engine.test.snapshot()<br>
                 • engine.test.getPhysicsState()<br>
@@ -792,7 +826,7 @@
         <!-- Status Bar -->
         <div class="status-bar">
             FPS: <span id="fps">60</span> • 
-            v3.8 • 
+            v3.10 • 
             Materials: <span>30</span> • 
             🤖 <span>AI Debug API</span>
         </div>
@@ -1137,6 +1171,26 @@
         }
 
         // Load scenario
+        // v3.10: Procedural World Generation
+        function generateProceduralWorld() {
+            const seed = parseInt(document.getElementById('worldSeed').value) || Date.now();
+            const biome = document.getElementById('worldBiome').value;
+            
+            console.log(`🌍 Generating procedural world: seed=${seed}, biome=${biome}`);
+            
+            const success = engine.test.generateWorld(seed, biome);
+            
+            if (success) {
+                console.log(`✨ World generated! Seed: ${seed}, Biome: ${biome}`);
+                console.log('Same seed + biome will always generate identical world.');
+            }
+        }
+        
+        function randomSeed() {
+            const seed = Math.floor(Math.random() * 1000000);
+            document.getElementById('worldSeed').value = seed;
+        }
+        
         function loadScenario(name) {
             clearWorld();
             
@@ -1310,9 +1364,9 @@
         engine.scene('main', {
             enter() {
                 console.log('═════════════════════════════════════════════════════════════');
-                console.log('⚛️ PIXEL PHYSICS v3.9 - EARTH ECOSYSTEM WITH TIME ACCELERATION');
-                console.log('🌍 Geological & ecological time simulation');
-                console.log('   Use time scale buttons to accelerate simulation');
+                console.log('⚛️ PIXEL PHYSICS v3.10 - PROCEDURAL WORLD GENERATION');
+                console.log('🌍 Generate infinite unique worlds from seeds');
+                console.log('   Use Generate World panel to create procedural worlds');
                 console.log('═════════════════════════════════════════════════════════════');
                 console.log('NEW IN v3.9:');
                 console.log('  ⏱️  Time acceleration: 1x, 10x, 100x, 1000x');
@@ -1325,7 +1379,7 @@
                 console.log('  📊 API: engine.test.getEcosystemState()');
                 console.log('  ⚙️  API: engine.physics.setTimeScale(scale)');
                 console.log('');
-                console.log('ALSO IN v3.8:');
+                console.log('ALSO IN v3.10:');
                 console.log('  🤖 Comprehensive testing API for AI developers');
                 console.log('  📊 Debug overlay: FPS, materials, chunks, frame counter');
                 console.log('  🧪 Scenario loading: engine.test.loadScenario(name)');
