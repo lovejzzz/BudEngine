@@ -417,6 +417,40 @@ class BudEngine {
         // Trigger entity callbacks
         if (a.onCollision) a.onCollision(b);
         if (b.onCollision) b.onCollision(a);
+        
+        // Solid collision resolution — push non-solid entity out of solid entity
+        const aSolid = a.tags.includes('solid') || a.tags.includes('wall');
+        const bSolid = b.tags.includes('solid') || b.tags.includes('wall');
+        
+        if (aSolid && !bSolid && b.collider) {
+            this.resolveOverlap(b, a);
+        } else if (bSolid && !aSolid && a.collider) {
+            this.resolveOverlap(a, b);
+        }
+    }
+    
+    resolveOverlap(mover, solid) {
+        // Push mover out of solid (AABB resolution)
+        if (solid.collider.type === 'aabb') {
+            const halfW = solid.collider.width / 2;
+            const halfH = solid.collider.height / 2;
+            
+            const dx = mover.x - solid.x;
+            const dy = mover.y - solid.y;
+            
+            const moverR = mover.collider.type === 'circle' ? mover.collider.radius : Math.max(mover.collider.width, mover.collider.height) / 2;
+            
+            const overlapX = halfW + moverR - Math.abs(dx);
+            const overlapY = halfH + moverR - Math.abs(dy);
+            
+            if (overlapX > 0 && overlapY > 0) {
+                if (overlapX < overlapY) {
+                    mover.x += dx > 0 ? overlapX : -overlapX;
+                } else {
+                    mover.y += dy > 0 ? overlapY : -overlapY;
+                }
+            }
+        }
     }
 
     onCollision(tagA, tagB, fn) {
