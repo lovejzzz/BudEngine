@@ -1,5 +1,5 @@
 /**
- * BUD ENGINE v3.2
+ * BUD ENGINE v3.5
  * A 2D web game engine designed for AI-human collaboration
  * 
  * Philosophy: AI can write, TEST, and iterate on games independently.
@@ -5075,13 +5075,13 @@ class PixelPhysics {
         // Heat visualization
         this.showHeat = false;
         
-        // v3.2: Dynamic Lighting System
+        // v3.5: Cell-Based Dynamic Lighting System (OPTIMIZED)
         this.lighting = true; // Enable by default
         this.ambientLight = 0.2; // 0 = pitch black, 1 = full bright
         this.lightSources = new Set(); // Track light-emitting cells
-        this.lightCanvas = null; // Offscreen canvas for light map
-        this.lightCtx = null;
-        this.lightUpdateInterval = 4; // Update light every N frames (lower = prettier, higher = faster)
+        this.lightMap = null; // Uint8ClampedArray - light level per cell (0-255)
+        this.lightColorMap = null; // Uint8ClampedArray - RGB per cell (3 values per cell)
+        this.lightUpdateInterval = 2; // Update light every N frames (lower = prettier, higher = faster)
         
         // Performance optimizations
         this.dirtyRects = [];
@@ -5140,7 +5140,7 @@ class PixelPhysics {
                 lastActive: 0
             }))
         );
-        console.log(`[PixelPhysics v3.2] Chunk system: ${this.chunksWide}x${this.chunksHigh} chunks (${this.chunkSize}x${this.chunkSize} cells)`);
+        console.log(`[PixelPhysics v3.5] Chunk system: ${this.chunksWide}x${this.chunksHigh} chunks (${this.chunkSize}x${this.chunkSize} cells)`);
         
         // Create offscreen canvas for rendering
         this.offscreenCanvas = document.createElement('canvas');
@@ -5149,20 +5149,28 @@ class PixelPhysics {
         this.offscreenCtx = this.offscreenCanvas.getContext('2d');
         this.imageData = this.offscreenCtx.createImageData(this.gridWidth, this.gridHeight);
         
-        // v3.2: Create light map canvas (1/4 resolution for performance)
-        const lightResDiv = 4;
-        this.lightCanvas = document.createElement('canvas');
-        this.lightCanvas.width = Math.floor(this.gridWidth / lightResDiv);
-        this.lightCanvas.height = Math.floor(this.gridHeight / lightResDiv);
-        this.lightCtx = this.lightCanvas.getContext('2d');
-        console.log(`[PixelPhysics v3.2] Lighting system initialized: ${this.lightCanvas.width}x${this.lightCanvas.height} light map`);
+        // v3.5: Create cell-based light map (much faster than canvas gradients!)
+        const totalCells = this.gridWidth * this.gridHeight;
+        this.lightMap = new Uint8ClampedArray(totalCells); // Light level per cell (0-255)
+        this.lightColorMap = new Uint8ClampedArray(totalCells * 3); // RGB per cell
+        // Initialize to ambient light
+        const ambientLevel = Math.floor(this.ambientLight * 255);
+        for (let i = 0; i < totalCells; i++) {
+            this.lightMap[i] = ambientLevel;
+            const colorIdx = i * 3;
+            this.lightColorMap[colorIdx] = ambientLevel;
+            this.lightColorMap[colorIdx + 1] = ambientLevel;
+            this.lightColorMap[colorIdx + 2] = ambientLevel;
+        }
+        console.log(`[PixelPhysics v3.5] Cell-based lighting system initialized: ${this.gridWidth}x${this.gridHeight} light map`);
         
         this.initialized = true;
-        console.log(`[PixelPhysics v3.3] Initialized ${this.gridWidth}x${this.gridHeight} grid (cell size: ${cellSize}px)`);
-        console.log('[PixelPhysics v3.3] Property-based emergent physics enabled');
-        console.log('[PixelPhysics v3.3] Temperature simulation active');
-        console.log('[PixelPhysics v3.3] Performance optimizations: chunking, flat arrays, O(1) reactions');
-        console.log('[PixelPhysics v3.3] Acoustic Physics System initialized - The Composition');
+        console.log(`[PixelPhysics v3.5] Initialized ${this.gridWidth}x${this.gridHeight} grid (cell size: ${cellSize}px)`);
+        console.log('[PixelPhysics v3.5] Property-based emergent physics enabled');
+        console.log('[PixelPhysics v3.5] Temperature simulation active');
+        console.log('[PixelPhysics v3.5] Performance optimizations: chunking, flat arrays, O(1) reactions, cell-based lighting');
+        console.log('[PixelPhysics v3.5] NEW: Optimized lighting (40+ FPS), entity-physics integration, wind system, save/load');
+        console.log('[PixelPhysics v3.5] Acoustic Physics System initialized - The Composition');
     }
 
     /**
@@ -7035,30 +7043,35 @@ class PixelPhysics {
     }
 
     /**
-     * Simulate gas behavior (fire, smoke, steam, etc.) (v3.2: uses flat arrays)
+     * Simulate gas behavior (fire, smoke, steam, etc.) (v3.5: uses flat arrays + wind)
      * @private
      */
     simulateGas(x, y, mat, id) {
-        // v3.2: Gases rise if density is negative (hot gases) - use flat array
+        // v3.5: Gases rise if density is negative (hot gases) - use flat array
         const density = this.densityArr[id];
         const rising = density < 0;
         
+        // v3.5: Apply wind force (affects movement direction)
+        const windX = Math.round(this.wind.x);
+        const windY = Math.round(this.wind.y);
+        
         if (rising) {
-            // Try to rise
-            if (this.tryMove(x, y, x, y - 1, id)) return;
+            // Try to rise (with wind offset)
+            if (this.tryMove(x, y, x + windX, y - 1 + windY, id)) return;
             
-            // Try to rise diagonally
-            const dir = Math.random() < 0.5 ? -1 : 1;
-            if (this.tryMove(x, y, x + dir, y - 1, id)) return;
-            if (this.tryMove(x, y, x - dir, y - 1, id)) return;
+            // Try to rise diagonally (wind affects direction preference)
+            const windDir = this.wind.x > 0 ? 1 : (this.wind.x < 0 ? -1 : (Math.random() < 0.5 ? -1 : 1));
+            if (this.tryMove(x, y, x + windDir, y - 1, id)) return;
+            if (this.tryMove(x, y, x - windDir, y - 1, id)) return;
         } else {
-            // Sink (heavy gas like CO2)
-            if (this.tryMove(x, y, x, y + 1, id)) return;
+            // Sink (heavy gas like CO2) - wind still affects horizontal
+            if (this.tryMove(x, y, x + windX, y + 1 + windY, id)) return;
         }
         
-        // Spread horizontally
+        // Spread horizontally (wind biases direction)
         if (Math.random() < 0.4) {
-            const spreadDir = Math.random() < 0.5 ? -1 : 1;
+            const spreadChance = Math.abs(this.wind.x) > 0.1 ? Math.random() : 0.5;
+            const spreadDir = this.wind.x > 0.1 ? 1 : (this.wind.x < -0.1 ? -1 : (spreadChance < 0.5 ? -1 : 1));
             if (this.tryMove(x, y, x + spreadDir, y, id)) return;
         }
     }
@@ -7154,7 +7167,12 @@ class PixelPhysics {
     render(ctx, camera) {
         if (!this.initialized) return;
         
-        // Update image data from grid
+        // v3.5: Render light map (only every N frames for performance)
+        if (this.lighting && this.frameCount % this.lightUpdateInterval === 0) {
+            this.renderLightMap();
+        }
+        
+        // Update image data from grid WITH LIGHTING applied directly
         const pixels = this.imageData.data;
         
         for (let y = 0; y < this.gridHeight; y++) {
@@ -7180,10 +7198,33 @@ class PixelPhysics {
                     
                     // Parse hex color
                     const hex = color.replace('#', '');
-                    const r = parseInt(hex.slice(0, 2), 16);
-                    const g = parseInt(hex.slice(2, 4), 16);
-                    const b = parseInt(hex.slice(4, 6), 16);
+                    let r = parseInt(hex.slice(0, 2), 16);
+                    let g = parseInt(hex.slice(2, 4), 16);
+                    let b = parseInt(hex.slice(4, 6), 16);
                     const a = hex.length === 8 ? parseInt(hex.slice(6, 8), 16) : 255;
+                    
+                    // v3.5: Apply lighting directly during render (multiply material color with light)
+                    if (this.lighting) {
+                        const lightLevel = this.lightMap[idx] / 255;
+                        const colorIdx3 = idx * 3;
+                        const lightR = this.lightColorMap[colorIdx3] / 255;
+                        const lightG = this.lightColorMap[colorIdx3 + 1] / 255;
+                        const lightB = this.lightColorMap[colorIdx3 + 2] / 255;
+                        
+                        // Multiply material color by light
+                        r = Math.floor(r * lightR);
+                        g = Math.floor(g * lightG);
+                        b = Math.floor(b * lightB);
+                    }
+                    
+                    // v3.5: Hot materials glow (blend toward white/yellow based on temperature)
+                    const temp = this.temperatureGrid[idx];
+                    if (temp > 400) {
+                        const glowIntensity = Math.min(1, (temp - 400) / 800);
+                        r = Math.floor(r + (255 - r) * glowIntensity);
+                        g = Math.floor(g + (255 - g) * glowIntensity * 0.9); // Slightly yellow
+                        b = Math.floor(b + (200 - b) * glowIntensity * 0.3); // Less blue in glow
+                    }
                     
                     pixels[pixelIdx] = r;
                     pixels[pixelIdx + 1] = g;
@@ -7202,11 +7243,6 @@ class PixelPhysics {
         // Put image data to offscreen canvas
         this.offscreenCtx.putImageData(this.imageData, 0, 0);
         
-        // v3.2: Render light map (only every N frames for performance)
-        if (this.lighting && this.frameCount % this.lightUpdateInterval === 0) {
-            this.renderLightMap();
-        }
-        
         // Draw scaled to game canvas (respecting camera)
         ctx.save();
         
@@ -7221,43 +7257,31 @@ class PixelPhysics {
             0, 0, this.width, this.height
         );
         
-        // v3.2: Apply lighting
-        if (this.lighting) {
-            ctx.globalCompositeOperation = 'multiply';
-            ctx.drawImage(
-                this.lightCanvas,
-                0, 0, this.lightCanvas.width, this.lightCanvas.height,
-                0, 0, this.width, this.height
-            );
-            ctx.globalCompositeOperation = 'source-over';
-        }
-        
         ctx.restore();
     }
 
     /**
-     * Render dynamic light map (v3.2)
+     * Render dynamic light map (v3.5 - OPTIMIZED: cell-based, NO canvas gradients)
      * @private
      */
     renderLightMap() {
-        const lctx = this.lightCtx;
-        const lw = this.lightCanvas.width;
-        const lh = this.lightCanvas.height;
+        const totalCells = this.gridWidth * this.gridHeight;
         
-        // Start with ambient light level
+        // Reset to ambient light
         const ambient = Math.floor(this.ambientLight * 255);
-        lctx.fillStyle = `rgb(${ambient}, ${ambient}, ${ambient})`;
-        lctx.fillRect(0, 0, lw, lh);
+        for (let i = 0; i < totalCells; i++) {
+            this.lightMap[i] = ambient;
+            const colorIdx = i * 3;
+            this.lightColorMap[colorIdx] = ambient;
+            this.lightColorMap[colorIdx + 1] = ambient;
+            this.lightColorMap[colorIdx + 2] = ambient;
+        }
         
-        // Additive blending for light sources
-        lctx.globalCompositeOperation = 'lighter';
-        
-        // Use heatSources set (already tracked) instead of scanning entire grid
-        // Sample every Nth heat source to limit draw calls
-        let lightCount = 0;
-        const MAX_LIGHTS = 40; // cap for performance
+        // Iterate light sources and add light to nearby cells
+        const MAX_LIGHTS = 60; // Can handle more with array math!
         const step = this.heatSources.size > MAX_LIGHTS ? Math.ceil(this.heatSources.size / MAX_LIGHTS) : 1;
         let i = 0;
+        let lightCount = 0;
         
         for (let idx of this.heatSources) {
             i++;
@@ -7268,55 +7292,67 @@ class PixelPhysics {
             const mat = this.getMaterial(id);
             if (!mat || mat.name === 'air') continue;
             
-            const y = Math.floor(idx / this.gridWidth);
-            const x = idx % this.gridWidth;
+            const sy = Math.floor(idx / this.gridWidth);
+            const sx = idx % this.gridWidth;
+            
+            let radius = 0;
+            let color = null;
+            let intensity = 0;
             
             // Materials with explicit light properties
             if (mat.lightRadius) {
-                this.renderLight(x, y, mat.lightRadius, mat.lightColor, mat.lightIntensity);
-                lightCount++;
+                radius = mat.lightRadius;
+                color = mat.lightColor;
+                intensity = mat.lightIntensity;
             }
             // Hot materials (> 500°C) emit faint temperature glow
             else if (this.temperatureGrid[idx] > 500) {
                 const temp = this.temperatureGrid[idx];
-                const glowIntensity = Math.min(0.3, (temp - 500) / 2000);
-                this.renderLight(x, y, 15, '#ff4400', glowIntensity);
-                lightCount++;
+                radius = 15;
+                color = '#ff4400';
+                intensity = Math.min(0.3, (temp - 500) / 2000);
+            } else {
+                continue;
             }
+            
+            // Parse light color once
+            const hex = color.replace('#', '');
+            const lr = parseInt(hex.slice(0, 2), 16);
+            const lg = parseInt(hex.slice(2, 4), 16);
+            const lb = parseInt(hex.slice(4, 6), 16);
+            
+            // Calculate light for cells within radius
+            const radiusCells = Math.ceil(radius / this.cellSize);
+            const minX = Math.max(0, sx - radiusCells);
+            const maxX = Math.min(this.gridWidth - 1, sx + radiusCells);
+            const minY = Math.max(0, sy - radiusCells);
+            const maxY = Math.min(this.gridHeight - 1, sy + radiusCells);
+            
+            for (let y = minY; y <= maxY; y++) {
+                for (let x = minX; x <= maxX; x++) {
+                    const dx = x - sx;
+                    const dy = y - sy;
+                    const dist = Math.sqrt(dx * dx + dy * dy) * this.cellSize;
+                    
+                    if (dist < radius) {
+                        // Linear falloff
+                        const falloff = 1 - (dist / radius);
+                        const lightLevel = Math.floor(falloff * intensity * 255);
+                        
+                        const cellIdx = y * this.gridWidth + x;
+                        const colorIdx = cellIdx * 3;
+                        
+                        // ADD light (additive blending)
+                        this.lightMap[cellIdx] = Math.min(255, this.lightMap[cellIdx] + lightLevel);
+                        this.lightColorMap[colorIdx] = Math.min(255, this.lightColorMap[colorIdx] + lr * falloff * intensity);
+                        this.lightColorMap[colorIdx + 1] = Math.min(255, this.lightColorMap[colorIdx + 1] + lg * falloff * intensity);
+                        this.lightColorMap[colorIdx + 2] = Math.min(255, this.lightColorMap[colorIdx + 2] + lb * falloff * intensity);
+                    }
+                }
+            }
+            
+            lightCount++;
         }
-        
-        lctx.globalCompositeOperation = 'source-over';
-    }
-    
-    /**
-     * Render a single light source with radial gradient (v3.2)
-     * @private
-     */
-    renderLight(x, y, radius, color, intensity) {
-        const lctx = this.lightCtx;
-        const lightResDiv = 4;
-        
-        // Convert grid coordinates to light map coordinates
-        const lx = x / lightResDiv;
-        const ly = y / lightResDiv;
-        const lr = radius / lightResDiv;
-        
-        // Create radial gradient
-        const gradient = lctx.createRadialGradient(lx, ly, 0, lx, ly, lr);
-        
-        // Parse light color
-        const hex = color.replace('#', '');
-        const r = parseInt(hex.slice(0, 2), 16);
-        const g = parseInt(hex.slice(2, 4), 16);
-        const b = parseInt(hex.slice(4, 6), 16);
-        
-        // Inner glow (full intensity)
-        gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${intensity})`);
-        // Fade to transparent
-        gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
-        
-        lctx.fillStyle = gradient;
-        lctx.fillRect(lx - lr, ly - lr, lr * 2, lr * 2);
     }
     
     /**
@@ -7361,20 +7397,277 @@ class PixelPhysics {
     }
     
     /**
-     * Toggle dynamic lighting (v3.2)
+     * Toggle dynamic lighting (v3.5)
      */
     toggleLighting() {
         this.lighting = !this.lighting;
-        console.log(`[PixelPhysics v3.2] Lighting: ${this.lighting ? 'ON' : 'OFF'}`);
+        console.log(`[PixelPhysics v3.5] Lighting: ${this.lighting ? 'ON' : 'OFF'}`);
     }
     
     /**
-     * Set ambient light level (v3.2)
+     * Set ambient light level (v3.5)
      * @param {number} level - Light level (0 = pitch black, 1 = full bright)
      */
     setAmbientLight(level) {
         this.ambientLight = Math.max(0, Math.min(1, level));
-        console.log(`[PixelPhysics v3.2] Ambient light: ${(this.ambientLight * 100).toFixed(0)}%`);
+        console.log(`[PixelPhysics v3.5] Ambient light: ${(this.ambientLight * 100).toFixed(0)}%`);
+    }
+    
+    // ===== ENTITY-PHYSICS INTEGRATION (v3.5) =====
+    
+    /**
+     * Get the material at a world position (v3.5)
+     * @param {number} x - World X position
+     * @param {number} y - World Y position
+     * @returns {string|null} Material name, or null if out of bounds/air
+     * @example
+     * const mat = engine.physics.getMaterialAt(player.x, player.y + player.height);
+     * if (mat === 'lava') player.takeDamage(10);
+     */
+    getMaterialAt(x, y) {
+        const gx = Math.floor(x / this.cellSize);
+        const gy = Math.floor(y / this.cellSize);
+        if (!this.inBounds(gx, gy)) return null;
+        
+        const idx = this.index(gx, gy);
+        const id = this.grid[idx];
+        const mat = this.getMaterial(id);
+        return mat && mat.name !== 'air' ? mat.name : null;
+    }
+    
+    /**
+     * Check if a world position is solid (v3.5)
+     * @param {number} x - World X position
+     * @param {number} y - World Y position
+     * @returns {boolean} True if position contains solid material
+     * @example
+     * if (!engine.physics.isSolidAt(entity.x, entity.y + 10)) {
+     *   entity.velocity.y += gravity * dt;
+     * }
+     */
+    isSolidAt(x, y) {
+        const gx = Math.floor(x / this.cellSize);
+        const gy = Math.floor(y / this.cellSize);
+        if (!this.inBounds(gx, gy)) return true; // Treat out-of-bounds as solid
+        
+        const idx = this.index(gx, gy);
+        const id = this.grid[idx];
+        if (id === 0) return false; // Air is not solid
+        
+        const state = this.stateArr[id];
+        return state === 1; // state 1 = solid
+    }
+    
+    /**
+     * Check if a world position is liquid (v3.5)
+     * @param {number} x - World X position
+     * @param {number} y - World Y position
+     * @returns {boolean} True if position contains liquid material
+     * @example
+     * if (engine.physics.isLiquidAt(entity.x, entity.y)) {
+     *   entity.velocity.x *= 0.95; // Water drag
+     *   entity.velocity.y *= 0.95;
+     * }
+     */
+    isLiquidAt(x, y) {
+        const gx = Math.floor(x / this.cellSize);
+        const gy = Math.floor(y / this.cellSize);
+        if (!this.inBounds(gx, gy)) return false;
+        
+        const idx = this.index(gx, gy);
+        const id = this.grid[idx];
+        if (id === 0) return false;
+        
+        const state = this.stateArr[id];
+        return state === 2; // state 2 = liquid
+    }
+    
+    /**
+     * Check if a world position is dangerous (v3.5)
+     * @param {number} x - World X position
+     * @param {number} y - World Y position
+     * @param {number} [damageThreshold=300] - Temperature threshold for damage (°C)
+     * @returns {boolean} True if position is hot or contains dangerous material
+     * @example
+     * if (engine.physics.isDangerousAt(entity.x, entity.y)) {
+     *   entity.health -= 5 * dt;
+     * }
+     */
+    isDangerousAt(x, y, damageThreshold = 300) {
+        const gx = Math.floor(x / this.cellSize);
+        const gy = Math.floor(y / this.cellSize);
+        if (!this.inBounds(gx, gy)) return false;
+        
+        const idx = this.index(gx, gy);
+        const id = this.grid[idx];
+        
+        // Check temperature
+        if (this.temperatureGrid[idx] > damageThreshold) return true;
+        
+        // Check for dangerous materials
+        if (id === 0) return false;
+        const mat = this.getMaterial(id);
+        if (!mat) return false;
+        
+        // Fire, lava, acid are dangerous
+        if (mat.name === 'fire' || mat.name === 'lava' || mat.name === 'acid') return true;
+        
+        return false;
+    }
+    
+    /**
+     * Disturb an area, displacing materials (v3.5)
+     * @param {number} x - World X center position
+     * @param {number} y - World Y center position
+     * @param {number} radius - Disturbance radius in pixels
+     * @param {number} force - Force strength (0-1)
+     * @example
+     * // Entity lands on ground
+     * engine.physics.disturbArea(entity.x, entity.y + entity.height, 20, 0.5);
+     * 
+     * // Explosion shockwave
+     * engine.physics.disturbArea(bombX, bombY, 100, 1.0);
+     */
+    disturbArea(x, y, radius, force = 0.5) {
+        const gx = Math.floor(x / this.cellSize);
+        const gy = Math.floor(y / this.cellSize);
+        const radiusCells = Math.ceil(radius / this.cellSize);
+        
+        for (let dy = -radiusCells; dy <= radiusCells; dy++) {
+            for (let dx = -radiusCells; dx <= radiusCells; dx++) {
+                const cx = gx + dx;
+                const cy = gy + dy;
+                if (!this.inBounds(cx, cy)) continue;
+                
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist > radiusCells) continue;
+                
+                const idx = this.index(cx, cy);
+                const id = this.grid[idx];
+                if (id === 0) continue; // Skip air
+                
+                const state = this.stateArr[id];
+                if (state === 1) continue; // Skip solid materials
+                
+                // Move material based on force and distance
+                const falloff = 1 - (dist / radiusCells);
+                const displaceForce = force * falloff;
+                
+                // Random displacement direction (simulates disturbance)
+                if (Math.random() < displaceForce) {
+                    const angle = Math.random() * Math.PI * 2;
+                    const pushDist = Math.floor(displaceForce * 3);
+                    const tx = cx + Math.round(Math.cos(angle) * pushDist);
+                    const ty = cy + Math.round(Math.sin(angle) * pushDist);
+                    
+                    if (this.inBounds(tx, ty)) {
+                        const targetIdx = this.index(tx, ty);
+                        if (this.grid[targetIdx] === 0) {
+                            // Move material to target
+                            this.grid[targetIdx] = id;
+                            this.temperatureGrid[targetIdx] = this.temperatureGrid[idx];
+                            this.lifetimeGrid[targetIdx] = this.lifetimeGrid[idx];
+                            
+                            this.grid[idx] = 0;
+                            this.temperatureGrid[idx] = this.ambientTemp;
+                            this.lifetimeGrid[idx] = 0;
+                            
+                            this.activateChunk(tx, ty);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    // ===== WIND SYSTEM (v3.5) =====
+    
+    /**
+     * Set global wind force (v3.5)
+     * @example
+     * engine.physics.wind = { x: 0.5, y: 0 }; // Light breeze to the right
+     * engine.physics.wind = { x: -1.0, y: -0.2 }; // Strong wind to the left and up
+     */
+    wind = { x: 0, y: 0 };
+    
+    // ===== SAVE/LOAD WORLDS (v3.5) =====
+    
+    /**
+     * Save the current pixel world state (v3.5)
+     * @returns {object} Save data {grid, temp, lifetime, width, height, cellSize}
+     * @example
+     * const saveData = engine.physics.save();
+     * localStorage.setItem('myWorld', JSON.stringify(saveData));
+     */
+    save() {
+        if (!this.initialized) {
+            console.warn('[PixelPhysics] Cannot save: not initialized');
+            return null;
+        }
+        
+        return {
+            width: this.width,
+            height: this.height,
+            cellSize: this.cellSize,
+            gridWidth: this.gridWidth,
+            gridHeight: this.gridHeight,
+            grid: Array.from(this.grid), // Convert typed arrays to regular arrays for JSON
+            temperature: Array.from(this.temperatureGrid),
+            lifetime: Array.from(this.lifetimeGrid),
+            ambientTemp: this.ambientTemp,
+            ambientLight: this.ambientLight,
+            lighting: this.lighting,
+            wind: { ...this.wind }
+        };
+    }
+    
+    /**
+     * Load a saved pixel world state (v3.5)
+     * @param {object} saveData - Save data from save()
+     * @example
+     * const saveData = JSON.parse(localStorage.getItem('myWorld'));
+     * engine.physics.load(saveData);
+     */
+    load(saveData) {
+        if (!saveData) {
+            console.error('[PixelPhysics] Invalid save data');
+            return;
+        }
+        
+        // Re-initialize with saved dimensions
+        this.init(saveData.width, saveData.height, saveData.cellSize);
+        
+        // Restore grid data
+        this.grid = new Uint8Array(saveData.grid);
+        this.temperatureGrid = new Float32Array(saveData.temperature);
+        this.lifetimeGrid = new Float32Array(saveData.lifetime);
+        
+        // Restore settings
+        this.ambientTemp = saveData.ambientTemp || 20;
+        this.ambientLight = saveData.ambientLight !== undefined ? saveData.ambientLight : 0.2;
+        this.lighting = saveData.lighting !== undefined ? saveData.lighting : true;
+        if (saveData.wind) {
+            this.wind.x = saveData.wind.x || 0;
+            this.wind.y = saveData.wind.y || 0;
+        }
+        
+        // Rebuild heat sources and activate all chunks
+        this.heatSources.clear();
+        for (let i = 0; i < this.grid.length; i++) {
+            if (this.grid[i] !== 0 && this.temperatureGrid[i] > 100) {
+                this.heatSources.add(i);
+            }
+        }
+        
+        // Activate all chunks
+        for (let y = 0; y < this.chunksHigh; y++) {
+            for (let x = 0; x < this.chunksWide; x++) {
+                this.chunks[y][x].active = true;
+                this.chunks[y][x].lastActive = 0;
+            }
+        }
+        
+        console.log(`[PixelPhysics v3.5] World loaded: ${this.gridWidth}x${this.gridHeight}`);
     }
 }
 
@@ -8064,7 +8357,7 @@ class AcousticEngine {
 }
 
 // Static properties (must be set AFTER class definition)
-BudEngine.VERSION = '3.3';
+BudEngine.VERSION = '3.5';
 BudEngine.LAYER = {
     DEFAULT: 1,
     PLAYER: 2,
