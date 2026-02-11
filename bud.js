@@ -45,18 +45,6 @@
  * - Wave announcements
  */
 
-// Collision layer constants
-BudEngine.LAYER = {
-    DEFAULT: 1,
-    PLAYER: 2,
-    ENEMY: 4,
-    BULLET: 8,
-    PICKUP: 16,
-    WALL: 32
-};
-
-BudEngine.VERSION = '2.1';
-
 class BudEngine {
     /**
      * Create a new BudEngine instance
@@ -71,7 +59,7 @@ class BudEngine {
      * const engine = new BudEngine({ width: 1280, height: 720, gravity: 800 });
      */
     constructor(config = {}) {
-        console.log(`[BudEngine v${BudEngine.VERSION}] Initializing...`);
+        console.log(`[BudEngine v${BudEngine.VERSION || '2.1'}] Initializing...`);
         this.config = {
             width: config.width || 1280,
             height: config.height || 720,
@@ -1532,6 +1520,7 @@ class BudEngine {
      * engine.random(5, 15); // 5-15
      */
     random(min, max) {
+        if (min === undefined) return Math.random();
         if (max === undefined) {
             max = min;
             min = 0;
@@ -1546,7 +1535,13 @@ class BudEngine {
      * @example
      * const color = engine.choose(['red', 'blue', 'green']);
      */
+    /**
+     * Choose a random element from an array
+     * @param {Array} array - Array to choose from
+     * @returns {*} Random element, or undefined if array is empty
+     */
     choose(array) {
+        if (!array || array.length === 0) return undefined;
         return array[Math.floor(Math.random() * array.length)];
     }
 }
@@ -2164,7 +2159,12 @@ class SoundSystem {
             } catch (e) {
                 console.warn('[BudEngine] Audio context initialization failed:', e);
                 this.audioContext = null;
+                return;
             }
+        }
+        // Resume suspended AudioContext (browsers block until user gesture)
+        if (this.audioContext && this.audioContext.state === 'suspended') {
+            this.audioContext.resume().catch(() => {});
         }
     }
 
@@ -3413,6 +3413,17 @@ class PathfindingSystem {
         return path;
     }
 }
+
+// Static properties (must be set AFTER class definition)
+BudEngine.VERSION = '2.1';
+BudEngine.LAYER = {
+    DEFAULT: 1,
+    PLAYER: 2,
+    ENEMY: 4,
+    BULLET: 8,
+    PICKUP: 16,
+    WALL: 32
+};
 
 // Export for use in browser
 if (typeof window !== 'undefined') {

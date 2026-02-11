@@ -72,6 +72,8 @@ engine.scene('gameplay', {
             speedBoostTime: 0,
             shootCooldown: 0,
             damageCooldown: 0,
+            dashCooldown: 0,
+            damageFlash: 0,
             score: 0,
             tags: ['player', 'friendly']
         });
@@ -139,10 +141,17 @@ engine.scene('gameplay', {
         engine.onCollision('player', 'enemy', (player, enemy) => {
             if (!player.damageCooldown || player.damageCooldown <= 0) {
                 player.health -= 15;
-                player.damageCooldown = 1.0; // 1 second invincibility
+                player.damageCooldown = 1.0;
+                player.damageFlash = 0.3;
                 engine.cameraShake(10);
                 engine.sound.play('hurt');
+                engine.slowMo(0.2, 0.1); // Brief hit-stop
                 if (player.health <= 0) {
+                    // Death explosion
+                    engine.particles.emit(player.x, player.y, {
+                        count: 50, color: ['#00ffcc', '#ffffff', '#ff3333'],
+                        speed: [100, 300], life: [0.5, 1.5], size: [3, 10], fade: true
+                    });
                     gameOver();
                 }
             }
@@ -191,6 +200,7 @@ engine.scene('gameplay', {
 
         engine.onCollision('enemy-bullet', 'player', (bullet, player) => {
             player.health -= 10;
+            player.damageFlash = 0.2;
             engine.destroy(bullet);
             engine.sound.play('hurt');
             engine.cameraShake(8);
@@ -209,9 +219,34 @@ engine.scene('gameplay', {
         const player = engine.findOne('player');
         if (!player) return;
 
-        // Damage cooldown
+        // Damage cooldown & flash
         if (player.damageCooldown > 0) {
             player.damageCooldown -= dt;
+        }
+        if (player.damageFlash > 0) {
+            player.damageFlash -= dt;
+        }
+
+        // Dash (Shift key)
+        if (player.dashCooldown > 0) player.dashCooldown -= dt;
+        if ((engine.input.keyPressed('Shift') || engine.input.keyPressed(' ')) && player.dashCooldown <= 0) {
+            let dashX = 0, dashY = 0;
+            if (engine.input.key('w') || engine.input.key('W')) dashY -= 1;
+            if (engine.input.key('s') || engine.input.key('S')) dashY += 1;
+            if (engine.input.key('a') || engine.input.key('A')) dashX -= 1;
+            if (engine.input.key('d') || engine.input.key('D')) dashX += 1;
+            const dLen = Math.sqrt(dashX * dashX + dashY * dashY);
+            if (dLen > 0) {
+                player.x += (dashX / dLen) * 120;
+                player.y += (dashY / dLen) * 120;
+                player.dashCooldown = 1.5;
+                engine.particles.emit(player.x, player.y, {
+                    count: 15, color: ['#00ffcc', '#ffffff'], speed: [100, 200],
+                    life: [0.2, 0.5], size: [3, 6], fade: true
+                });
+                engine.sound.play('powerup');
+                engine.slowMo(0.4, 0.15); // Brief bullet-time on dash
+            }
         }
 
         // Speed boost timer
@@ -326,7 +361,34 @@ engine.scene('gameplay', {
         }
     },
 
-    draw(ctx) {}
+    draw(ctx) {
+        const player = engine.findOne('player');
+        if (!player) return;
+        
+        // Damage flash overlay
+        if (player.damageFlash > 0) {
+            ctx.fillStyle = `rgba(255, 0, 0, ${player.damageFlash * 0.4})`;
+            ctx.fillRect(0, 0, engine.canvas.width, engine.canvas.height);
+        }
+        
+        // Dash cooldown indicator
+        if (player.dashCooldown > 0) {
+            const pct = 1 - (player.dashCooldown / 1.5);
+            ctx.fillStyle = '#333';
+            ctx.fillRect(20, 680, 100, 8);
+            ctx.fillStyle = '#00ffcc';
+            ctx.fillRect(20, 680, 100 * pct, 8);
+            ctx.font = '12px monospace';
+            ctx.fillStyle = '#888';
+            ctx.textAlign = 'left';
+            ctx.fillText('DASH', 20, 675);
+        } else {
+            ctx.font = '12px monospace';
+            ctx.fillStyle = '#00ffcc';
+            ctx.textAlign = 'left';
+            ctx.fillText('DASH READY [Shift]', 20, 675);
+        }
+    }
 });
 
 // ===== GAME OVER SCENE =====
@@ -505,10 +567,19 @@ function spawnBomber(x, y) {
 // ===== ENEMY AI =====
 
 function updatePatrolDrone(enemy, player, dt) {
-    // Patrol in circles
+    // Patrol in circles, but drift toward player
     enemy.patrolAngle += dt * 2;
+    const dx = player.x - enemy.x;
+    const dy = player.y - enemy.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const driftSpeed = 40; // Slowly approach player
+    
     enemy.x += Math.cos(enemy.patrolAngle) * enemy.speed * dt;
     enemy.y += Math.sin(enemy.patrolAngle) * enemy.speed * dt;
+    if (dist > 0) {
+        enemy.x += (dx / dist) * driftSpeed * dt;
+        enemy.y += (dy / dist) * driftSpeed * dt;
+    }
 }
 
 function updateChaser(enemy, player, dt) {

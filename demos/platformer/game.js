@@ -63,10 +63,12 @@ engine.scene('gameplay', {
                 layer: BudEngine.LAYER.PLAYER,
                 mask: BudEngine.LAYER.WALL | BudEngine.LAYER.PICKUP | BudEngine.LAYER.ENEMY
             },
-            speed: 250,
-            jumpForce: 400,
+            speed: 280,
+            jumpForce: 420,
             velocity: { x: 0, y: 0 },
             grounded: false,
+            coyoteTime: 0,    // Time since last grounded (allows late jumps)
+            jumpBuffer: 0,     // Buffered jump input
             tags: ['player']
         });
 
@@ -112,7 +114,13 @@ engine.scene('gameplay', {
         });
 
         engine.onCollision('player', 'spike', (player, spike) => {
-            // Death - restart level
+            // Death explosion
+            engine.particles.emit(player.x, player.y, {
+                count: 30, color: ['#ff3333', '#ff8800', '#00ffcc'],
+                speed: [100, 250], life: [0.5, 1.0], size: [3, 8], gravity: 300, fade: true
+            });
+            engine.cameraShake(12);
+            engine.sound.play('explode');
             gameOver();
         });
 
@@ -167,9 +175,24 @@ engine.scene('gameplay', {
 
         player.velocity.x = moveX * player.speed;
 
-        // Jump
-        if ((engine.input.keyPressed('ArrowUp') || engine.input.keyPressed(' ') || engine.input.keyPressed('w') || engine.input.keyPressed('W')) && player.grounded) {
+        // Coyote time & jump buffer
+        if (player.grounded) {
+            player.coyoteTime = 0.12; // 120ms grace period after leaving ground
+        } else {
+            player.coyoteTime -= dt;
+        }
+        
+        if (engine.input.keyPressed('ArrowUp') || engine.input.keyPressed(' ') || engine.input.keyPressed('w') || engine.input.keyPressed('W')) {
+            player.jumpBuffer = 0.1; // 100ms buffer
+        } else {
+            player.jumpBuffer -= dt;
+        }
+        
+        // Jump (with coyote time + jump buffer)
+        if (player.jumpBuffer > 0 && player.coyoteTime > 0) {
             player.velocity.y = -player.jumpForce;
+            player.coyoteTime = 0;
+            player.jumpBuffer = 0;
             engine.sound.play('jump');
             engine.particles.emit(player.x, player.y + 20, {
                 count: 8,
