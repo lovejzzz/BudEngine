@@ -6961,37 +6961,36 @@ class PixelPhysics {
         // Additive blending for light sources
         lctx.globalCompositeOperation = 'lighter';
         
-        // Update light sources set (track all light-emitting materials)
-        this.lightSources.clear();
-        for (let y = 0; y < this.gridHeight; y++) {
-            for (let x = 0; x < this.gridWidth; x++) {
-                const idx = this.index(x, y);
-                const id = this.grid[idx];
-                const mat = this.getMaterial(id);
-                
-                if (mat && mat.lightRadius) {
-                    this.lightSources.add(idx);
-                }
-                
-                // Hot materials (> 500°C) emit faint glow
-                if (mat && mat.name !== 'air' && this.temperatureGrid[idx] > 500) {
-                    const temp = this.temperatureGrid[idx];
-                    // Calculate glow intensity based on temperature
-                    const glowIntensity = Math.min(0.4, (temp - 500) / 1500);
-                    this.renderLight(x, y, 20, '#ff4400', glowIntensity);
-                }
-            }
-        }
+        // Use heatSources set (already tracked) instead of scanning entire grid
+        // Sample every Nth heat source to limit draw calls
+        let lightCount = 0;
+        const MAX_LIGHTS = 80; // cap for performance
+        const step = this.heatSources.size > MAX_LIGHTS ? Math.ceil(this.heatSources.size / MAX_LIGHTS) : 1;
+        let i = 0;
         
-        // Render each light source
-        for (let idx of this.lightSources) {
-            const y = Math.floor(idx / this.gridWidth);
-            const x = idx % this.gridWidth;
+        for (let idx of this.heatSources) {
+            i++;
+            if (i % step !== 0) continue;
+            if (lightCount >= MAX_LIGHTS) break;
+            
             const id = this.grid[idx];
             const mat = this.getMaterial(id);
+            if (!mat || mat.name === 'air') continue;
             
-            if (mat && mat.lightRadius) {
+            const y = Math.floor(idx / this.gridWidth);
+            const x = idx % this.gridWidth;
+            
+            // Materials with explicit light properties
+            if (mat.lightRadius) {
                 this.renderLight(x, y, mat.lightRadius, mat.lightColor, mat.lightIntensity);
+                lightCount++;
+            }
+            // Hot materials (> 500°C) emit faint temperature glow
+            else if (this.temperatureGrid[idx] > 500) {
+                const temp = this.temperatureGrid[idx];
+                const glowIntensity = Math.min(0.3, (temp - 500) / 2000);
+                this.renderLight(x, y, 15, '#ff4400', glowIntensity);
+                lightCount++;
             }
         }
         
