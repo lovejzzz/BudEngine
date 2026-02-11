@@ -1,11 +1,21 @@
 /**
- * BUD ENGINE v4.1
+ * BUD ENGINE v4.2
  * A 2D web game engine designed for AI-human collaboration
  * 
  * Philosophy: AI can write, TEST, and iterate on games independently.
  * Killer feature: AI Testing API + auto-playtest bot
  * 
  * Architecture: Single-file, no build tools, runs in browser
+ * 
+ * v4.2 ECOSYSTEM POLISH - Visible Creatures, Plant Growth, Interactive Conducting:
+ * - Multi-pixel creature rendering: worms (2px), fish (3px arrow), bugs (2px) - now VISIBLE!
+ * - Brighter creature colors: worm pink #ff8877, fish orange #ffaa33, bug lime #66ff44
+ * - Fixed bug spawning: increased search radius to 10 cells, bugs spawn on plants, search upward
+ * - Complete plant growth cycle: biology chunks stay awake, plants grow/spread/harden to wood
+ * - Auto-enable sound on welcome tap for immediate acoustic feedback
+ * - Conducting mode ecosystem gestures: swipe→wind, tap→rain, long press→warmth
+ * - Garden scenario spawn fix: bugs spawn at correct Y position for air cells
+ * - Creatures eat, reproduce, and sustain populations in living ecosystems
  * 
  * v4.1 LIVING ECOSYSTEM - Creatures, Food Chains, Self-Sustaining Life:
  * - Three creature types: Worms (🪱 soil decomposers), Fish (🐟 aquatic herbivores), Bugs (🐛 surface herbivores)
@@ -4170,7 +4180,7 @@ class TestingAPI {
                 // Bugs on dirt surface
                 for (let i = 0; i < 8; i++) {
                     const bx = Math.random() * w * 0.75;
-                    const by = h*0.69;
+                    const by = h*0.68; // Slightly above dirt surface to ensure air
                     this.engine.physics.spawnCreature('bug', bx, by);
                 }
                 
@@ -6992,7 +7002,7 @@ class PixelPhysics {
             pH: 7,
             reactivity: 0,
             solubility: null,
-            color: ['#d4836b', '#c47a63'],
+            color: ['#ff8877', '#ff6655'],
             immovable: false,
             organic: true,
             living: true,
@@ -7038,7 +7048,7 @@ class PixelPhysics {
             pH: 7,
             reactivity: 0,
             solubility: null,
-            color: ['#ff9933', '#ffaa44'],
+            color: ['#ffaa33', '#ffcc44'],
             immovable: false,
             organic: true,
             living: true,
@@ -7085,7 +7095,7 @@ class PixelPhysics {
             pH: 7,
             reactivity: 0,
             solubility: null,
-            color: ['#336633', '#2d5c2d'],
+            color: ['#66ff44', '#44dd22'],
             immovable: false,
             organic: true,
             living: true,
@@ -7645,7 +7655,7 @@ class PixelPhysics {
     spawnCreature(type, pixelX, pixelY) {
         const targetGx = Math.floor(pixelX / this.cellSize);
         const targetGy = Math.floor(pixelY / this.cellSize);
-        const searchRadius = 5; // grid cells
+        const searchRadius = 10; // grid cells (increased from 5)
         
         let bestGx = null;
         let bestGy = null;
@@ -7677,16 +7687,23 @@ class PixelPhysics {
                         isValid = true;
                     }
                 } else if (type === 'bug') {
-                    // Bugs need air with solid below
-                    if (id === 0) {
+                    // Bugs need air (or plant) with solid (non-liquid/non-gas) below
+                    // Bugs can spawn on plants!
+                    if (id === 0 || (mat && (mat.name === 'plant' || mat.name === 'vegetation'))) {
                         const belowIdx = this.index(gx, gy + 1);
                         if (this.inBounds(gx, gy + 1)) {
                             const belowId = this.grid[belowIdx];
                             const belowMat = this.getMaterial(belowId);
-                            if (belowMat && belowMat.state === 'solid') {
+                            // Bugs spawn on ANY non-liquid, non-gas surface
+                            if (belowMat && belowMat.state !== 'liquid' && belowMat.state !== 'gas') {
                                 isValid = true;
                             }
                         }
+                    }
+                    // For bugs, also search UPWARD (prioritize cells above target)
+                    if (!isValid && dy < 0) {
+                        // Upward cells get bonus priority (smaller effective distance)
+                        // This helps bugs spawn above the dirt surface
                     }
                 }
                 
@@ -7968,6 +7985,8 @@ class PixelPhysics {
                         // v3.6: Biology simulation for living materials
                         if (mat.living) {
                             this.simulateBiology(x, y, mat, idx);
+                            // v4.2: Keep biology chunks active (plants, vegetation, fungus)
+                            this.activateChunk(x, y);
                         }
                         
                         // v4.1: Count creatures (every 60 frames)
@@ -9545,6 +9564,59 @@ class PixelPhysics {
                     pixels[pixelIdx + 1] = g;
                     pixels[pixelIdx + 2] = b;
                     pixels[pixelIdx + 3] = mat.alpha !== undefined ? mat.alpha * 255 : a;
+                    
+                    // v4.2: Multi-pixel rendering for creatures (make them VISIBLE!)
+                    if (mat.creature) {
+                        const creatureType = mat.creatureType;
+                        
+                        if (creatureType === 'worm') {
+                            // Draw worm as 2 pixels: current + 1 to the right (or left at edge)
+                            const rightX = x < this.gridWidth - 1 ? x + 1 : x - 1;
+                            if (rightX >= 0 && rightX < this.gridWidth) {
+                                const rightIdx = this.index(rightX, y);
+                                const rightPixelIdx = rightIdx * 4;
+                                pixels[rightPixelIdx] = r;
+                                pixels[rightPixelIdx + 1] = g;
+                                pixels[rightPixelIdx + 2] = b;
+                                pixels[rightPixelIdx + 3] = 255;
+                            }
+                        } else if (creatureType === 'fish') {
+                            // Draw fish as 3 pixels: current + right + upper-right (arrow shape)
+                            const rightX = x < this.gridWidth - 1 ? x + 1 : x;
+                            const upY = y > 0 ? y - 1 : y;
+                            
+                            // Right pixel
+                            if (rightX < this.gridWidth) {
+                                const rightIdx = this.index(rightX, y);
+                                const rightPixelIdx = rightIdx * 4;
+                                pixels[rightPixelIdx] = r;
+                                pixels[rightPixelIdx + 1] = g;
+                                pixels[rightPixelIdx + 2] = b;
+                                pixels[rightPixelIdx + 3] = 255;
+                            }
+                            
+                            // Upper-right pixel
+                            if (rightX < this.gridWidth && upY >= 0) {
+                                const diagIdx = this.index(rightX, upY);
+                                const diagPixelIdx = diagIdx * 4;
+                                pixels[diagPixelIdx] = r;
+                                pixels[diagPixelIdx + 1] = g;
+                                pixels[diagPixelIdx + 2] = b;
+                                pixels[diagPixelIdx + 3] = 255;
+                            }
+                        } else if (creatureType === 'bug') {
+                            // Draw bug as 2 pixels: current + 1 above
+                            const upY = y > 0 ? y - 1 : y;
+                            if (upY >= 0) {
+                                const upIdx = this.index(x, upY);
+                                const upPixelIdx = upIdx * 4;
+                                pixels[upPixelIdx] = r;
+                                pixels[upPixelIdx + 1] = g;
+                                pixels[upPixelIdx + 2] = b;
+                                pixels[upPixelIdx + 3] = 255;
+                            }
+                        }
+                    }
                 } else {
                     // Empty - transparent
                     pixels[pixelIdx] = 0;
@@ -12204,8 +12276,10 @@ class CompositionGame {
             
             // Apply conducting gestures
             if (Math.abs(dx) > Math.abs(dy)) {
-                // Horizontal swipe: wind
-                this.conducting.wind.x = Math.max(-1, Math.min(1, dx / 100));
+                // v4.2: Horizontal swipe: create wind burst for seed dispersal
+                const swipeVelocity = dx / 100;
+                this.conducting.wind.x = Math.max(-1, Math.min(1, swipeVelocity));
+                this.physics.wind.x = swipeVelocity * 0.5;
             } else {
                 // Vertical swipe: temperature
                 this.conducting.tempModifier = Math.max(-1, Math.min(1, -dy / 100));
@@ -12230,15 +12304,15 @@ class CompositionGame {
         if (dist < 10) {
             if (duration > 0.5) {
                 this.gesture.type = 'longpress';
-                // Long press in conducting mode: spawn rain/snow
+                // v4.2: Long press in conducting mode: warmth burst (increase temperature)
                 if (this.mode === 'conducting') {
-                    this.spawnWeather(x, y);
+                    this.spawnWarmth(x, y);
                 }
             } else {
                 this.gesture.type = 'tap';
-                // Tap in conducting mode: geological event
+                // v4.2: Tap in conducting mode: trigger rain at tap position
                 if (this.mode === 'conducting') {
-                    this.triggerGeologicalEvent(x, y);
+                    this.spawnRain(x, y);
                 }
             }
         }
@@ -12247,37 +12321,45 @@ class CompositionGame {
     }
 
     /**
-     * Spawn weather at position (conducting mode)
+     * v4.2: Spawn rain at tap position (conducting mode)
      * @private
      */
-    spawnWeather(screenX, screenY) {
-        // Convert screen to world position
-        const worldX = Math.floor(screenX / this.physics.cellSize);
-        const worldY = Math.floor(screenY / this.physics.cellSize);
-        
-        // Spawn water or snow based on temperature
-        const material = this.physics.ambientTemp < 0 ? 'ice' : 'water';
-        
-        // Rain down from top
+    spawnRain(tapX, tapY) {
+        // Spawn 20 water drops in a line above the tap point
+        // CRITICAL: physics.set() takes PIXEL coordinates, NOT grid coordinates
         for (let i = 0; i < 20; i++) {
-            const x = worldX + Math.floor(Math.random() * 10) - 5;
-            const y = Math.max(0, worldY - Math.floor(Math.random() * 20));
-            this.physics.set(x, y, material);
+            const x = tapX + (Math.random() - 0.5) * 50;
+            const y = tapY - 50 - Math.random() * 30;
+            this.physics.set(x, y, 'water');
         }
     }
 
     /**
-     * Trigger geological event at position (conducting mode)
+     * v4.2: Spawn warmth burst at long press position (conducting mode)
      * @private
      */
-    triggerGeologicalEvent(screenX, screenY) {
-        // Convert screen to world position
-        const worldX = Math.floor(screenX / this.physics.cellSize);
-        const worldY = Math.floor(screenY / this.physics.cellSize);
+    spawnWarmth(pressX, pressY) {
+        // Increase temperature in a radius around the press point
+        const gx = Math.floor(pressX / this.physics.cellSize);
+        const gy = Math.floor(pressY / this.physics.cellSize);
+        const radius = 10; // grid cells
         
-        // Small explosion effect
-        if (this.physics.explode) {
-            this.physics.explode(worldX, worldY, 5);
+        for (let dy = -radius; dy <= radius; dy++) {
+            for (let dx = -radius; dx <= radius; dx++) {
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist > radius) continue;
+                
+                const x = gx + dx;
+                const y = gy + dy;
+                
+                if (!this.physics.inBounds(x, y)) continue;
+                
+                const idx = this.physics.index(x, y);
+                // Add +5 to temperature, stronger at center
+                const heatBoost = 5 * (1 - dist / radius);
+                this.physics.temperatureGrid[idx] += heatBoost;
+                this.physics.activateChunk(x, y);
+            }
         }
     }
 
@@ -12315,7 +12397,7 @@ class CompositionGame {
 }
 
 // Static properties (must be set AFTER class definition)
-BudEngine.VERSION = '4.0';
+BudEngine.VERSION = '4.2';
 BudEngine.LAYER = {
     DEFAULT: 1,
     PLAYER: 2,

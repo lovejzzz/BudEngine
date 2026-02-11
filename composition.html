@@ -561,7 +561,7 @@
         </div>
     </div>
 
-    <script src="bud.js?v=48"></script>
+    <script src="bud.js?v=50"></script>
     <script>
         // The Composition v4.2
         // Your instrument is the Earth
@@ -861,6 +861,12 @@
 
                 // Mark as visited
                 localStorage.setItem('composition_visited', '1');
+
+                // v4.2: Auto-enable sound on welcome tap
+                engine.physics.acoustics.init();
+                soundEnabled = true;
+                soundToggle.textContent = '🔊';
+                soundToggle.classList.add('enabled');
 
                 // Load garden after brief delay
                 setTimeout(() => {
