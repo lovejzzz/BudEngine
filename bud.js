@@ -8628,8 +8628,9 @@ class PixelPhysics {
         
         // 5. MOVEMENT
         if (Math.random() < mat.moveSpeed) {
-            // Decrement hunger slowly
+            // Decrement hunger slowly and increment age timer
             const newHunger = Math.max(0, hunger - 1);
+            var newMoveTimer = Math.min(255, moveTimer + 1);
             
             // Change direction sometimes
             let newDirection = direction;
@@ -8688,7 +8689,7 @@ class PixelPhysics {
                     // Move creature
                     this.grid[nidx] = this.grid[idx];
                     this.temperatureGrid[nidx] = this.temperatureGrid[idx];
-                    this.lifetimeGrid[nidx] = newHunger | (newDirection << 16) | (moveTimer << 24);
+                    this.lifetimeGrid[nidx] = newHunger | (newDirection << 16) | (newMoveTimer << 24);
                     
                     this.grid[idx] = restoreMat;
                     this.temperatureGrid[idx] = this.ambientTemp;
@@ -8699,12 +8700,12 @@ class PixelPhysics {
                 } else {
                     // Bounce - reverse direction
                     newDirection = (newDirection + 4) % 8;
-                    this.lifetimeGrid[idx] = newHunger | (newDirection << 16) | (moveTimer << 24);
+                    this.lifetimeGrid[idx] = newHunger | (newDirection << 16) | (newMoveTimer << 24);
                 }
             } else {
                 // Hit boundary - reverse direction
                 newDirection = (newDirection + 4) % 8;
-                this.lifetimeGrid[idx] = newHunger | (newDirection << 16) | (moveTimer << 24);
+                this.lifetimeGrid[idx] = newHunger | (newDirection << 16) | (newMoveTimer << 24);
             }
         }
     }
