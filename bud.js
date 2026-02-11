@@ -5267,7 +5267,7 @@ class PixelPhysics {
             meltingPoint: null,
             boilingPoint: 2400,
             ignitionPoint: null,
-            thermalConductivity: 1.0,
+            thermalConductivity: 5.0,  // high — lava radiates heat aggressively
             specificHeat: 0.84,
             flammability: 0,
             hardness: 0,
@@ -5277,8 +5277,8 @@ class PixelPhysics {
             solubility: null,
             color: ['#ff4400', '#ff6600', '#ff8800', '#ff2200'],
             solidForm: 'obsidian',
-            viscosity: 0.9, // very viscous
-            ignitesMaterials: true // sets flammable things on fire
+            viscosity: 0.9,
+            heatEmission: 300  // actively radiates heat like fire
         });
 
         // OBSIDIAN (cooled lava)
@@ -6278,9 +6278,10 @@ class PixelPhysics {
             const y = Math.floor(idx / this.gridWidth);
             const x = idx % this.gridWidth;
             
-            // Add neighbors
-            for (let dy = -2; dy <= 2; dy++) {
-                for (let dx = -2; dx <= 2; dx++) {
+            // Add neighbors — larger radius for very hot sources
+            const radius = temp > 500 ? 4 : 2;
+            for (let dy = -radius; dy <= radius; dy++) {
+                for (let dx = -radius; dx <= radius; dx++) {
                     const nx = x + dx;
                     const ny = y + dy;
                     if (this.inBounds(nx, ny)) {
@@ -6330,8 +6331,10 @@ class PixelPhysics {
                 const tempDiff = temp - ntemp;
                 const transfer = tempDiff * avgConductivity * dt * 0.5;
                 
-                newTemps[idx] -= transfer * 0.25;
-                newTemps[nidx] += transfer * 0.25;
+                // Higher transfer rate for more realistic heat spread
+                const transferRate = 0.5;
+                newTemps[idx] -= transfer * transferRate;
+                newTemps[nidx] += transfer * transferRate;
                 
                 // Track new heat sources
                 if (newTemps[nidx] > this.ambientTemp + 50) {
