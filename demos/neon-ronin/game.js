@@ -1706,22 +1706,43 @@ function transitionToRoom(roomName, spawnSide) {
         // Create new room
         createRoom(roomName);
         
-        // Spawn player at appropriate position
-        let spawnX = 100;
-        let spawnY = 360;
+        // Spawn player at appropriate position based on entry side
+        const roomSizes = {
+            room1: { w: 30, h: 20 },
+            room2: { w: 35, h: 25 },
+            room3: { w: 30, h: 22 },
+            boss: { w: 40, h: 30 }
+        };
+        const size = roomSizes[roomName] || { w: 30, h: 20 };
+        const roomMidY = (size.h * 32) / 2;
         
+        let spawnX, spawnY;
         if (spawnSide === 'left') {
             spawnX = 80;
+            spawnY = roomMidY;
         } else if (spawnSide === 'right') {
-            spawnX = 1100;
+            spawnX = size.w * 32 - 80;
+            spawnY = roomMidY;
+        } else {
+            spawnX = (size.w * 32) / 2;
+            spawnY = roomMidY;
         }
         
         const newPlayer = createPlayer(spawnX, spawnY);
         
-        // Snap camera to player immediately to prevent offset
+        // Snap camera and set bounds
         engine.camera.x = newPlayer.x;
         engine.camera.y = newPlayer.y;
         engine.cameraFollow(newPlayer, 0.1);
+        
+        const halfW = engine.canvas.width / 2;
+        const halfH = engine.canvas.height / 2;
+        engine.camera.bounds = {
+            minX: halfW / engine.camera.zoom,
+            minY: halfH / engine.camera.zoom,
+            maxX: size.w * 32 - halfW / engine.camera.zoom,
+            maxY: size.h * 32 - halfH / engine.camera.zoom
+        };
         
         // Setup UI
         setupGameUI();
@@ -1902,13 +1923,38 @@ engine.scene('gameplay', {
         // Reset or start new game
         if (!engine.findOne('player')) {
             createRoom(game.currentRoom);
-            const player = createPlayer(100, 360);
+            // Spawn player in room center
+            const roomCenters = {
+                room1: { x: 480, y: 320 },
+                room2: { x: 560, y: 400 },
+                room3: { x: 480, y: 320 },
+                boss: { x: 640, y: 480 }
+            };
+            const center = roomCenters[game.currentRoom] || { x: 480, y: 320 };
+            const player = createPlayer(center.x, center.y);
             
-            // FIXED: Snap camera to player immediately
+            // Snap camera to player immediately
             engine.camera.x = player.x;
             engine.camera.y = player.y;
             engine.camera.lookahead = { x: 0, y: 0 };
             engine.cameraFollow(player, 0.1);
+            
+            // Set camera bounds to room dimensions
+            const roomSizes = {
+                room1: { w: 30, h: 20 },
+                room2: { w: 35, h: 25 },
+                room3: { w: 30, h: 22 },
+                boss: { w: 40, h: 30 }
+            };
+            const size = roomSizes[game.currentRoom] || { w: 30, h: 20 };
+            const halfW = engine.canvas.width / 2;
+            const halfH = engine.canvas.height / 2;
+            engine.camera.bounds = {
+                minX: halfW / engine.camera.zoom,
+                minY: halfH / engine.camera.zoom,
+                maxX: size.w * 32 - halfW / engine.camera.zoom,
+                maxY: size.h * 32 - halfH / engine.camera.zoom
+            };
             
             setupGameUI();
             setupCollisions();
