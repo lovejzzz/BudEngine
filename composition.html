@@ -578,6 +578,16 @@
             // Gesture tracking for composition game
             engine.composition.onGestureStart(pos.x, pos.y);
 
+            // Draw debug red dot at raw canvas position
+            const debugCtx = canvas.getContext('2d');
+            debugCtx.save();
+            debugCtx.setTransform(1, 0, 0, 1, 0, 0);
+            debugCtx.fillStyle = 'red';
+            debugCtx.beginPath();
+            debugCtx.arc(pos.x, pos.y, 5, 0, Math.PI * 2);
+            debugCtx.fill();
+            debugCtx.restore();
+
             // Place material
             if (engine.composition.mode === 'creation') {
                 placeMaterial(pos.x, pos.y);
