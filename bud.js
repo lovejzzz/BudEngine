@@ -6416,15 +6416,20 @@ class PixelPhysics {
     hasOxygenNearby(x, y) {
         const neighbors = [
             [x - 1, y], [x + 1, y],
-            [x, y - 1], [x, y + 1]
+            [x, y - 1], [x, y + 1],
+            [x - 1, y - 1], [x + 1, y - 1],
+            [x - 1, y + 1], [x + 1, y + 1]
         ];
         
         for (let [nx, ny] of neighbors) {
             if (!this.inBounds(nx, ny)) continue;
             
             const nid = this.grid[this.index(nx, ny)];
-            const nmat = this.getMaterial(nid);
             
+            // Empty cells (id=0) are air — they contain oxygen
+            if (nid === 0) return true;
+            
+            const nmat = this.getMaterial(nid);
             if (nmat && (nmat.supportsCombustion || nmat.name === 'oxygen' || nmat.name === 'air')) {
                 return true;
             }
