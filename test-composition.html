@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>The Composition - API Test</title>
+    <style>
+        body {
+            font-family: monospace;
+            background: #000;
+            color: #0f0;
+            padding: 20px;
+        }
+        .test { margin: 10px 0; }
+        .pass { color: #0f0; }
+        .fail { color: #f00; }
+    </style>
+</head>
+<body>
+    <h1>The Composition v4.0 - API Test</h1>
+    <div id="results"></div>
+
+    <script src="bud.js"></script>
+    <script>
+        const results = document.getElementById('results');
+        
+        function log(msg, pass = true) {
+            const div = document.createElement('div');
+            div.className = 'test ' + (pass ? 'pass' : 'fail');
+            div.textContent = (pass ? '✓ ' : '✗ ') + msg;
+            results.appendChild(div);
+        }
+
+        // Test 1: Engine initialization
+        const engine = new BudEngine({ width: 800, height: 600 });
+        log('Engine created: ' + (engine ? 'YES' : 'NO'), !!engine);
+
+        // Test 2: Physics initialization
+        engine.physics.init(800, 600, 2);
+        log('Physics initialized: ' + (engine.physics.initialized ? 'YES' : 'NO'), engine.physics.initialized);
+
+        // Test 3: CompositionGame class exists
+        log('CompositionGame class exists: ' + (typeof CompositionGame !== 'undefined' ? 'YES' : 'NO'), typeof CompositionGame !== 'undefined');
+
+        // Test 4: Create composition game
+        engine.composition = new CompositionGame(engine);
+        log('CompositionGame created: ' + (engine.composition ? 'YES' : 'NO'), !!engine.composition);
+
+        // Test 5: Check initial state
+        const state = engine.composition.getState();
+        log('Initial epoch: ' + state.epoch, state.epoch === 'genesis');
+        log('Initial mode: ' + state.mode, state.mode === 'creation');
+        log('Initial score: ' + state.score, state.score === 0);
+
+        // Test 6: Mode switching
+        engine.composition.setMode('listening');
+        const state2 = engine.composition.getState();
+        log('Mode switched to: ' + state2.mode, state2.mode === 'listening');
+
+        engine.composition.setMode('conducting');
+        const state3 = engine.composition.getState();
+        log('Mode switched to: ' + state3.mode, state3.mode === 'conducting');
+
+        // Test 7: Test API integration
+        const testState = engine.test.getCompositionState();
+        log('Test API getCompositionState(): ' + (testState ? 'YES' : 'NO'), !!testState);
+
+        engine.test.setCompositionMode('creation');
+        const state4 = engine.composition.getState();
+        log('Test API setCompositionMode(): ' + state4.mode, state4.mode === 'creation');
+
+        // Test 8: Musical scoring components
+        log('Harmony score exists: ' + (typeof state.harmony === 'number' ? 'YES' : 'NO'), typeof state.harmony === 'number');
+        log('Complexity score exists: ' + (typeof state.complexity === 'number' ? 'YES' : 'NO'), typeof state.complexity === 'number');
+        log('Rhythm score exists: ' + (typeof state.rhythm === 'number' ? 'YES' : 'NO'), typeof state.rhythm === 'number');
+        log('Dynamics score exists: ' + (typeof state.dynamics === 'number' ? 'YES' : 'NO'), typeof state.dynamics === 'number');
+        log('Texture score exists: ' + (typeof state.texture === 'number' ? 'YES' : 'NO'), typeof state.texture === 'number');
+        log('Melody score exists: ' + (typeof state.melody === 'number' ? 'YES' : 'NO'), typeof state.melody === 'number');
+
+        // Test 9: Place some materials and test scoring
+        engine.physics.circle(100, 100, 5, 'stone');
+        engine.physics.circle(120, 100, 5, 'water');
+        engine.physics.circle(140, 100, 5, 'wood');
+        
+        // Update analysis
+        engine.composition.updateAnalysis(0.016);
+        engine.composition.calculateScores();
+        
+        const state5 = engine.composition.getState();
+        log('Materials placed, complexity > 0: ' + (state5.complexity > 0 ? 'YES' : 'NO'), state5.complexity > 0);
+        log('Active materials count: ' + state5.activeMaterials.length, state5.activeMaterials.length > 0);
+
+        // Test 10: Epoch thresholds
+        const thresholds = engine.composition.epochThresholds;
+        log('Genesis threshold: ' + thresholds.genesis, thresholds.genesis === 0);
+        log('Formation threshold: ' + thresholds.formation, thresholds.formation === 100);
+        log('Life threshold: ' + thresholds.life, thresholds.life === 500);
+        log('Civilization threshold: ' + thresholds.civilization, thresholds.civilization === 1500);
+        log('Transcendence threshold: ' + thresholds.transcendence, thresholds.transcendence === 3000);
+
+        // Test 11: Consonant interval detection
+        log('Consonant interval check (octave 2:1): ' + engine.composition.isConsonant(2.0), engine.composition.isConsonant(2.0));
+        log('Consonant interval check (fifth 3:2): ' + engine.composition.isConsonant(1.5), engine.composition.isConsonant(1.5));
+        log('Dissonant interval check (7:5): ' + !engine.composition.isConsonant(1.4), !engine.composition.isConsonant(1.4));
+
+        // Final summary
+        log('\n=== ALL TESTS COMPLETE ===');
+        log('The Composition v4.0 is ready! 🌍🎵');
+        log('Open composition.html to play the game');
+    </script>
+</body>
+</html>

@@ -1,0 +1,27 @@
+# Build artifacts
+*.backup
+*_COMPLETE.md
+*_COMPLETION_REPORT.md
+*_RELEASE_NOTES.md
+*_SUMMARY.md
+*_THE_COMPOSITION.md
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+npm-debug.log*
+
+# Temporary files
+*.tmp
+tmp/
+temp/
