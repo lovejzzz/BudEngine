@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Bud Engine v2.5 Feature Test</title>
+    <style>
+        body { 
+            margin: 0; 
+            padding: 20px;
+            background: #0a0814; 
+            color: #00ffcc;
+            font-family: monospace;
+        }
+        canvas { 
+            border: 2px solid #00ffcc; 
+            display: block;
+            margin: 20px auto;
+        }
+        #info {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1a1a2e;
+            border: 1px solid #00ffcc;
+        }
+        .test { margin: 10px 0; }
+        .pass { color: #33ff33; }
+        .pending { color: #ffaa00; }
+    </style>
+</head>
+<body>
+    <div id="info">
+        <h2>Bud Engine v2.5 Feature Test</h2>
+        <div class="test">
+            <strong>1. Camera Lookahead:</strong> 
+            <span class="pending">Move mouse around the circle - camera should offset in that direction</span>
+        </div>
+        <div class="test">
+            <strong>2. Impact Helper:</strong> 
+            <span class="pending">Click anywhere - should shake + freeze + flash</span>
+        </div>
+        <div class="test">
+            <strong>3. Particle Presets:</strong> 
+            <span class="pending">Press keys 1-4 for different bursts</span>
+        </div>
+        <ul style="margin-left: 40px; font-size: 14px;">
+            <li>1 = Fire burst</li>
+            <li>2 = Electric burst</li>
+            <li>3 = Magic burst</li>
+            <li>4 = Dust burst</li>
+            <li>T = Trail (automatic)</li>
+        </ul>
+    </div>
+
+    <script src="bud.js"></script>
+    <script>
+        const engine = new BudEngine({
+            width: 800,
+            height: 600,
+            backgroundColor: '#0a0814'
+        });
+
+        engine.scene('test', {
+            enter() {
+                console.log('Bud Engine v2.5 Test Scene');
+                
+                // Create a test entity that faces the mouse
+                const player = engine.spawn('player', {
+                    x: 400,
+                    y: 300,
+                    sprite: engine.art.character({
+                        size: 20,
+                        color: '#00ffcc',
+                        body: 'capsule',
+                        eyes: true,
+                        glow: true
+                    }),
+                    rotation: 0,
+                    tags: ['player'],
+                    
+                    update(dt) {
+                        // Face mouse
+                        const mouse = engine.input.mouseWorld;
+                        this.rotation = Math.atan2(mouse.y - this.y, mouse.x - this.x);
+                        
+                        // Automatic trail on T key
+                        if (engine.input.key('t') && engine.frame % 3 === 0) {
+                            engine.particles.trail(this.x, this.y, 'cyan', 1.0);
+                        }
+                    }
+                });
+                
+                // Enable camera follow with lookahead
+                engine.cameraFollow(player, 0.15);
+                engine.cameraLookahead(100); // TEST: Camera should offset in direction faced
+                
+                console.log('✓ Camera lookahead enabled (100px)');
+                console.log('✓ Player created at center');
+                
+                // Visual ring to show center
+                engine.spawn('center-ring', {
+                    x: 400,
+                    y: 300,
+                    sprite: (ctx) => {
+                        ctx.strokeStyle = '#00ffcc33';
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.arc(0, 0, 80, 0, Math.PI * 2);
+                        ctx.stroke();
+                        
+                        // Crosshair
+                        ctx.strokeStyle = '#00ffcc22';
+                        ctx.beginPath();
+                        ctx.moveTo(-100, 0);
+                        ctx.lineTo(100, 0);
+                        ctx.moveTo(0, -100);
+                        ctx.lineTo(0, 100);
+                        ctx.stroke();
+                    },
+                    tags: ['visual']
+                });
+            },
+            
+            update(dt) {
+                const player = engine.findOne('player');
+                if (!player) return;
+                
+                // Test impact on click
+                if (engine.input.mousePressed) {
+                    const mouse = engine.input.mouseWorld;
+                    
+                    // Cycle through different impact intensities
+                    const intensities = [3, 5, 7, 10];
+                    const colors = ['#ffffff', '#00ffff', '#ff00ff', '#ff0000'];
+                    const idx = Math.floor(Math.random() * intensities.length);
+                    
+                    engine.impact(intensities[idx], { flashColor: colors[idx] });
+                    console.log(`✓ Impact triggered (intensity: ${intensities[idx]}, color: ${colors[idx]})`);
+                }
+                
+                // Test particle bursts on number keys
+                if (engine.input.keyPressed('1')) {
+                    engine.particles.burst(player.x, player.y, 'fire', 1.5);
+                    console.log('✓ Fire burst');
+                }
+                if (engine.input.keyPressed('2')) {
+                    engine.particles.burst(player.x, player.y, 'electric', 1.5);
+                    console.log('✓ Electric burst');
+                }
+                if (engine.input.keyPressed('3')) {
+                    engine.particles.burst(player.x, player.y, 'magic', 1.5);
+                    console.log('✓ Magic burst');
+                }
+                if (engine.input.keyPressed('4')) {
+                    engine.particles.burst(player.x, player.y, 'dust', 1.5);
+                    console.log('✓ Dust burst');
+                }
+            }
+        });
+
+        engine.goTo('test');
+        engine.start();
+        
+        console.log('=== BUD ENGINE v2.5 TEST ===');
+        console.log('Camera lookahead:', engine.camera.lookahead);
+        console.log('Impact method:', typeof engine.impact);
+        console.log('Particle burst:', typeof engine.particles.burst);
+        console.log('Particle trail:', typeof engine.particles.trail);
+        console.log('All features loaded ✓');
+    </script>
+</body>
+</html>
