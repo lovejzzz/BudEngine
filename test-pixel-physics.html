@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pixel Physics v3.6 - Biology System - Bud Engine</title>
+    <title>Pixel Physics v3.7 - AI Debug/Testing API - Bud Engine</title>
     <style>
         * {
             margin: 0;
@@ -440,7 +440,7 @@
         <!-- Header -->
         <div class="header">
             <h1>⚛️ Pixel Physics ⚛️</h1>
-            <div class="version">v3.6 • BIOLOGY SYSTEM</div>
+            <div class="version">v3.7 • AI DEBUG/TESTING API</div>
         </div>
         
         <!-- Material Tabs -->
@@ -750,12 +750,28 @@
             </div>
         </div>
         
+        <!-- Debug Controls (v3.7) -->
+        <div class="control-section">
+            <h3>🤖 AI Debug</h3>
+            <div class="toggle-row">
+                <button class="action-btn toggle" id="debugBtn" onclick="toggleDebug()">📊 Overlay</button>
+            </div>
+            <div style="padding: 10px; font-size: 10px; color: #888; line-height: 1.4;">
+                Debug API available in console:<br>
+                • engine.test.loadScenario(name)<br>
+                • engine.test.step(n)<br>
+                • engine.test.snapshot()<br>
+                • engine.test.getPhysicsState()<br>
+                • engine.debug.enabled = true
+            </div>
+        </div>
+        
         <!-- Status Bar -->
         <div class="status-bar">
             FPS: <span id="fps">60</span> • 
-            v3.6 • 
+            v3.7 • 
             Materials: <span>30</span> • 
-            🌿 <span>Biology System</span>
+            🤖 <span>AI Debug API</span>
         </div>
     </div>
     
@@ -770,13 +786,16 @@
 
     <script src="bud.js"></script>
     <script>
-        // Create engine
+        // Create engine (exposed globally for AI testing)
         const engine = new BudEngine({
             canvas: document.getElementById('gameCanvas'),
             width: window.innerWidth - 320,
             height: window.innerHeight,
             backgroundColor: '#0f0f1e'
         });
+
+        // Expose engine globally for browser console access
+        window.engine = engine;
 
         // Handle window resize
         window.addEventListener('resize', () => {
@@ -1018,6 +1037,13 @@
             document.getElementById('lightBtn').classList.toggle('active');
         }
 
+        // Debug toggle (v3.7)
+        function toggleDebug() {
+            engine.debugSystem.enabled = !engine.debugSystem.enabled;
+            document.getElementById('debugBtn').classList.toggle('active');
+            console.log('🤖 Debug overlay:', engine.debugSystem.enabled ? 'enabled' : 'disabled');
+        }
+
         // Explosion function
         function createExplosion() {
             const x = engine.canvas.width / 2 + (Math.random() - 0.5) * 200;
@@ -1205,24 +1231,29 @@
         engine.scene('main', {
             enter() {
                 console.log('═════════════════════════════════════════════════════════════');
-                console.log('⚛️ PIXEL PHYSICS v3.6 - BIOLOGY SYSTEM');
+                console.log('⚛️ PIXEL PHYSICS v3.7 - AI DEBUG/TESTING API');
                 console.log('═════════════════════════════════════════════════════════════');
-                console.log('NEW IN v3.6:');
-                console.log('  🌿 Living materials: plant, vegetation, fungus, decay');
-                console.log('  🌱 Life emerges naturally from chemistry');
-                console.log('  🌳 Trees grow: vegetation → wood over time');
-                console.log('  💨 Oxygen production: plants convert CO₂ → O₂');
-                console.log('  🍄 Decomposition: fungus breaks down organic matter');
-                console.log('  ☀️ Light detection: plants need light, fungus grows in dark');
-                console.log('  🌡️ Temperature-based survival: materials die if too hot/cold');
-                console.log('  💧 Water requirement: biology needs moisture to thrive');
+                console.log('NEW IN v3.7:');
+                console.log('  🤖 Comprehensive testing API for AI developers');
+                console.log('  📊 Debug overlay: FPS, materials, chunks, frame counter');
+                console.log('  🧪 Scenario loading: engine.test.loadScenario(name)');
+                console.log('  ⏭️  Simulation stepping: engine.test.step(n)');
+                console.log('  📸 Canvas snapshots: engine.test.snapshot()');
+                console.log('  📈 State inspection: engine.test.getPhysicsState()');
+                console.log('  🔍 Material queries: engine.test.getMaterialAt(x, y)');
+                console.log('  🎨 Material placement: engine.test.placeMaterial(x, y, mat)');
+                console.log('  🗑️ World clearing: engine.test.clearWorld()');
+                console.log('  🎨 Pixel reading: engine.test.getPixelColor(x, y)');
+                console.log('  📝 Logging system: engine.debug.log(msg)');
+                console.log('  👀 Property watching: engine.debug.watch(property)');
                 console.log('');
-                console.log('🌱 TRY THIS:');
-                console.log('  • Load "Garden" scenario → watch life grow');
-                console.log('  • Place dirt + water → add plant → watch it spread');
-                console.log('  • Build a cave → add fungus → watch it decompose organic matter');
-                console.log('  • Burn vegetation → it becomes decay → eventually dirt');
-                console.log('  • Stack vegetation tall → bottom hardens into wood (trees!)');
+                console.log('🤖 AI DEVELOPER WORKFLOW:');
+                console.log('  1. Load scenario: engine.test.loadScenario("garden")');
+                console.log('  2. Enable debug: engine.debug.enabled = true');
+                console.log('  3. Run simulation: engine.test.step(100)');
+                console.log('  4. Check state: engine.test.getPhysicsState()');
+                console.log('  5. Take snapshot: engine.test.snapshot()');
+                console.log('  6. Inspect materials: engine.test.getMaterialAt(x, y)');
                 console.log('');
                 console.log('🔬 Materials: ~30 total (including 5 living materials)');
                 console.log('T = heat view • L = lighting • Use sidebar to select materials');

@@ -1,11 +1,19 @@
 /**
- * BUD ENGINE v3.6
+ * BUD ENGINE v3.7
  * A 2D web game engine designed for AI-human collaboration
  * 
  * Philosophy: AI can write, TEST, and iterate on games independently.
  * Killer feature: AI Testing API + auto-playtest bot
  * 
  * Architecture: Single-file, no build tools, runs in browser
+ * 
+ * v3.7 AI DEBUG/TESTING API - Self-Testing Without Human Intervention:
+ * - Comprehensive test API for pixel physics: loadScenario, step, snapshot, getState
+ * - Material inspection: getMaterialAt, placeMaterial, getPixelColor
+ * - Debug overlay system: FPS, material counts, active chunks, frame counter
+ * - Console logging: log, getLogs, watch for property monitoring
+ * - AI can now test and iterate on physics simulations independently
+ * - All APIs accessible via browser console for AI evaluation
  * 
  * v3.6 BIOLOGY SYSTEM - Life Emerges from Chemistry:
  * - Living materials: plant, vegetation, fungus, organic decay
@@ -628,7 +636,7 @@ class BudEngine {
         this.renderScreenEffects(ctx);
 
         // Render debug overlay (P2: Debug overlay)
-        if (this.debug) {
+        if (this.debug || this.debugSystem.enabled) {
             this.debugSystem.render(ctx);
         }
     }
@@ -3994,6 +4002,265 @@ class TestingAPI {
             // Do nothing
         }
     }
+
+    // ========== PIXEL PHYSICS TESTING API (v3.7) ==========
+
+    /**
+     * Load a named scenario for testing
+     * @param {string} name - Scenario name ('volcano', 'lab', 'forest', 'garden', 'underwater', 'arctic')
+     * @returns {boolean} Success
+     */
+    loadScenario(name) {
+        if (!this.engine.physics.initialized) {
+            console.error('PixelPhysics not initialized');
+            return false;
+        }
+
+        this.clearWorld();
+        
+        const w = this.engine.canvas.width;
+        const h = this.engine.canvas.height;
+        
+        switch(name) {
+            case 'volcano':
+                this.engine.physics.fill(0, h*0.92, w, h, 'stone');
+                this.engine.physics.fill(w*0.15, h*0.7, w*0.85, h*0.92, 'stone');
+                this.engine.physics.fill(w*0.25, h*0.55, w*0.75, h*0.7, 'stone');
+                this.engine.physics.fill(w*0.35, h*0.45, w*0.65, h*0.55, 'stone');
+                this.engine.physics.fill(w*0.35, h*0.55, w*0.65, h*0.85, 'lava');
+                this.engine.physics.fill(w*0.42, h*0.45, w*0.58, h*0.55, 'lava');
+                this.engine.physics.fill(w*0.02, h*0.85, w*0.12, h*0.92, 'water');
+                break;
+            
+            case 'lab':
+                this.engine.physics.fill(0, h*0.92, w, h, 'stone');
+                const tubes = [
+                    {x: 0.12, mat: 'acid'}, {x: 0.27, mat: 'water'},
+                    {x: 0.42, mat: 'oil'}, {x: 0.57, mat: 'lava'}, {x: 0.72, mat: 'salt'}
+                ];
+                tubes.forEach(t => {
+                    const tx = w*t.x;
+                    const tw = w*0.06;
+                    this.engine.physics.fill(tx, h*0.6, tx+4, h*0.92, 'glass');
+                    this.engine.physics.fill(tx+tw, h*0.6, tx+tw+4, h*0.92, 'glass');
+                    this.engine.physics.fill(tx, h*0.88, tx+tw, h*0.92, 'glass');
+                    this.engine.physics.fill(tx+4, h*0.7, tx+tw, h*0.88, t.mat);
+                });
+                this.engine.physics.fill(w*0.87, h*0.85, w*0.93, h*0.92, 'iron');
+                this.engine.physics.circle(w*0.05, h*0.88, 15, 'gunpowder');
+                break;
+            
+            case 'forest':
+                const treeCount = Math.min(8, Math.floor(w / 100));
+                for (let i = 0; i < treeCount; i++) {
+                    const x = (w * 0.1) + (i * (w * 0.8 / treeCount));
+                    this.engine.physics.fill(x, h*0.55, x + (w*0.05), h*0.9, 'wood');
+                }
+                this.engine.physics.fill(0, h*0.9, w, h, 'dirt');
+                for (let i = 0; i < 10; i++) {
+                    this.engine.physics.circle(Math.random() * w, h*0.88, 10, 'vegetation');
+                }
+                this.engine.physics.circle(w*0.15, h*0.6, 15, 'fire');
+                break;
+            
+            case 'garden':
+                this.engine.physics.fill(0, h*0.7, w, h, 'dirt');
+                this.engine.physics.fill(w*0.25, h*0.65, w*0.28, h, 'water');
+                this.engine.physics.fill(w*0.72, h*0.65, w*0.75, h, 'water');
+                this.engine.physics.fill(w*0.05, h*0.6, w*0.15, h*0.7, 'stone');
+                this.engine.physics.fill(w*0.85, h*0.55, w*0.95, h*0.68, 'stone');
+                
+                const cs = this.engine.physics.cellSize;
+                for (let gx = 0; gx < this.engine.physics.gridWidth; gx++) {
+                    for (let gy = Math.floor((h*0.7)/cs); gy < this.engine.physics.gridHeight; gy++) {
+                        const idx = this.engine.physics.index(gx, gy);
+                        if (this.engine.physics.grid[idx] === this.engine.physics.getMaterialId('dirt')) {
+                            this.engine.physics.temperatureGrid[idx] = 25;
+                        }
+                    }
+                }
+                
+                for (let i = 0; i < 20; i++) {
+                    this.engine.physics.circle(Math.random() * w, h*0.68 + Math.random() * (h*0.08), 3, 'plant');
+                }
+                for (let i = 0; i < 12; i++) {
+                    this.engine.physics.circle(Math.random() * w, h*0.68 + Math.random() * (h*0.08), 8, 'vegetation');
+                }
+                for (let i = 0; i < 8; i++) {
+                    this.engine.physics.circle(w*0.05 + Math.random() * (w*0.1), h*0.65 + Math.random() * (h*0.05), 5, 'fungus');
+                }
+                for (let i = 0; i < 8; i++) {
+                    this.engine.physics.circle(w*0.85 + Math.random() * (w*0.1), h*0.63 + Math.random() * (h*0.05), 5, 'fungus');
+                }
+                break;
+            
+            case 'underwater':
+                this.engine.physics.fill(0, h*0.15, w, h, 'water');
+                this.engine.physics.fill(0, h*0.92, w, h, 'sand');
+                this.engine.physics.fill(w*0.4, h*0.83, w*0.6, h*0.92, 'stone');
+                this.engine.physics.circle(w*0.5, h*0.87, w*0.04, 'lava');
+                break;
+            
+            case 'arctic':
+                this.engine.physics.fill(0, h*0.4, w, h*0.6, 'ice');
+                this.engine.physics.fill(0, h*0.6, w, h, 'water');
+                this.engine.physics.circle(w*0.5, h*0.5, w*0.05, 'lava');
+                break;
+            
+            default:
+                console.error(`Unknown scenario: ${name}`);
+                return false;
+        }
+        
+        console.log(`✅ Loaded scenario: ${name}`);
+        return true;
+    }
+
+    /**
+     * Get canvas snapshot as base64 data URL
+     * @param {string} [format='jpeg'] - Format ('jpeg' or 'png')
+     * @param {number} [quality=0.5] - JPEG quality (0-1)
+     * @returns {string} Base64 data URL
+     */
+    snapshot(format = 'jpeg', quality = 0.5) {
+        if (!this.engine.physics.initialized) {
+            console.error('PixelPhysics not initialized');
+            return null;
+        }
+        
+        const mimeType = format === 'png' ? 'image/png' : 'image/jpeg';
+        return this.engine.canvas.toDataURL(mimeType, quality);
+    }
+
+    /**
+     * Get comprehensive state for pixel physics
+     * @returns {object} State with FPS, materials, chunks, grid dimensions, etc.
+     */
+    getPhysicsState() {
+        if (!this.engine.physics.initialized) {
+            return { error: 'PixelPhysics not initialized' };
+        }
+
+        const physics = this.engine.physics;
+        
+        // Count materials
+        const materialCounts = {};
+        for (let i = 0; i < physics.grid.length; i++) {
+            const matId = physics.grid[i];
+            if (matId > 0) {
+                const matName = physics.getMaterialName(matId);
+                materialCounts[matName] = (materialCounts[matName] || 0) + 1;
+            }
+        }
+
+        // Count active chunks
+        let activeChunks = 0;
+        if (physics.chunks) {
+            for (let cy = 0; cy < physics.chunksHigh; cy++) {
+                for (let cx = 0; cx < physics.chunksWide; cx++) {
+                    if (physics.chunks[cy][cx].active) activeChunks++;
+                }
+            }
+        }
+
+        return {
+            fps: this.engine.fps,
+            frame: physics.frameCount,
+            gridWidth: physics.gridWidth,
+            gridHeight: physics.gridHeight,
+            cellSize: physics.cellSize,
+            materialCounts: materialCounts,
+            totalCells: physics.grid.length,
+            activeCells: Object.values(materialCounts).reduce((a, b) => a + b, 0),
+            activeChunks: activeChunks,
+            totalChunks: physics.chunksWide * physics.chunksHigh,
+            lighting: physics.lighting,
+            showHeat: physics.showHeat,
+            windX: physics.wind.x,
+            windY: physics.wind.y,
+            ambientTemp: physics.ambientTemp
+        };
+    }
+
+    /**
+     * Get material info at grid position
+     * @param {number} x - Grid x coordinate
+     * @param {number} y - Grid y coordinate
+     * @returns {object} Material info
+     */
+    getMaterialAt(x, y) {
+        if (!this.engine.physics.initialized) {
+            return { error: 'PixelPhysics not initialized' };
+        }
+
+        const idx = this.engine.physics.index(x, y);
+        if (idx === -1) {
+            return { error: 'Position out of bounds' };
+        }
+
+        const matId = this.engine.physics.grid[idx];
+        const matName = this.engine.physics.getMaterialName(matId);
+        const material = this.engine.physics.materials.get(matId);
+
+        return {
+            x: x,
+            y: y,
+            materialId: matId,
+            materialName: matName,
+            temperature: this.engine.physics.temperatureGrid[idx],
+            lifetime: this.engine.physics.lifetimeGrid[idx],
+            state: material ? material.state : 'unknown',
+            density: material ? material.density : 0
+        };
+    }
+
+    /**
+     * Place material at canvas position
+     * @param {number} x - Canvas x coordinate
+     * @param {number} y - Canvas y coordinate
+     * @param {string} materialId - Material name
+     * @param {number} [radius=5] - Brush radius
+     * @returns {boolean} Success
+     */
+    placeMaterial(x, y, materialId, radius = 5) {
+        if (!this.engine.physics.initialized) {
+            console.error('PixelPhysics not initialized');
+            return false;
+        }
+
+        this.engine.physics.circle(x, y, radius, materialId);
+        return true;
+    }
+
+    /**
+     * Clear the entire world
+     */
+    clearWorld() {
+        if (!this.engine.physics.initialized) {
+            console.error('PixelPhysics not initialized');
+            return false;
+        }
+
+        this.engine.physics.clearArea(0, 0, this.engine.canvas.width, this.engine.canvas.height);
+        return true;
+    }
+
+    /**
+     * Get pixel color at canvas position
+     * @param {number} x - Canvas x coordinate
+     * @param {number} y - Canvas y coordinate
+     * @returns {object} RGBA color
+     */
+    getPixelColor(x, y) {
+        const imageData = this.engine.ctx.getImageData(x, y, 1, 1);
+        const data = imageData.data;
+        return {
+            r: data[0],
+            g: data[1],
+            b: data[2],
+            a: data[3]
+        };
+    }
 }
 
 // ===== ANIMATION SYSTEM (P1) =====
@@ -4235,9 +4502,154 @@ class AnimationSystem {
 class DebugSystem {
     constructor(engine) {
         this.engine = engine;
+        this.enabled = false;
+        this.logs = [];
+        this.maxLogs = 50;
+        this.watchedProperties = new Map(); // property name -> last value
+    }
+
+    /**
+     * Log a debug message
+     * @param {string} message - Message to log
+     */
+    log(message) {
+        const timestamp = new Date().toISOString();
+        const logEntry = { timestamp, message, frame: this.engine.frame };
+        this.logs.push(logEntry);
+        
+        // Keep only last maxLogs messages
+        if (this.logs.length > this.maxLogs) {
+            this.logs.shift();
+        }
+        
+        console.log(`[Debug ${this.engine.frame}] ${message}`);
+    }
+
+    /**
+     * Get all stored logs
+     * @returns {Array} Array of log entries
+     */
+    getLogs() {
+        return [...this.logs];
+    }
+
+    /**
+     * Watch a property and log changes
+     * @param {string} propertyPath - Property path (e.g., 'physics.frameCount', 'fps')
+     */
+    watch(propertyPath) {
+        const getValue = () => {
+            const parts = propertyPath.split('.');
+            let value = this.engine;
+            for (let part of parts) {
+                value = value[part];
+                if (value === undefined) return undefined;
+            }
+            return value;
+        };
+
+        const currentValue = getValue();
+        this.watchedProperties.set(propertyPath, currentValue);
+        this.log(`Watching property: ${propertyPath} = ${currentValue}`);
+    }
+
+    /**
+     * Update watched properties (called in update loop)
+     */
+    updateWatched() {
+        for (let [propertyPath, lastValue] of this.watchedProperties.entries()) {
+            const parts = propertyPath.split('.');
+            let value = this.engine;
+            for (let part of parts) {
+                value = value[part];
+                if (value === undefined) break;
+            }
+
+            if (value !== lastValue) {
+                this.log(`${propertyPath} changed: ${lastValue} → ${value}`);
+                this.watchedProperties.set(propertyPath, value);
+            }
+        }
     }
 
     render(ctx) {
+        if (!this.enabled) return;
+
+        const e = this.engine;
+        
+        // Update watched properties
+        this.updateWatched();
+
+        // ========== PIXEL PHYSICS DEBUG OVERLAY ==========
+        if (e.physics && e.physics.initialized) {
+            this.renderPixelPhysicsOverlay(ctx);
+        } else {
+            // Standard debug overlay for non-pixel-physics games
+            this.renderStandardOverlay(ctx);
+        }
+    }
+
+    renderPixelPhysicsOverlay(ctx) {
+        const e = this.engine;
+        const physics = e.physics;
+
+        // Count materials
+        const materialCounts = {};
+        for (let i = 0; i < physics.grid.length; i++) {
+            const matId = physics.grid[i];
+            if (matId > 0) {
+                const matName = physics.getMaterialName(matId);
+                materialCounts[matName] = (materialCounts[matName] || 0) + 1;
+            }
+        }
+
+        // Count active chunks
+        let activeChunks = 0;
+        if (physics.chunks) {
+            for (let cy = 0; cy < physics.chunksHigh; cy++) {
+                for (let cx = 0; cx < physics.chunksWide; cx++) {
+                    if (physics.chunks[cy][cx].active) activeChunks++;
+                }
+            }
+        }
+
+        ctx.save();
+        ctx.font = '14px monospace';
+
+        // TOP-LEFT: FPS Counter
+        const fpsColor = e.fps >= 55 ? '#00ff00' : (e.fps >= 30 ? '#ffff00' : '#ff0000');
+        this.drawTextWithBackground(ctx, `FPS: ${e.fps}`, 10, 30, fpsColor);
+
+        // TOP-RIGHT: Material Counts
+        const nonZeroMaterials = Object.entries(materialCounts)
+            .filter(([name, count]) => count > 0)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 10); // Top 10 materials
+
+        let rightX = e.canvas.width - 10;
+        let rightY = 30;
+        
+        this.drawTextWithBackground(ctx, 'MATERIALS:', rightX, rightY, '#00ffcc', 'right');
+        rightY += 20;
+        
+        for (let [name, count] of nonZeroMaterials) {
+            const text = `${name}: ${count}`;
+            this.drawTextWithBackground(ctx, text, rightX, rightY, '#aaaaaa', 'right');
+            rightY += 18;
+        }
+
+        // BOTTOM-LEFT: Chunk Stats & Frame
+        let bottomY = e.canvas.height - 70;
+        this.drawTextWithBackground(ctx, `Frame: ${physics.frameCount}`, 10, bottomY, '#00ffcc');
+        bottomY += 20;
+        this.drawTextWithBackground(ctx, `Active Chunks: ${activeChunks} / ${physics.chunksWide * physics.chunksHigh}`, 10, bottomY, '#00ffcc');
+        bottomY += 20;
+        this.drawTextWithBackground(ctx, `Grid: ${physics.gridWidth}x${physics.gridHeight}`, 10, bottomY, '#888888');
+
+        ctx.restore();
+    }
+
+    renderStandardOverlay(ctx) {
         const e = this.engine;
         
         // Semi-transparent background
@@ -4321,6 +4733,30 @@ class DebugSystem {
         }
         
         ctx.restore();
+    }
+
+    /**
+     * Helper to draw text with semi-transparent background
+     */
+    drawTextWithBackground(ctx, text, x, y, color, align = 'left') {
+        ctx.textAlign = align;
+        ctx.font = '14px monospace';
+        
+        // Measure text for background
+        const metrics = ctx.measureText(text);
+        const padding = 4;
+        const bgX = align === 'right' ? x - metrics.width - padding : x - padding;
+        const bgY = y - 14;
+        const bgWidth = metrics.width + padding * 2;
+        const bgHeight = 18;
+        
+        // Draw background
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(bgX, bgY, bgWidth, bgHeight);
+        
+        // Draw text
+        ctx.fillStyle = color;
+        ctx.fillText(text, x, y);
     }
 }
 
@@ -6495,6 +6931,16 @@ class PixelPhysics {
      */
     getMaterial(id) {
         return this.materials.get(id);
+    }
+
+    /**
+     * Get material name by ID
+     * @param {number} id - Material ID
+     * @returns {string} Material name
+     */
+    getMaterialName(id) {
+        const mat = this.materials.get(id);
+        return mat ? mat.name : 'air';
     }
 
     /**
