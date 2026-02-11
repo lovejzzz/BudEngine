@@ -1029,7 +1029,6 @@
         // Clear world function
         function clearWorld() {
             engine.physics.clearArea(0, 0, engine.canvas.width, engine.canvas.height);
-            buildInitialWorld();
         }
 
         // Load scenario
@@ -1040,34 +1039,46 @@
             const h = engine.canvas.height;
             
             if (name === 'volcano') {
-                // Lava chamber (centered, lower half)
-                engine.physics.fill(w*0.3, h*0.65, w*0.7, h*0.85, 'lava');
-                // Stone walls
-                engine.physics.fill(w*0.2, h*0.5, w*0.25, h*0.9, 'stone');
-                engine.physics.fill(w*0.75, h*0.5, w*0.8, h*0.9, 'stone');
-                // Water pool
-                engine.physics.fill(w*0.05, h*0.75, w*0.15, h*0.9, 'water');
+                // Stone ground
+                engine.physics.fill(0, h*0.92, w, h, 'stone');
+                // Volcano mountain shape
+                engine.physics.fill(w*0.15, h*0.7, w*0.85, h*0.92, 'stone');
+                engine.physics.fill(w*0.25, h*0.55, w*0.75, h*0.7, 'stone');
+                engine.physics.fill(w*0.35, h*0.45, w*0.65, h*0.55, 'stone');
+                // Lava chamber inside (carve out)
+                engine.physics.fill(w*0.35, h*0.55, w*0.65, h*0.85, 'lava');
+                // Chimney opening at top
+                engine.physics.fill(w*0.42, h*0.45, w*0.58, h*0.55, 'lava');
+                // Water pool nearby
+                engine.physics.fill(w*0.02, h*0.85, w*0.12, h*0.92, 'water');
                 
                 console.log('🌋 Volcano scenario loaded');
             } else if (name === 'lab') {
-                // Test tubes (spaced across canvas)
-                const tubeY = h*0.75;
-                const tubeH = h*0.9;
-                
-                engine.physics.fill(w*0.15, tubeY, w*0.18, tubeH, 'glass');
-                engine.physics.fill(w*0.15, h*0.8, w*0.18, h*0.88, 'acid');
-                
-                engine.physics.fill(w*0.3, tubeY, w*0.33, tubeH, 'glass');
-                engine.physics.fill(w*0.3, h*0.8, w*0.33, h*0.88, 'water');
-                
-                engine.physics.fill(w*0.45, tubeY, w*0.48, tubeH, 'glass');
-                engine.physics.fill(w*0.45, h*0.8, w*0.48, h*0.88, 'hydrogen');
-                
-                engine.physics.fill(w*0.6, tubeY, w*0.63, tubeH, 'glass');
-                engine.physics.fill(w*0.6, h*0.8, w*0.63, h*0.88, 'oxygen');
-                
-                // Metal samples
-                engine.physics.fill(w*0.75, h*0.8, w*0.8, h*0.83, 'iron');
+                // Stone floor
+                engine.physics.fill(0, h*0.92, w, h, 'stone');
+                // Test tubes (glass containers with materials)
+                const tubes = [
+                    {x: 0.12, mat: 'acid', label: 'Acid'},
+                    {x: 0.27, mat: 'water', label: 'Water'},
+                    {x: 0.42, mat: 'oil', label: 'Oil'},
+                    {x: 0.57, mat: 'lava', label: 'Lava'},
+                    {x: 0.72, mat: 'salt', label: 'Salt'}
+                ];
+                tubes.forEach(t => {
+                    const tx = w*t.x;
+                    const tw = w*0.06;
+                    // Glass walls
+                    engine.physics.fill(tx, h*0.6, tx+4, h*0.92, 'glass');
+                    engine.physics.fill(tx+tw, h*0.6, tx+tw+4, h*0.92, 'glass');
+                    // Glass bottom
+                    engine.physics.fill(tx, h*0.88, tx+tw, h*0.92, 'glass');
+                    // Material inside
+                    engine.physics.fill(tx+4, h*0.7, tx+tw, h*0.88, t.mat);
+                });
+                // Metal sample
+                engine.physics.fill(w*0.87, h*0.85, w*0.93, h*0.92, 'iron');
+                // Gunpowder pile
+                engine.physics.circle(w*0.05, h*0.88, 15, 'gunpowder');
                 
                 console.log('🧪 Lab scenario loaded');
             } else if (name === 'forest') {
@@ -1101,11 +1112,12 @@
                 engine.physics.fill(w*0.85, h*0.55, w*0.95, h*0.68, 'stone');
                 
                 // Pre-warm the soil to perfect growing temperature (25°C)
-                for (let x = 0; x < w; x += 2) {
-                    for (let y = Math.floor(h*0.7); y < h; y += 2) {
-                        const idx = engine.physics.index(x, y);
+                const cs = engine.physics.cellSize;
+                for (let gx = 0; gx < engine.physics.gridWidth; gx++) {
+                    for (let gy = Math.floor((h*0.7)/cs); gy < engine.physics.gridHeight; gy++) {
+                        const idx = engine.physics.index(gx, gy);
                         if (engine.physics.grid[idx] === engine.physics.getMaterialId('dirt')) {
-                            engine.physics.temperatureGrid[idx] = 25; // Perfect growing temp
+                            engine.physics.temperatureGrid[idx] = 25;
                         }
                     }
                 }
