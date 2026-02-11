@@ -1476,6 +1476,10 @@ function transitionToRoom(roomName, spawnSide) {
     }
     
     const newPlayer = createPlayer(spawnX, spawnY);
+    
+    // FIXED: Snap camera to player immediately to prevent offset
+    engine.camera.x = newPlayer.x;
+    engine.camera.y = newPlayer.y;
     engine.cameraFollow(newPlayer, 0.1);
     
     // Setup UI
@@ -1490,8 +1494,8 @@ function setupGameUI() {
     
     // Health bar
     engine.ui.healthBar(player, {
-        x: 20,
-        y: 20,
+        x: 50,
+        y: 30,
         width: 200,
         height: 20,
         color: '#33ff33',
@@ -1502,8 +1506,8 @@ function setupGameUI() {
     engine.ui.elements.push({
         type: 'energybar',
         entity: player,
-        x: 20,
-        y: 50,
+        x: 50,
+        y: 60,
         width: 200,
         height: 15,
         color: '#3333ff',
@@ -1513,8 +1517,8 @@ function setupGameUI() {
     // Stats text
     engine.ui.elements.push({
         type: 'stats',
-        x: 20,
-        y: 85
+        x: 50,
+        y: 95
     });
 }
 
@@ -1654,7 +1658,12 @@ engine.scene('gameplay', {
         if (!engine.findOne('player')) {
             createRoom(game.currentRoom);
             const player = createPlayer(100, 360);
+            
+            // FIXED: Snap camera to player immediately
+            engine.camera.x = player.x;
+            engine.camera.y = player.y;
             engine.cameraFollow(player, 0.1);
+            
             setupGameUI();
             setupCollisions();
         }
