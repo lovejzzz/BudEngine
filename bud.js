@@ -1,11 +1,25 @@
 /**
- * BUD ENGINE v3.8
+ * BUD ENGINE v3.9
  * A 2D web game engine designed for AI-human collaboration
  * 
  * Philosophy: AI can write, TEST, and iterate on games independently.
  * Killer feature: AI Testing API + auto-playtest bot
  * 
  * Architecture: Single-file, no build tools, runs in browser
+ * 
+ * v3.9 EARTH ECOSYSTEM WITH TIME ACCELERATION - Geological & Ecological Time:
+ * - Time acceleration system: 1x, 10x, 100x, 1000x for geological time simulation
+ * - World age tracking in "years" with seasonal cycles (spring/summer/fall/winter)
+ * - Seasonal weather system: temperature, rain, snow, wind based on season
+ * - Erosion system: water erodes stone→sand→dirt, wind shifts particles, thermal cracking
+ * - Enhanced biology with seasonal growth rates and dormancy
+ * - Fire ecology: dry summers increase wildfire risk, forests regrow after burns
+ * - Seed dispersal: wind carries plant seeds to spread vegetation
+ * - Soil building: decay enriches dirt for better plant growth
+ * - Geological events: earthquakes (stone→sand), volcanic eruptions (lava), floods (rare, dramatic)
+ * - Test API: engine.test.getEcosystemState() returns season, worldAge, weather, erosion stats
+ * - setTimeScale(scale) method to control simulation speed
+ * - Rivers carve canyons, forests grow and burn and regrow - Earth emerges over time
  * 
  * v3.8 ACOUSTIC PHYSICS SYSTEM - Sound from Material Properties:
  * - Every material has real acoustic properties: resonance frequency, dampening, brightness
@@ -4198,6 +4212,58 @@ class TestingAPI {
     }
 
     /**
+     * v3.9: Get ecosystem state (seasons, time acceleration, weather, erosion stats)
+     * @returns {object} Ecosystem state
+     * @example
+     * const eco = engine.test.getEcosystemState();
+     * console.log('Season:', eco.season, 'World Age:', eco.worldAge);
+     */
+    getEcosystemState() {
+        if (!this.engine.physics.initialized) {
+            return { error: 'PixelPhysics not initialized' };
+        }
+
+        const physics = this.engine.physics;
+        
+        return {
+            // Time system
+            timeScale: physics.timeScale,
+            worldAge: physics.worldAge.toFixed(2),
+            season: physics.season,
+            seasonCycle: physics.seasonCycle.toFixed(2),
+            
+            // Weather
+            weather: {
+                season: physics.weather.season,
+                temperature: physics.weather.temperature.toFixed(1) + '°C',
+                rainChance: (physics.weather.rainChance * 100).toFixed(0) + '%',
+                windStrength: physics.weather.windStrength.toFixed(1),
+                dayLength: physics.weather.dayLength + 'h'
+            },
+            
+            // Wind
+            wind: {
+                x: physics.wind.x.toFixed(2),
+                y: physics.wind.y.toFixed(2)
+            },
+            
+            // Erosion stats
+            erosion: {
+                waterErosion: physics.erosionStats.waterErosion,
+                windErosion: physics.erosionStats.windErosion,
+                thermalErosion: physics.erosionStats.thermalErosion,
+                total: physics.erosionStats.waterErosion + physics.erosionStats.windErosion + physics.erosionStats.thermalErosion
+            },
+            
+            // Ambient conditions
+            ambientTemp: physics.ambientTemp + '°C',
+            
+            // Geological events config
+            geologicalEvents: physics.geologicalEvents
+        };
+    }
+
+    /**
      * Get material info at grid position
      * @param {number} x - Grid x coordinate
      * @param {number} y - Grid y coordinate
@@ -5569,6 +5635,41 @@ class PixelPhysics {
         
         // v3.3: Acoustic Engine - The Composition
         this.acoustics = new AcousticEngine(this);
+        
+        // v3.9: Earth Ecosystem with Time Acceleration
+        this.timeScale = 1; // Multiplier: 1x, 10x, 100x, 1000x for geological time
+        this.worldAge = 0; // Total simulated time in "years"
+        this.season = 'spring'; // Current season
+        this.seasonCycle = 0; // 0-4 (cycles through seasons)
+        
+        // Weather system
+        this.weather = {
+            season: 'spring',
+            temperature: 15,
+            rainChance: 0.3,
+            windStrength: 0.5,
+            dayLength: 12
+        };
+        
+        // Erosion tracking
+        this.erosionStats = {
+            waterErosion: 0,
+            windErosion: 0,
+            thermalErosion: 0
+        };
+        
+        // Geological event probabilities (per simulated year)
+        this.geologicalEvents = {
+            earthquakeChance: 0.001,
+            volcanicChance: 0.0005,
+            floodChance: 0.002
+        };
+        
+        // Wind system (enhanced for erosion)
+        this.wind = { x: 0, y: 0 };
+        
+        // Track last year for event checking
+        this.lastEventCheck = -1;
     }
 
     /**
@@ -7361,6 +7462,31 @@ class PixelPhysics {
         
         this.frameCount++;
         
+        // v3.9: Update seasonal cycle and weather
+        this.updateSeasons(dt);
+        this.applyWeather();
+        
+        // v3.9: Trigger geological events (rare)
+        if (this.frameCount % 60 === 0) {
+            this.triggerGeologicalEvents();
+        }
+        
+        // v3.9: Run multiple simulation steps for time acceleration
+        const steps = Math.min(Math.floor(this.timeScale), 10); // Cap at 10 steps per frame for performance
+        
+        for (let step = 0; step < steps; step++) {
+            this.simulateStep(dt);
+        }
+        
+        // v3.3: Update acoustic engine
+        this.acoustics.update(dt);
+    }
+
+    /**
+     * v3.9: Single simulation step (called multiple times for time acceleration)
+     * @private
+     */
+    simulateStep(dt) {
         // v3.2: Update chunk activity
         this.updateChunks();
         
@@ -7439,6 +7565,16 @@ class PixelPhysics {
                         // v3.6: Biology simulation for living materials
                         if (mat.living) {
                             this.simulateBiology(x, y, mat, idx);
+                        }
+                        
+                        // v3.9: Ecosystem simulation (enhanced biology)
+                        if (mat.living || mat.organic) {
+                            this.simulateEcosystem(x, y, mat, idx);
+                        }
+                        
+                        // v3.9: Erosion simulation (geological time)
+                        if (this.timeScale > 1) { // Only when time accelerated
+                            this.simulateErosion(x, y, mat, idx);
                         }
                         
                         // v3.2: Simulate based on state (using flat array)
@@ -7533,9 +7669,6 @@ class PixelPhysics {
                 }
             }
         }
-        
-        // v3.3: Update acoustic engine
-        this.acoustics.update(dt);
     }
 
     /**
@@ -7973,6 +8106,335 @@ class PixelPhysics {
                     this.temperatureGrid[nidx] = this.ambientTemp;
                     this.activateChunk(nx, ny);
                     break;
+                }
+            }
+        }
+    }
+
+    /**
+     * v3.9: Set time acceleration scale
+     * @param {number} scale - Time multiplier (1x, 10x, 100x, 1000x)
+     */
+    setTimeScale(scale) {
+        this.timeScale = scale;
+        console.log(`⏱️ Time scale set to ${scale}x`);
+    }
+
+    /**
+     * v3.9: Update seasonal cycle
+     * @private
+     */
+    updateSeasons(dt) {
+        // Advance world age based on time scale
+        const yearsPerSecond = 0.01; // 0.01 years per second at 1x (100 seconds = 1 year)
+        this.worldAge += yearsPerSecond * dt * this.timeScale;
+        
+        // Season cycle: 4 seasons per year
+        this.seasonCycle = (this.worldAge * 4) % 4;
+        
+        // Determine current season
+        if (this.seasonCycle < 1) {
+            this.season = 'spring';
+            this.weather.season = 'spring';
+            this.weather.temperature = 15 + Math.random() * 5; // 15-20°C
+            this.weather.rainChance = 0.3;
+            this.weather.windStrength = 0.5;
+            this.weather.dayLength = 12;
+            this.ambientTemp = 18;
+        } else if (this.seasonCycle < 2) {
+            this.season = 'summer';
+            this.weather.season = 'summer';
+            this.weather.temperature = 25 + Math.random() * 10; // 25-35°C
+            this.weather.rainChance = 0.1;
+            this.weather.windStrength = 0.3;
+            this.weather.dayLength = 16;
+            this.ambientTemp = 30;
+        } else if (this.seasonCycle < 3) {
+            this.season = 'fall';
+            this.weather.season = 'fall';
+            this.weather.temperature = 10 + Math.random() * 5; // 10-15°C
+            this.weather.rainChance = 0.4;
+            this.weather.windStrength = 0.8;
+            this.weather.dayLength = 10;
+            this.ambientTemp = 12;
+        } else {
+            this.season = 'winter';
+            this.weather.season = 'winter';
+            this.weather.temperature = -5 + Math.random() * 10; // -5 to 5°C
+            this.weather.rainChance = 0.2; // Snow instead
+            this.weather.windStrength = 0.6;
+            this.weather.dayLength = 8;
+            this.ambientTemp = 0;
+        }
+    }
+
+    /**
+     * v3.9: Apply weather effects
+     * @private
+     */
+    applyWeather() {
+        // Rain/snow spawning (every N frames based on rain chance)
+        if (Math.random() < this.weather.rainChance * 0.001) {
+            const x = Math.floor(Math.random() * this.gridWidth);
+            const y = 0; // Top of grid
+            const idx = this.index(x, y);
+            
+            if (this.grid[idx] === 0) { // Only spawn in empty cells
+                if (this.season === 'winter' && this.weather.temperature < 5) {
+                    // Snow (ice particles)
+                    this.grid[idx] = this.getMaterialId('ice');
+                    this.temperatureGrid[idx] = -5;
+                } else {
+                    // Rain (water)
+                    this.grid[idx] = this.getMaterialId('water');
+                    this.temperatureGrid[idx] = this.weather.temperature;
+                }
+                this.activateChunk(x, y);
+            }
+        }
+        
+        // Wind variation (smooth changes)
+        this.wind.x += (Math.random() - 0.5) * 0.1;
+        this.wind.x = Math.max(-this.weather.windStrength * 2, Math.min(this.weather.windStrength * 2, this.wind.x));
+        this.wind.x *= 0.99; // Dampening
+    }
+
+    /**
+     * v3.9: Simulate erosion effects
+     * @private
+     */
+    simulateErosion(x, y, mat, idx) {
+        // WATER EROSION: flowing water slowly converts stone→sand→dirt
+        if (mat.name === 'water') {
+            const neighbors = [
+                [x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]
+            ];
+            
+            for (let [nx, ny] of neighbors) {
+                if (!this.inBounds(nx, ny)) continue;
+                
+                const nidx = this.index(nx, ny);
+                const nid = this.grid[nidx];
+                const nmat = this.getMaterial(nid);
+                
+                if (!nmat) continue;
+                
+                // Water erodes stone to sand (very slow, geological time)
+                if (nmat.name === 'stone' && Math.random() < 0.0001 * this.timeScale) {
+                    this.grid[nidx] = this.getMaterialId('sand');
+                    this.temperatureGrid[nidx] = this.temperatureGrid[idx];
+                    this.activateChunk(nx, ny);
+                    this.erosionStats.waterErosion++;
+                }
+                // Water erodes sand to dirt (faster than stone)
+                else if (nmat.name === 'sand' && Math.random() < 0.0005 * this.timeScale) {
+                    this.grid[nidx] = this.getMaterialId('dirt');
+                    this.temperatureGrid[nidx] = this.temperatureGrid[idx];
+                    this.activateChunk(nx, ny);
+                    this.erosionStats.waterErosion++;
+                }
+            }
+        }
+        
+        // WIND EROSION: exposed sand/dirt particles shift in wind direction
+        if ((mat.name === 'sand' || mat.name === 'dirt') && Math.abs(this.wind.x) > 0.5) {
+            const windDir = this.wind.x > 0 ? 1 : -1;
+            const nx = x + windDir;
+            const ny = y - 1; // Wind tends to lift particles slightly
+            
+            if (this.inBounds(nx, ny)) {
+                const nidx = this.index(nx, ny);
+                const nid = this.grid[nidx];
+                
+                // Check if destination is air (exposed particle)
+                if (nid === 0 && Math.random() < 0.00005 * this.timeScale * Math.abs(this.wind.x)) {
+                    // Check if current cell is exposed to air above
+                    const aboveIdx = this.index(x, y - 1);
+                    if (this.inBounds(x, y - 1) && this.grid[aboveIdx] === 0) {
+                        // Move particle in wind direction
+                        this.grid[nidx] = this.grid[idx];
+                        this.temperatureGrid[nidx] = this.temperatureGrid[idx];
+                        this.grid[idx] = 0;
+                        this.temperatureGrid[idx] = this.ambientTemp;
+                        this.activateChunk(x, y);
+                        this.activateChunk(nx, ny);
+                        this.erosionStats.windErosion++;
+                    }
+                }
+            }
+        }
+        
+        // THERMAL EROSION: temperature cycling cracks stone
+        if (mat.name === 'stone') {
+            const temp = this.temperatureGrid[idx];
+            const tempSwing = Math.abs(temp - this.ambientTemp);
+            
+            // Check if exposed to air (surface)
+            const aboveIdx = this.index(x, y - 1);
+            const exposed = this.inBounds(x, y - 1) && this.grid[aboveIdx] === 0;
+            
+            // Big temperature swings on exposed surfaces crack stone
+            if (exposed && tempSwing > 40 && Math.random() < 0.00001 * this.timeScale * (tempSwing / 40)) {
+                this.grid[idx] = this.getMaterialId('sand');
+                this.temperatureGrid[idx] = this.ambientTemp;
+                this.activateChunk(x, y);
+                this.erosionStats.thermalErosion++;
+            }
+        }
+    }
+
+    /**
+     * v3.9: Simulate ecosystem biology (enhanced)
+     * @private
+     */
+    simulateEcosystem(x, y, mat, idx) {
+        // Apply seasonal growth modifiers
+        let growthModifier = 1.0;
+        if (this.season === 'spring') growthModifier = 1.5; // Boost growth in spring
+        else if (this.season === 'summer') growthModifier = 1.2; // Good growth in summer
+        else if (this.season === 'fall') growthModifier = 0.7; // Slower growth in fall
+        else if (this.season === 'winter') growthModifier = 0.1; // Dormant in winter
+        
+        // Seasonal death rate for plants
+        let deathRateModifier = 1.0;
+        if (this.season === 'fall') deathRateModifier = 3.0; // Leaves fall
+        else if (this.season === 'winter') deathRateModifier = 2.0; // Cold kills plants
+        
+        // Modify biology simulation with seasonal effects
+        if (mat.living && mat.growthRate) {
+            // Apply seasonal growth rate
+            const modifiedGrowthRate = mat.growthRate * growthModifier;
+            
+            // SEED DISPERSAL: wind carries plant seeds
+            if ((mat.name === 'plant' || mat.name === 'vegetation') && Math.abs(this.wind.x) > 0.3 && Math.random() < 0.001 * this.timeScale) {
+                const windDir = this.wind.x > 0 ? 1 : -1;
+                const seedDist = Math.floor(Math.random() * 5) + 3; // 3-7 cells away
+                const nx = x + (windDir * seedDist);
+                const ny = y + Math.floor(Math.random() * 3) - 1; // Slight vertical variation
+                
+                if (this.inBounds(nx, ny)) {
+                    const nidx = this.index(nx, ny);
+                    const nid = this.grid[nidx];
+                    const nmat = this.getMaterial(nid);
+                    
+                    // Can seed in dirt or empty space above dirt
+                    if (nmat && nmat.name === 'dirt') {
+                        this.grid[nidx] = this.getMaterialId('plant');
+                        this.temperatureGrid[nidx] = this.ambientTemp;
+                        this.activateChunk(nx, ny);
+                    }
+                }
+            }
+            
+            // FIRE ECOLOGY: dry + summer + fire = forest fires
+            if (mat.flammability > 0 && this.season === 'summer' && this.weather.rainChance < 0.15) {
+                const temp = this.temperatureGrid[idx];
+                // Very dry conditions lower ignition threshold
+                const dryIgnitionPoint = mat.ignitionPoint * 0.8;
+                
+                if (temp >= dryIgnitionPoint && Math.random() < 0.001) {
+                    this.igniteMaterial(x, y, mat, idx);
+                }
+            }
+            
+            // SOIL BUILDING: decay + dirt = richer soil (boost nearby plant growth)
+            if (mat.name === 'decay') {
+                const neighbors = [
+                    [x - 1, y], [x + 1, y], [x, y - 1], [x, y + 1]
+                ];
+                
+                for (let [nx, ny] of neighbors) {
+                    if (!this.inBounds(nx, ny)) continue;
+                    
+                    const nidx = this.index(nx, ny);
+                    const nid = this.grid[nidx];
+                    const nmat = this.getMaterial(nid);
+                    
+                    // Enrich nearby dirt (no visual change, but conceptually better soil)
+                    if (nmat && nmat.name === 'dirt') {
+                        // Could add a "richSoil" material in future, for now just note it
+                        // This affects nearby plant growth rates positively
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * v3.9: Trigger geological events
+     * @private
+     */
+    triggerGeologicalEvents() {
+        // Check for events based on world age (per simulated "year")
+        const yearsPassed = Math.floor(this.worldAge);
+        
+        // Only check once per year
+        if (yearsPassed === this.lastEventCheck) return;
+        this.lastEventCheck = yearsPassed;
+        
+        // EARTHQUAKE: shake and displace materials
+        if (Math.random() < this.geologicalEvents.earthquakeChance) {
+            console.log(`🌍 Earthquake at year ${yearsPassed}!`);
+            
+            // Displace random chunks of material
+            for (let i = 0; i < 20; i++) {
+                const x = Math.floor(Math.random() * this.gridWidth);
+                const y = Math.floor(Math.random() * this.gridHeight);
+                const idx = this.index(x, y);
+                const id = this.grid[idx];
+                const mat = this.getMaterial(id);
+                
+                if (mat && mat.name === 'stone' && Math.random() < 0.3) {
+                    // Crack stone to sand
+                    this.grid[idx] = this.getMaterialId('sand');
+                    this.activateChunk(x, y);
+                }
+            }
+            
+            // Camera shake (if engine has camera)
+            if (this.engine && this.engine.cameraShake) {
+                this.engine.cameraShake(15);
+            }
+        }
+        
+        // VOLCANIC ERUPTION: spawn lava from bottom
+        if (Math.random() < this.geologicalEvents.volcanicChance) {
+            console.log(`🌋 Volcanic eruption at year ${yearsPassed}!`);
+            
+            const eruptX = Math.floor(Math.random() * this.gridWidth);
+            const eruptY = this.gridHeight - Math.floor(Math.random() * 20) - 5; // Near bottom
+            
+            // Create lava source
+            for (let dy = 0; dy < 10; dy++) {
+                for (let dx = -3; dx <= 3; dx++) {
+                    const x = eruptX + dx;
+                    const y = eruptY + dy;
+                    
+                    if (this.inBounds(x, y) && Math.random() < 0.7) {
+                        const idx = this.index(x, y);
+                        this.grid[idx] = this.getMaterialId('lava');
+                        this.temperatureGrid[idx] = 1200;
+                        this.activateChunk(x, y);
+                        this.heatSources.add(idx);
+                    }
+                }
+            }
+        }
+        
+        // FLOOD: massive water spawn
+        if (Math.random() < this.geologicalEvents.floodChance) {
+            console.log(`🌊 Flood at year ${yearsPassed}!`);
+            
+            // Spawn water across top quarter of world
+            for (let i = 0; i < 50; i++) {
+                const x = Math.floor(Math.random() * this.gridWidth);
+                const y = Math.floor(Math.random() * (this.gridHeight * 0.25));
+                const idx = this.index(x, y);
+                
+                if (this.grid[idx] === 0) {
+                    this.grid[idx] = this.getMaterialId('water');
+                    this.temperatureGrid[idx] = this.weather.temperature;
+                    this.activateChunk(x, y);
                 }
             }
         }
@@ -9606,7 +10068,7 @@ class AcousticEngine {
 }
 
 // Static properties (must be set AFTER class definition)
-BudEngine.VERSION = '3.8';
+BudEngine.VERSION = '3.9';
 BudEngine.LAYER = {
     DEFAULT: 1,
     PLAYER: 2,

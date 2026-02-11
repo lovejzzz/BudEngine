@@ -440,7 +440,7 @@
         <!-- Header -->
         <div class="header">
             <h1>⚛️ Pixel Physics ⚛️</h1>
-            <div class="version">v3.8 • ACOUSTIC PHYSICS</div>
+            <div class="version">v3.9 • EARTH ECOSYSTEM</div>
         </div>
         
         <!-- Material Tabs -->
@@ -701,6 +701,28 @@
                     <input type="range" id="windY" min="-2" max="2" step="0.1" value="0">
                     <span class="value" id="windYValue">0</span>
                 </div>
+            </div>
+        </div>
+        
+        <!-- Time Acceleration (v3.9) -->
+        <div class="control-section">
+            <h3>⏱️ Time Scale</h3>
+            <div class="toggle-row">
+                <button class="action-btn toggle active" onclick="setTimeScale(1)">1x</button>
+                <button class="action-btn toggle" onclick="setTimeScale(10)">10x</button>
+                <button class="action-btn toggle" onclick="setTimeScale(100)">100x</button>
+                <button class="action-btn toggle" onclick="setTimeScale(1000)">1000x</button>
+            </div>
+        </div>
+        
+        <!-- Season Display (v3.9) -->
+        <div class="control-section">
+            <h3>🌍 Ecosystem</h3>
+            <div style="padding: 10px; font-size: 11px; color: #00ffcc; line-height: 1.6; background: #1a1a2e; border: 1px solid #444;">
+                <div><strong>Season:</strong> <span id="seasonDisplay">Spring</span></div>
+                <div><strong>World Age:</strong> <span id="worldAgeDisplay">0.00</span> years</div>
+                <div><strong>Temp:</strong> <span id="tempDisplay">15</span>°C</div>
+                <div><strong>Erosion:</strong> <span id="erosionDisplay">0</span></div>
             </div>
         </div>
         
@@ -1026,6 +1048,40 @@
             }
         }
         
+        // v3.9: Time scale control
+        function setTimeScale(scale) {
+            engine.physics.setTimeScale(scale);
+            
+            // Update button states
+            document.querySelectorAll('.toggle-row .action-btn.toggle').forEach((btn, idx) => {
+                const scales = [1, 10, 100, 1000];
+                if (btn.parentElement.parentElement.querySelector('h3').textContent.includes('Time')) {
+                    btn.classList.toggle('active', scales[idx] === scale);
+                }
+            });
+        }
+        
+        // v3.9: Update ecosystem display
+        function updateEcosystemDisplay() {
+            const eco = engine.test.getEcosystemState();
+            
+            if (eco && !eco.error) {
+                // Season with emoji
+                const seasonEmoji = {
+                    spring: '🌱',
+                    summer: '☀️',
+                    fall: '🍂',
+                    winter: '❄️'
+                };
+                
+                document.getElementById('seasonDisplay').textContent = 
+                    seasonEmoji[eco.season] + ' ' + eco.season.charAt(0).toUpperCase() + eco.season.slice(1);
+                document.getElementById('worldAgeDisplay').textContent = eco.worldAge;
+                document.getElementById('tempDisplay').textContent = eco.weather.temperature.replace('°C', '');
+                document.getElementById('erosionDisplay').textContent = eco.erosion.total;
+            }
+        }
+        
         // Heat visualization toggle
         function toggleHeat() {
             engine.physics.toggleHeatView();
@@ -1254,11 +1310,22 @@
         engine.scene('main', {
             enter() {
                 console.log('═════════════════════════════════════════════════════════════');
-                console.log('⚛️ PIXEL PHYSICS v3.8 - ACOUSTIC PHYSICS SYSTEM');
-                console.log('🔊 Sound generation from real material properties');
-                console.log('   Click "🔊 Sound" button to enable audio');
+                console.log('⚛️ PIXEL PHYSICS v3.9 - EARTH ECOSYSTEM WITH TIME ACCELERATION');
+                console.log('🌍 Geological & ecological time simulation');
+                console.log('   Use time scale buttons to accelerate simulation');
                 console.log('═════════════════════════════════════════════════════════════');
-                console.log('NEW IN v3.8:');
+                console.log('NEW IN v3.9:');
+                console.log('  ⏱️  Time acceleration: 1x, 10x, 100x, 1000x');
+                console.log('  🌱 Seasonal cycles: spring → summer → fall → winter');
+                console.log('  🌧️  Weather system: rain, snow, wind based on season');
+                console.log('  🏔️  Erosion: water erodes stone→sand→dirt over time');
+                console.log('  🌊 Rivers carve canyons, forests grow/burn/regrow');
+                console.log('  🌋 Geological events: earthquakes, volcanoes, floods (rare)');
+                console.log('  🌿 Enhanced biology: seasonal growth, seed dispersal, fire ecology');
+                console.log('  📊 API: engine.test.getEcosystemState()');
+                console.log('  ⚙️  API: engine.physics.setTimeScale(scale)');
+                console.log('');
+                console.log('ALSO IN v3.8:');
                 console.log('  🤖 Comprehensive testing API for AI developers');
                 console.log('  📊 Debug overlay: FPS, materials, chunks, frame counter');
                 console.log('  🧪 Scenario loading: engine.test.loadScenario(name)');
@@ -1288,6 +1355,11 @@
             update(dt) {
                 // Update FPS display
                 document.getElementById('fps').textContent = engine.fps;
+                
+                // v3.9: Update ecosystem display (every 10 frames)
+                if (engine.frame % 10 === 0) {
+                    updateEcosystemDisplay();
+                }
             }
         });
 
