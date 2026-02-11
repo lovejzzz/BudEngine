@@ -5684,51 +5684,228 @@ class PixelPhysics {
      * @private
      */
     registerReactionRules() {
-        // Acid + Metal → Hydrogen gas + Salt
+        // ========== ACID REACTIONS (pH-based, emergent) ==========
+        
+        // Acid + Metal → Hydrogen gas + heat (any acid + any metal)
         this.reactionRules.push({
             condition: (matA, matB) => {
-                return (matA.pH && matA.pH < 3 && matB.metal) ||
-                       (matB.pH && matB.pH < 3 && matA.metal);
+                return (matA.pH != null && matA.pH < 3 && matB.metal) ||
+                       (matB.pH != null && matB.pH < 3 && matA.metal);
             },
             react: (x, y, matA, matB, idxA, idxB) => {
-                // Produce hydrogen gas
                 if (Math.random() < 0.05) {
-                    this.grid[idxA] = this.getMaterialId('hydrogen');
-                    this.temperatureGrid[idxA] += 10; // exothermic reaction
+                    const acidIdx = matA.pH != null && matA.pH < 3 ? idxA : idxB;
+                    this.grid[acidIdx] = this.getMaterialId('hydrogen');
+                    this.temperatureGrid[acidIdx] += 15;
                 }
             }
         });
 
-        // Water + Salt → Saltwater (if we had it, for now just consumes salt)
-        // Water + Hot material → Steam
-        // These emerge from temperature system
-
-        // Hydrogen + Oxygen + Ignition → Water + EXPLOSION
+        // Acid + Water → dilution (acid slowly neutralizes in water)
         this.reactionRules.push({
             condition: (matA, matB) => {
-                const hasHydrogen = matA.name === 'hydrogen' || matB.name === 'hydrogen';
-                const hasOxygen = (matA.supportsCombustion || matA.name === 'oxygen') ||
-                                  (matB.supportsCombustion || matB.name === 'oxygen');
-                const hot = (matA.temperature && matA.temperature > 500) ||
-                           (matB.temperature && matB.temperature > 500);
-                return hasHydrogen && hasOxygen && hot;
+                return (matA.pH != null && matA.pH < 3 && matB.name === 'water') ||
+                       (matB.pH != null && matB.pH < 3 && matA.name === 'water');
             },
             react: (x, y, matA, matB, idxA, idxB) => {
-                // BOOM! H₂ + O₂ → H₂O
-                if (Math.random() < 0.3) {
-                    // Explode
+                // Acid dilutes into water over time
+                if (Math.random() < 0.02) {
+                    const acidIdx = (matA.pH != null && matA.pH < 3) ? idxA : idxB;
+                    this.grid[acidIdx] = this.getMaterialId('water');
+                    this.temperatureGrid[acidIdx] += 5; // slight exothermic
+                }
+            }
+        });
+
+        // Acid dissolves organic solids (wood, dirt, coal)
+        this.reactionRules.push({
+            condition: (matA, matB) => {
+                const organic = ['wood', 'dirt', 'coal'];
+                return (matA.pH != null && matA.pH < 3 && organic.includes(matB.name)) ||
+                       (matB.pH != null && matB.pH < 3 && organic.includes(matA.name));
+            },
+            react: (x, y, matA, matB, idxA, idxB) => {
+                if (Math.random() < 0.03) {
+                    const solidIdx = (matA.pH != null && matA.pH < 3) ? idxB : idxA;
+                    this.grid[solidIdx] = this.getMaterialId('smoke');
+                    this.temperatureGrid[solidIdx] += 10;
+                }
+            }
+        });
+
+        // ========== WATER REACTIONS ==========
+
+        // Water + Salt → dissolves (salt disappears into water)
+        this.reactionRules.push({
+            condition: (matA, matB) => {
+                return (matA.name === 'water' && matB.name === 'salt') ||
+                       (matB.name === 'water' && matA.name === 'salt');
+            },
+            react: (x, y, matA, matB, idxA, idxB) => {
+                if (Math.random() < 0.04) {
+                    const saltIdx = matA.name === 'salt' ? idxA : idxB;
+                    this.grid[saltIdx] = this.getMaterialId('water');
+                }
+            }
+        });
+
+        // Water + Dirt → Mud
+        this.reactionRules.push({
+            condition: (matA, matB) => {
+                return (matA.name === 'water' && matB.name === 'dirt') ||
+                       (matB.name === 'water' && matA.name === 'dirt');
+            },
+            react: (x, y, matA, matB, idxA, idxB) => {
+                if (Math.random() < 0.03) {
+                    const waterIdx = matA.name === 'water' ? idxA : idxB;
+                    const dirtIdx = matA.name === 'dirt' ? idxA : idxB;
+                    this.grid[waterIdx] = 0; // water absorbed
+                    this.grid[dirtIdx] = this.getMaterialId('mud');
+                }
+            }
+        });
+
+        // Water + Clay powder (if clay is powder state) → hardens clay
+        // Water on lava → obsidian + steam (temperature handles most, but ensure contact reaction)
+        this.reactionRules.push({
+            condition: (matA, matB) => {
+                return (matA.name === 'water' && matB.name === 'lava') ||
+                       (matB.name === 'water' && matA.name === 'lava');
+            },
+            react: (x, y, matA, matB, idxA, idxB) => {
+                if (Math.random() < 0.15) {
+                    const lavaIdx = matA.name === 'lava' ? idxA : idxB;
+                    const waterIdx = matA.name === 'water' ? idxA : idxB;
+                    this.grid[lavaIdx] = this.getMaterialId('obsidian');
+                    this.grid[waterIdx] = this.getMaterialId('steam');
+                    this.temperatureGrid[lavaIdx] = 400;
+                    this.temperatureGrid[waterIdx] = 100;
+                }
+            }
+        });
+
+        // ========== GAS REACTIONS ==========
+
+        // Hydrogen + Oxygen + heat → Water + EXPLOSION
+        this.reactionRules.push({
+            condition: (matA, matB) => {
+                const hasH = matA.name === 'hydrogen' || matB.name === 'hydrogen';
+                const hasO = matA.name === 'oxygen' || matB.name === 'oxygen' ||
+                             matA.supportsCombustion || matB.supportsCombustion;
+                const idxA_t = this.temperatureGrid ? true : false;
+                // Check if either cell is hot enough
+                return hasH && hasO;
+            },
+            react: (x, y, matA, matB, idxA, idxB) => {
+                const temp = Math.max(this.temperatureGrid[idxA], this.temperatureGrid[idxB]);
+                if (temp > 500 && Math.random() < 0.3) {
                     const worldX = x * this.cellSize;
                     const worldY = y * this.cellSize;
                     this.explode(worldX, worldY, 30, 100);
-                    // Create steam
                     this.grid[idxA] = this.getMaterialId('steam');
                     this.temperatureGrid[idxA] = 100;
                 }
             }
         });
 
-        // Melting point reactions (sand → glass when hot enough)
-        // These are handled by state transition system
+        // Methane + fire/heat → CO2 + Water + explosion
+        this.reactionRules.push({
+            condition: (matA, matB) => {
+                const hasMethane = matA.name === 'methane' || matB.name === 'methane';
+                const hasFire = matA.name === 'fire' || matB.name === 'fire' ||
+                                matA.name === 'oxygen' || matB.name === 'oxygen';
+                return hasMethane && hasFire;
+            },
+            react: (x, y, matA, matB, idxA, idxB) => {
+                const temp = Math.max(
+                    this.temperatureGrid[idxA] || 20,
+                    this.temperatureGrid[idxB] || 20
+                );
+                if (temp > 580 && Math.random() < 0.2) {
+                    const methIdx = matA.name === 'methane' ? idxA : idxB;
+                    this.grid[methIdx] = this.getMaterialId('co2');
+                    this.temperatureGrid[methIdx] += 200;
+                    // Small explosion
+                    const worldX = x * this.cellSize;
+                    const worldY = y * this.cellSize;
+                    this.explode(worldX, worldY, 15, 50);
+                }
+            }
+        });
+
+        // CO2 extinguishes fire (displaces oxygen)
+        this.reactionRules.push({
+            condition: (matA, matB) => {
+                return (matA.name === 'co2' && matB.name === 'fire') ||
+                       (matB.name === 'co2' && matA.name === 'fire');
+            },
+            react: (x, y, matA, matB, idxA, idxB) => {
+                if (Math.random() < 0.3) {
+                    const fireIdx = matA.name === 'fire' ? idxA : idxB;
+                    this.grid[fireIdx] = this.getMaterialId('smoke');
+                    this.temperatureGrid[fireIdx] -= 100;
+                }
+            }
+        });
+
+        // ========== MATERIAL TRANSFORMATION ==========
+
+        // Oil + Water → they don't mix (oil floats — handled by density)
+        // But oil + fire near water → steam
+        
+        // Gunpowder + fire/heat → massive explosion
+        this.reactionRules.push({
+            condition: (matA, matB) => {
+                const hasGP = matA.name === 'gunpowder' || matB.name === 'gunpowder';
+                const hasFire = matA.name === 'fire' || matB.name === 'fire';
+                return hasGP && hasFire;
+            },
+            react: (x, y, matA, matB, idxA, idxB) => {
+                if (Math.random() < 0.5) {
+                    const worldX = x * this.cellSize;
+                    const worldY = y * this.cellSize;
+                    this.explode(worldX, worldY, 50, 200);
+                    this.grid[idxA] = this.getMaterialId('smoke');
+                    this.grid[idxB] = this.getMaterialId('smoke');
+                    this.temperatureGrid[idxA] = 500;
+                }
+            }
+        });
+
+        // Sulfur + Fire → SO2 (toxic smoke) + heat
+        this.reactionRules.push({
+            condition: (matA, matB) => {
+                return (matA.name === 'sulfur' && matB.name === 'fire') ||
+                       (matB.name === 'sulfur' && matA.name === 'fire');
+            },
+            react: (x, y, matA, matB, idxA, idxB) => {
+                if (Math.random() < 0.1) {
+                    const sulfIdx = matA.name === 'sulfur' ? idxA : idxB;
+                    this.grid[sulfIdx] = this.getMaterialId('smoke');
+                    this.temperatureGrid[sulfIdx] += 100;
+                }
+            }
+        });
+
+        // ========== CORROSION (property-based) ==========
+
+        // Any corrosive material eats through non-stone solids slowly
+        this.reactionRules.push({
+            condition: (matA, matB) => {
+                const aCorrosive = matA.corrosive && matB.state === 'solid' && matB.hardness < 6;
+                const bCorrosive = matB.corrosive && matA.state === 'solid' && matA.hardness < 6;
+                return aCorrosive || bCorrosive;
+            },
+            react: (x, y, matA, matB, idxA, idxB) => {
+                // Harder materials resist longer
+                const solid = matA.corrosive ? matB : matA;
+                const chance = 0.01 * (1 - solid.hardness / 10);
+                if (Math.random() < chance) {
+                    const solidIdx = matA.corrosive ? idxB : idxA;
+                    this.grid[solidIdx] = this.getMaterialId('smoke');
+                }
+            }
+        });
     }
 
     /**
