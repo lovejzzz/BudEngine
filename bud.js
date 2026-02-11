@@ -1,11 +1,15 @@
 /**
- * BUD ENGINE v2.2
+ * BUD ENGINE v2.3
  * A 2D web game engine designed for AI-human collaboration
  * 
  * Philosophy: AI can write, TEST, and iterate on games independently.
  * Killer feature: AI Testing API + auto-playtest bot
  * 
  * Architecture: Single-file, no build tools, runs in browser
+ * 
+ * v2.3 Improvements (Neon Ronin):
+ * - Screen flash effects (screenFlash, screenFade)
+ * - Impact feedback for damage/hits
  * 
  * v2.2 Improvements:
  * - Virtual joystick for mobile (on-screen controls)
@@ -193,6 +197,13 @@ class BudEngine {
             fadeOut: false,
             nextScene: null
         };
+
+        // Screen effects (v2.3)
+        this.screenEffects = {
+            flash: { active: false, color: '#ffffff', intensity: 0, duration: 0, elapsed: 0 },
+            fade: { active: false, color: '#000000', alpha: 0 },
+            vignette: { active: false, intensity: 0 }
+        };
     }
 
     // ===== GAME LOOP =====
@@ -278,6 +289,9 @@ class BudEngine {
     update(dt) {
         // Update timers (v2.1)
         this.updateTimers(dt);
+
+        // Update screen effects (v2.3)
+        this.updateScreenEffects(dt);
 
         // Update scene transitions
         if (this.transition.active) {
@@ -420,9 +434,37 @@ class BudEngine {
             ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         }
 
+        // Render screen effects (v2.3)
+        this.renderScreenEffects(ctx);
+
         // Render debug overlay (P2: Debug overlay)
         if (this.debug) {
             this.debugSystem.render(ctx);
+        }
+    }
+
+    /**
+     * @private
+     * Render screen effects
+     */
+    renderScreenEffects(ctx) {
+        // Flash effect
+        if (this.screenEffects.flash.active) {
+            const progress = this.screenEffects.flash.elapsed / this.screenEffects.flash.duration;
+            const alpha = this.screenEffects.flash.intensity * (1 - progress);
+            
+            ctx.fillStyle = this.screenEffects.flash.color;
+            ctx.globalAlpha = alpha;
+            ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            ctx.globalAlpha = 1;
+        }
+
+        // Fade effect
+        if (this.screenEffects.fade.active || this.screenEffects.fade.alpha > 0) {
+            ctx.fillStyle = this.screenEffects.fade.color;
+            ctx.globalAlpha = this.screenEffects.fade.alpha;
+            ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            ctx.globalAlpha = 1;
         }
     }
 
@@ -496,6 +538,41 @@ class BudEngine {
         if (duration) {
             this.slowMoTimer = duration;
         }
+    }
+
+    // ===== SCREEN EFFECTS (v2.3) =====
+
+    /**
+     * Flash the screen with a color (for impact/damage effects)
+     * @param {string} [color='#ffffff'] - Flash color
+     * @param {number} [intensity=0.8] - Flash intensity (0-1)
+     * @param {number} [duration=0.15] - Flash duration in seconds
+     * @example
+     * engine.screenFlash('#ff0000', 0.6, 0.2); // Red flash for damage
+     */
+    screenFlash(color = '#ffffff', intensity = 0.8, duration = 0.15) {
+        this.screenEffects.flash.active = true;
+        this.screenEffects.flash.color = color;
+        this.screenEffects.flash.intensity = intensity;
+        this.screenEffects.flash.duration = duration;
+        this.screenEffects.flash.elapsed = 0;
+    }
+
+    /**
+     * Fade screen to/from a color
+     * @param {string} color - Fade color
+     * @param {number} alpha - Target alpha (0-1)
+     * @param {number} duration - Fade duration in seconds
+     * @example
+     * engine.screenFade('#000000', 1, 0.5); // Fade to black over 0.5s
+     */
+    screenFade(color, alpha, duration) {
+        this.screenEffects.fade.active = true;
+        this.screenEffects.fade.color = color;
+        this.screenEffects.fade.targetAlpha = alpha;
+        this.screenEffects.fade.alpha = this.screenEffects.fade.alpha || 0;
+        this.screenEffects.fade.duration = duration;
+        this.screenEffects.fade.elapsed = 0;
     }
 
     // ===== TIMER SYSTEM (v2.1) =====
@@ -574,6 +651,32 @@ class BudEngine {
                 } else {
                     this.timers.splice(i, 1);
                 }
+            }
+        }
+    }
+
+    /**
+     * @private
+     * Update screen effects
+     */
+    updateScreenEffects(dt) {
+        // Flash effect
+        if (this.screenEffects.flash.active) {
+            this.screenEffects.flash.elapsed += dt;
+            if (this.screenEffects.flash.elapsed >= this.screenEffects.flash.duration) {
+                this.screenEffects.flash.active = false;
+            }
+        }
+
+        // Fade effect
+        if (this.screenEffects.fade.active) {
+            this.screenEffects.fade.elapsed += dt;
+            const progress = Math.min(1, this.screenEffects.fade.elapsed / this.screenEffects.fade.duration);
+            this.screenEffects.fade.alpha = this.screenEffects.fade.alpha + 
+                (this.screenEffects.fade.targetAlpha - this.screenEffects.fade.alpha) * progress;
+            
+            if (progress >= 1) {
+                this.screenEffects.fade.active = false;
             }
         }
     }
@@ -3543,7 +3646,7 @@ class PathfindingSystem {
 }
 
 // Static properties (must be set AFTER class definition)
-BudEngine.VERSION = '2.2';
+BudEngine.VERSION = '2.3';
 BudEngine.LAYER = {
     DEFAULT: 1,
     PLAYER: 2,

@@ -1,0 +1,1345 @@
+/**
+ * NEON RONIN
+ * A top-down cyberpunk action RPG built with Bud Engine
+ * 
+ * Purpose: Stress-test and improve Bud Engine through actual game development
+ */
+
+const CONFIG = {
+    PLAYER_SPEED: 200,
+    PLAYER_DASH_SPEED: 600,
+    PLAYER_MAX_HEALTH: 100,
+    PLAYER_MAX_ENERGY: 100,
+    ENERGY_REGEN: 15, // per second
+    DASH_COST: 20,
+    RANGED_COST: 10,
+    MELEE_DAMAGE: 25,
+    RANGED_DAMAGE: 15,
+    BULLET_SPEED: 500,
+};
+
+// Initialize engine
+const engine = new BudEngine({
+    width: 1280,
+    height: 720,
+    backgroundColor: '#0a0814'
+});
+
+// Game state
+const game = {
+    currentRoom: 'room1',
+    playerData: {
+        health: CONFIG.PLAYER_MAX_HEALTH,
+        maxHealth: CONFIG.PLAYER_MAX_HEALTH,
+        energy: CONFIG.PLAYER_MAX_ENERGY,
+        maxEnergy: CONFIG.PLAYER_MAX_ENERGY,
+        weapon: 'katana',
+        upgrades: [],
+        kills: 0
+    }
+};
+
+// ===== PLAYER CONTROLLER =====
+
+function createPlayer(x, y) {
+    const sprite = engine.art.character({
+        size: 16,
+        color: '#00ffcc',
+        body: 'capsule',
+        eyes: true,
+        glow: true
+    });
+
+    const player = engine.spawn('player', {
+        x, y,
+        sprite,
+        collider: { type: 'circle', radius: 14 },
+        velocity: { x: 0, y: 0 },
+        health: game.playerData.health,
+        maxHealth: game.playerData.maxHealth,
+        energy: game.playerData.energy,
+        maxEnergy: game.playerData.maxEnergy,
+        speed: CONFIG.PLAYER_SPEED,
+        dashCooldown: 0,
+        meleeCooldown: 0,
+        rangedCooldown: 0,
+        invulnerable: 0,
+        tags: ['player'],
+        
+        update(dt) {
+            // Energy regeneration
+            this.energy = Math.min(this.maxEnergy, this.energy + CONFIG.ENERGY_REGEN * dt);
+            
+            // Cooldowns
+            if (this.dashCooldown > 0) this.dashCooldown -= dt;
+            if (this.meleeCooldown > 0) this.meleeCooldown -= dt;
+            if (this.rangedCooldown > 0) this.rangedCooldown -= dt;
+            if (this.invulnerable > 0) this.invulnerable -= dt;
+            
+            // Movement input
+            let moveX = 0;
+            let moveY = 0;
+            
+            if (engine.input.key('w') || engine.input.key('ArrowUp')) moveY -= 1;
+            if (engine.input.key('s') || engine.input.key('ArrowDown')) moveY += 1;
+            if (engine.input.key('a') || engine.input.key('ArrowLeft')) moveX -= 1;
+            if (engine.input.key('d') || engine.input.key('ArrowRight')) moveX += 1;
+            
+            // Normalize diagonal movement
+            if (moveX !== 0 || moveY !== 0) {
+                const len = Math.sqrt(moveX * moveX + moveY * moveY);
+                moveX /= len;
+                moveY /= len;
+            }
+            
+            // Apply movement
+            const speed = this.speed;
+            this.velocity.x = moveX * speed;
+            this.velocity.y = moveY * speed;
+            
+            // Face mouse cursor
+            const mouseWorld = engine.input.mouseWorld;
+            this.rotation = Math.atan2(mouseWorld.y - this.y, mouseWorld.x - this.x);
+            
+            // Dash (Space key)
+            if (engine.input.keyPressed(' ') && this.dashCooldown <= 0 && this.energy >= CONFIG.DASH_COST) {
+                this.energy -= CONFIG.DASH_COST;
+                this.dashCooldown = 0.5;
+                this.invulnerable = 0.2;
+                this.isDashing = true;
+                
+                // Dash in movement direction (or facing direction if not moving)
+                let dashX = moveX;
+                let dashY = moveY;
+                if (dashX === 0 && dashY === 0) {
+                    dashX = Math.cos(this.rotation);
+                    dashY = Math.sin(this.rotation);
+                }
+                
+                this.velocity.x = dashX * CONFIG.PLAYER_DASH_SPEED;
+                this.velocity.y = dashY * CONFIG.PLAYER_DASH_SPEED;
+                
+                // Dash particles
+                engine.particles.emit(this.x, this.y, {
+                    count: 20,
+                    color: ['#00ffcc', '#00ffff', '#ffffff'],
+                    speed: [50, 150],
+                    life: [0.4, 0.8],
+                    size: [3, 8]
+                });
+                
+                engine.sound.play('jump');
+                engine.slowMo(0.3, 0.1); // Brief slow-mo for dash
+                
+                // Schedule dash end
+                engine.after(0.15, () => {
+                    this.isDashing = false;
+                });
+            }
+            
+            // Dash trail effect
+            if (this.isDashing && engine.frame % 1 === 0) {
+                engine.particles.emit(this.x, this.y, {
+                    count: 3,
+                    color: ['#00ffcc', '#00ffff'],
+                    speed: [0, 30],
+                    life: [0.3, 0.5],
+                    size: [4, 8]
+                });
+            }
+            
+            // Melee attack (Left click or E key when close to enemies)
+            if ((engine.input.mousePressed || engine.input.keyPressed('e')) && this.meleeCooldown <= 0) {
+                this.meleeCooldown = 0.4;
+                performMeleeAttack(this);
+            }
+            
+            // Ranged attack (Right click or Q key)
+            if ((engine.input.key('q') && engine.input.keyPressed('q')) && 
+                this.rangedCooldown <= 0 && 
+                this.energy >= CONFIG.RANGED_COST) {
+                this.energy -= CONFIG.RANGED_COST;
+                this.rangedCooldown = 0.25;
+                shootProjectile(this);
+            }
+            
+            // Trail effect when moving fast
+            if (this.velocity.x !== 0 || this.velocity.y !== 0) {
+                if (engine.frame % 3 === 0) {
+                    engine.particles.emit(this.x, this.y, {
+                        count: 1,
+                        color: ['#00ffcc'],
+                        speed: [0, 20],
+                        life: [0.3, 0.5],
+                        size: [3, 6]
+                    });
+                }
+            }
+        },
+        
+        takeDamage(amount) {
+            if (this.invulnerable > 0) return;
+            
+            this.health -= amount;
+            this.invulnerable = 0.5;
+            
+            engine.sound.play('hurt');
+            engine.cameraShake(8);
+            engine.screenFlash('#ff0000', 0.5, 0.2); // Red damage flash
+            
+            // Damage particles
+            engine.particles.emit(this.x, this.y, {
+                count: 10,
+                color: ['#ff3333', '#ff8800'],
+                speed: [100, 200],
+                life: [0.4, 0.7],
+                size: [3, 6]
+            });
+            
+            if (this.health <= 0) {
+                playerDeath();
+            }
+        }
+    });
+    
+    return player;
+}
+
+function performMeleeAttack(player) {
+    engine.sound.play('hit');
+    
+    // Visual slash effect
+    const slashAngle = player.rotation;
+    const slashDist = 40;
+    const slashX = player.x + Math.cos(slashAngle) * slashDist;
+    const slashY = player.y + Math.sin(slashAngle) * slashDist;
+    
+    engine.particles.emit(slashX, slashY, {
+        count: 8,
+        color: ['#00ffcc', '#00ffff', '#ffffff'],
+        speed: [80, 150],
+        life: [0.2, 0.4],
+        size: [4, 8]
+    });
+    
+    // Check for enemies in range
+    const enemies = engine.findByTag('enemy');
+    const meleeRange = 60;
+    
+    for (let enemy of enemies) {
+        const dx = enemy.x - player.x;
+        const dy = enemy.y - player.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        // Check if enemy is in arc in front of player
+        const angleToEnemy = Math.atan2(dy, dx);
+        const angleDiff = Math.abs(angleToEnemy - slashAngle);
+        
+        if (dist < meleeRange && angleDiff < Math.PI / 3) {
+            if (enemy.takeDamage) {
+                enemy.takeDamage(CONFIG.MELEE_DAMAGE);
+            }
+        }
+    }
+}
+
+function shootProjectile(player) {
+    engine.sound.play('shoot');
+    
+    const angle = player.rotation;
+    const spawnDist = 25;
+    const x = player.x + Math.cos(angle) * spawnDist;
+    const y = player.y + Math.sin(angle) * spawnDist;
+    
+    const bulletSprite = engine.art.particle({
+        size: 6,
+        color: '#00ffff',
+        fade: false
+    });
+    
+    engine.spawn('bullet', {
+        x, y,
+        sprite: bulletSprite,
+        rotation: angle,
+        collider: { type: 'circle', radius: 6 },
+        velocity: {
+            x: Math.cos(angle) * CONFIG.BULLET_SPEED,
+            y: Math.sin(angle) * CONFIG.BULLET_SPEED
+        },
+        damage: CONFIG.RANGED_DAMAGE,
+        lifetime: 2,
+        tags: ['bullet', 'player-bullet'],
+        layer: 5,
+        
+        update(dt) {
+            this.lifetime -= dt;
+            if (this.lifetime <= 0) {
+                engine.destroy(this);
+            }
+            
+            // Trail
+            if (engine.frame % 2 === 0) {
+                engine.particles.emit(this.x, this.y, {
+                    count: 1,
+                    color: ['#00ffff'],
+                    speed: [0, 10],
+                    life: [0.2, 0.3],
+                    size: [2, 4]
+                });
+            }
+        }
+    });
+}
+
+// ===== ENEMY SYSTEM =====
+
+function createMeleeRusher(x, y) {
+    const sprite = engine.art.enemy({
+        size: 14,
+        color: '#ff3333',
+        body: 'diamond',
+        glow: true
+    });
+    
+    const enemy = engine.spawn('enemy', {
+        x, y,
+        sprite,
+        collider: { type: 'circle', radius: 12 },
+        velocity: { x: 0, y: 0 },
+        health: 50,
+        maxHealth: 50,
+        speed: 120,
+        damage: 15,
+        attackCooldown: 0,
+        pathfindCooldown: 0,
+        currentPath: [],
+        currentWaypoint: 0,
+        type: 'rusher',
+        tags: ['enemy'],
+        
+        update(dt) {
+            this.attackCooldown -= dt;
+            this.pathfindCooldown -= dt;
+            
+            const player = engine.findOne('player');
+            if (!player) return;
+            
+            const dx = player.x - this.x;
+            const dy = player.y - this.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            
+            if (dist > 30) {
+                // Pathfinding AI
+                if (this.pathfindCooldown <= 0 && engine.currentTilemap) {
+                    this.pathfindCooldown = 0.5; // Recalculate path every 0.5s
+                    this.currentPath = engine.pathfind(
+                        { x: this.x, y: this.y },
+                        { x: player.x, y: player.y }
+                    );
+                    this.currentWaypoint = 0;
+                }
+                
+                // Follow path if we have one
+                if (this.currentPath && this.currentPath.length > 0) {
+                    const waypoint = this.currentPath[this.currentWaypoint];
+                    if (waypoint) {
+                        const wpDx = waypoint.x - this.x;
+                        const wpDy = waypoint.y - this.y;
+                        const wpDist = Math.sqrt(wpDx * wpDx + wpDy * wpDy);
+                        
+                        if (wpDist < 20) {
+                            // Reached waypoint, move to next
+                            this.currentWaypoint++;
+                            if (this.currentWaypoint >= this.currentPath.length) {
+                                // Reached end of path, go direct
+                                this.velocity.x = (dx / dist) * this.speed;
+                                this.velocity.y = (dy / dist) * this.speed;
+                            }
+                        } else {
+                            // Move towards current waypoint
+                            this.velocity.x = (wpDx / wpDist) * this.speed;
+                            this.velocity.y = (wpDy / wpDist) * this.speed;
+                        }
+                        
+                        this.rotation = Math.atan2(this.velocity.y, this.velocity.x);
+                    }
+                } else {
+                    // No path, go direct (fallback)
+                    this.velocity.x = (dx / dist) * this.speed;
+                    this.velocity.y = (dy / dist) * this.speed;
+                    this.rotation = Math.atan2(dy, dx);
+                }
+            } else {
+                // Attack range
+                this.velocity.x = 0;
+                this.velocity.y = 0;
+                
+                if (this.attackCooldown <= 0) {
+                    this.attackCooldown = 1.5;
+                    if (player.takeDamage) {
+                        player.takeDamage(this.damage);
+                    }
+                }
+            }
+        },
+        
+        takeDamage(amount) {
+            this.health -= amount;
+            engine.sound.play('hit');
+            
+            // Hit effect
+            engine.particles.emit(this.x, this.y, {
+                count: 5,
+                color: ['#ff3333', '#ff6666'],
+                speed: [60, 120],
+                life: [0.3, 0.5],
+                size: [3, 5]
+            });
+            
+            if (this.health <= 0) {
+                enemyDeath(this);
+            }
+        }
+    });
+    
+    return enemy;
+}
+
+function createRangedEnemy(x, y) {
+    const sprite = engine.art.enemy({
+        size: 14,
+        color: '#ff8800',
+        body: 'hexagon',
+        glow: true
+    });
+    
+    const enemy = engine.spawn('enemy', {
+        x, y,
+        sprite,
+        collider: { type: 'circle', radius: 12 },
+        velocity: { x: 0, y: 0 },
+        health: 35,
+        maxHealth: 35,
+        speed: 80,
+        damage: 10,
+        shootCooldown: 0,
+        pathfindCooldown: 0,
+        currentPath: [],
+        currentWaypoint: 0,
+        type: 'ranged',
+        tags: ['enemy'],
+        
+        update(dt) {
+            this.shootCooldown -= dt;
+            this.pathfindCooldown -= dt;
+            
+            const player = engine.findOne('player');
+            if (!player) return;
+            
+            const dx = player.x - this.x;
+            const dy = player.y - this.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            
+            // Kiting behavior with pathfinding
+            let targetX = this.x;
+            let targetY = this.y;
+            
+            if (dist < 150) {
+                // Too close - move away
+                targetX = this.x - dx;
+                targetY = this.y - dy;
+            } else if (dist > 300) {
+                // Too far - move closer
+                targetX = player.x - (dx / dist) * 200;
+                targetY = player.y - (dy / dist) * 200;
+            } else {
+                // Good distance - strafe
+                const perpAngle = Math.atan2(dy, dx) + Math.PI / 2;
+                targetX = this.x + Math.cos(perpAngle) * 100;
+                targetY = this.y + Math.sin(perpAngle) * 100;
+            }
+            
+            // Pathfind to target position
+            if (this.pathfindCooldown <= 0 && engine.currentTilemap) {
+                this.pathfindCooldown = 0.7;
+                this.currentPath = engine.pathfind(
+                    { x: this.x, y: this.y },
+                    { x: targetX, y: targetY }
+                );
+                this.currentWaypoint = 0;
+            }
+            
+            // Follow path
+            if (this.currentPath && this.currentPath.length > 0) {
+                const waypoint = this.currentPath[this.currentWaypoint];
+                if (waypoint) {
+                    const wpDx = waypoint.x - this.x;
+                    const wpDy = waypoint.y - this.y;
+                    const wpDist = Math.sqrt(wpDx * wpDx + wpDy * wpDy);
+                    
+                    if (wpDist < 20) {
+                        this.currentWaypoint++;
+                    } else {
+                        this.velocity.x = (wpDx / wpDist) * this.speed;
+                        this.velocity.y = (wpDy / wpDist) * this.speed;
+                    }
+                }
+            } else {
+                // Fallback - direct movement
+                if (dist < 150) {
+                    this.velocity.x = -(dx / dist) * this.speed;
+                    this.velocity.y = -(dy / dist) * this.speed;
+                } else if (dist > 300) {
+                    this.velocity.x = (dx / dist) * this.speed;
+                    this.velocity.y = (dy / dist) * this.speed;
+                } else {
+                    this.velocity.x = -dy / dist * this.speed * 0.5;
+                    this.velocity.y = dx / dist * this.speed * 0.5;
+                }
+            }
+            
+            this.rotation = Math.atan2(dy, dx);
+            
+            // Shoot at player
+            if (this.shootCooldown <= 0 && dist < 400) {
+                this.shootCooldown = 2;
+                shootEnemyProjectile(this, player);
+            }
+        },
+        
+        takeDamage(amount) {
+            this.health -= amount;
+            engine.sound.play('hit');
+            
+            engine.particles.emit(this.x, this.y, {
+                count: 5,
+                color: ['#ff8800', '#ffaa00'],
+                speed: [60, 120],
+                life: [0.3, 0.5],
+                size: [3, 5]
+            });
+            
+            if (this.health <= 0) {
+                enemyDeath(this);
+            }
+        }
+    });
+    
+    return enemy;
+}
+
+function shootEnemyProjectile(enemy, target) {
+    const angle = Math.atan2(target.y - enemy.y, target.x - enemy.x);
+    const spawnDist = 20;
+    const x = enemy.x + Math.cos(angle) * spawnDist;
+    const y = enemy.y + Math.sin(angle) * spawnDist;
+    
+    const bulletSprite = engine.art.particle({
+        size: 5,
+        color: '#ff3333',
+        fade: false
+    });
+    
+    engine.spawn('enemy-bullet', {
+        x, y,
+        sprite: bulletSprite,
+        rotation: angle,
+        collider: { type: 'circle', radius: 5 },
+        velocity: {
+            x: Math.cos(angle) * 250,
+            y: Math.sin(angle) * 250
+        },
+        damage: enemy.damage,
+        lifetime: 3,
+        tags: ['bullet', 'enemy-bullet'],
+        layer: 5,
+        
+        update(dt) {
+            this.lifetime -= dt;
+            if (this.lifetime <= 0) {
+                engine.destroy(this);
+            }
+        }
+    });
+}
+
+function enemyDeath(enemy) {
+    game.playerData.kills++;
+    
+    engine.particles.emit(enemy.x, enemy.y, {
+        count: 20,
+        color: ['#ff3333', '#ff8800', '#ffff00'],
+        speed: [100, 200],
+        life: [0.5, 1],
+        size: [3, 6]
+    });
+    
+    engine.sound.play('explode');
+    engine.cameraShake(5);
+    
+    // Chance to drop pickup
+    const roll = Math.random();
+    if (roll < 0.3) {
+        createHealthPickup(enemy.x, enemy.y);
+    } else if (roll < 0.45) {
+        createEnergyPickup(enemy.x, enemy.y);
+    } else if (roll < 0.50) {
+        createWeaponUpgrade(enemy.x, enemy.y);
+    }
+    
+    engine.destroy(enemy);
+}
+
+// ===== PICKUPS =====
+
+function createHealthPickup(x, y) {
+    const sprite = engine.art.character({
+        size: 10,
+        color: '#33ff33',
+        body: 'circle',
+        glow: true
+    });
+    
+    engine.spawn('health-pickup', {
+        x, y,
+        sprite,
+        collider: { type: 'circle', radius: 12, trigger: true },
+        healAmount: 30,
+        tags: ['pickup', 'health'],
+        layer: -1,
+        
+        update(dt) {
+            // Float animation
+            this.y += Math.sin(engine.time * 3) * 0.5;
+            this.rotation += dt * 2;
+        }
+    });
+}
+
+function createEnergyPickup(x, y) {
+    const sprite = engine.art.character({
+        size: 10,
+        color: '#3333ff',
+        body: 'diamond',
+        glow: true
+    });
+    
+    engine.spawn('energy-pickup', {
+        x, y,
+        sprite,
+        collider: { type: 'circle', radius: 12, trigger: true },
+        energyAmount: 50,
+        tags: ['pickup', 'energy'],
+        layer: -1,
+        
+        update(dt) {
+            this.y += Math.sin(engine.time * 3) * 0.5;
+            this.rotation += dt * 2;
+        }
+    });
+}
+
+function createWeaponUpgrade(x, y) {
+    const sprite = engine.art.character({
+        size: 12,
+        color: '#ffff00',
+        body: 'star',
+        glow: true
+    });
+    
+    engine.spawn('weapon-upgrade', {
+        x, y,
+        sprite,
+        collider: { type: 'circle', radius: 15, trigger: true },
+        upgradeType: engine.choose(['damage', 'speed', 'energy']),
+        tags: ['pickup', 'upgrade'],
+        layer: -1,
+        
+        update(dt) {
+            this.y += Math.sin(engine.time * 3) * 0.5;
+            this.rotation += dt * 2;
+            
+            // Pulsing glow effect
+            const pulse = Math.sin(engine.time * 5) * 0.5 + 0.5;
+            // TODO: Could add sprite alpha/scale pulsing (engine improvement)
+        }
+    });
+}
+
+// ===== ROOM SYSTEM =====
+
+function createRoom(roomName) {
+    const map = engine.tilemap(32);
+    
+    if (roomName === 'room1') {
+        // Starting room
+        map.room(0, 0, 30, 20, 'floor', 'wall');
+        
+        // Door to room2
+        map.door(29, 10, 'right');
+        createDoorTrigger(29 * 32, 10 * 32, 'room2', 'left');
+        
+        // Spawn enemies
+        createMeleeRusher(200, 200);
+        createMeleeRusher(600, 400);
+        createRangedEnemy(800, 300);
+        
+    } else if (roomName === 'room2') {
+        // Combat room
+        map.room(0, 0, 35, 25, 'floor', 'wall');
+        
+        // Door back to room1
+        map.door(0, 12, 'left');
+        createDoorTrigger(0, 12 * 32, 'room1', 'right');
+        
+        // Door to room3
+        map.door(34, 12, 'right');
+        createDoorTrigger(34 * 32, 12 * 32, 'room3', 'left');
+        
+        // More enemies
+        createMeleeRusher(300, 300);
+        createMeleeRusher(700, 300);
+        createRangedEnemy(500, 500);
+        createRangedEnemy(900, 400);
+        
+    } else if (roomName === 'room3') {
+        // Pre-boss room
+        map.room(0, 0, 30, 30, 'floor', 'wall');
+        
+        // Door back to room2
+        map.door(0, 15, 'left');
+        createDoorTrigger(0, 15 * 32, 'room2', 'right');
+        
+        // Door to boss room
+        map.door(29, 15, 'right');
+        createDoorTrigger(29 * 32, 15 * 32, 'boss-room', 'left');
+        
+        // Mixed enemies
+        createMeleeRusher(400, 300);
+        createMeleeRusher(400, 600);
+        createRangedEnemy(700, 450);
+        createRangedEnemy(200, 450);
+        
+    } else if (roomName === 'boss-room') {
+        // Boss arena
+        map.room(0, 0, 40, 30, 'floor', 'wall');
+        
+        // Door back (locked until boss defeated)
+        map.door(0, 15, 'left');
+        
+        // Spawn boss (for now, just multiple enemies - will upgrade to proper boss later)
+        createBoss(640, 400);
+    }
+}
+
+function createDoorTrigger(x, y, targetRoom, spawnSide) {
+    engine.spawn('door-trigger', {
+        x, y,
+        collider: { type: 'circle', radius: 40, trigger: true },
+        targetRoom,
+        spawnSide,
+        tags: ['door'],
+        enabled: true
+    });
+}
+
+function createBoss(x, y) {
+    const sprite = engine.art.enemy({
+        size: 32,
+        color: '#ff00ff',
+        body: 'star',
+        spikes: true,
+        glow: true
+    });
+    
+    const boss = engine.spawn('boss', {
+        x, y,
+        sprite,
+        collider: { type: 'circle', radius: 30 },
+        velocity: { x: 0, y: 0 },
+        health: 300,
+        maxHealth: 300,
+        speed: 100,
+        damage: 25,
+        phase: 1,
+        attackCooldown: 0,
+        specialCooldown: 0,
+        tags: ['enemy', 'boss'],
+        
+        update(dt) {
+            this.attackCooldown -= dt;
+            this.specialCooldown -= dt;
+            
+            const player = engine.findOne('player');
+            if (!player) return;
+            
+            const dx = player.x - this.x;
+            const dy = player.y - this.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            
+            this.rotation = Math.atan2(dy, dx);
+            
+            // Phase 2 at 50% health
+            if (this.health < this.maxHealth / 2 && this.phase === 1) {
+                this.phase = 2;
+                this.speed = 150;
+                engine.cameraShake(15);
+                engine.screenFlash('#ff00ff', 0.8, 0.3); // Purple flash for phase change
+            }
+            
+            // Movement pattern - circle player
+            const angle = Math.atan2(dy, dx);
+            const perpAngle = angle + Math.PI / 2;
+            
+            if (dist > 200) {
+                // Move towards player
+                this.velocity.x = Math.cos(angle) * this.speed;
+                this.velocity.y = Math.sin(angle) * this.speed;
+            } else if (dist < 150) {
+                // Move away
+                this.velocity.x = -Math.cos(angle) * this.speed;
+                this.velocity.y = -Math.sin(angle) * this.speed;
+            } else {
+                // Circle strafe
+                this.velocity.x = Math.cos(perpAngle) * this.speed;
+                this.velocity.y = Math.sin(perpAngle) * this.speed;
+            }
+            
+            // Basic attack - shoot projectiles
+            if (this.attackCooldown <= 0) {
+                this.attackCooldown = this.phase === 1 ? 1.5 : 1;
+                
+                // Shoot burst
+                const burstCount = this.phase === 1 ? 3 : 5;
+                for (let i = 0; i < burstCount; i++) {
+                    const spreadAngle = angle + (i - Math.floor(burstCount / 2)) * 0.3;
+                    shootBossProjectile(this, spreadAngle);
+                }
+            }
+            
+            // Special attack - phase 2 only
+            if (this.phase === 2 && this.specialCooldown <= 0) {
+                this.specialCooldown = 5;
+                // Radial burst
+                for (let i = 0; i < 12; i++) {
+                    const burstAngle = (i / 12) * Math.PI * 2;
+                    shootBossProjectile(this, burstAngle);
+                }
+                engine.sound.play('powerup');
+            }
+        },
+        
+        takeDamage(amount) {
+            this.health -= amount;
+            engine.sound.play('hit');
+            engine.cameraShake(3);
+            
+            engine.particles.emit(this.x, this.y, {
+                count: 8,
+                color: ['#ff00ff', '#ff66ff'],
+                speed: [80, 150],
+                life: [0.4, 0.7],
+                size: [4, 8]
+            });
+            
+            if (this.health <= 0) {
+                bossDeath(this);
+            }
+        }
+    });
+    
+    return boss;
+}
+
+function shootBossProjectile(boss, angle) {
+    const spawnDist = 35;
+    const x = boss.x + Math.cos(angle) * spawnDist;
+    const y = boss.y + Math.sin(angle) * spawnDist;
+    
+    const bulletSprite = engine.art.particle({
+        size: 8,
+        color: '#ff00ff',
+        fade: false
+    });
+    
+    engine.spawn('boss-bullet', {
+        x, y,
+        sprite: bulletSprite,
+        rotation: angle,
+        collider: { type: 'circle', radius: 8 },
+        velocity: {
+            x: Math.cos(angle) * 300,
+            y: Math.sin(angle) * 300
+        },
+        damage: boss.damage,
+        lifetime: 4,
+        tags: ['bullet', 'enemy-bullet'],
+        layer: 5,
+        
+        update(dt) {
+            this.lifetime -= dt;
+            if (this.lifetime <= 0) {
+                engine.destroy(this);
+            }
+            
+            // Trail
+            if (engine.frame % 2 === 0) {
+                engine.particles.emit(this.x, this.y, {
+                    count: 1,
+                    color: ['#ff00ff'],
+                    speed: [0, 10],
+                    life: [0.2, 0.3],
+                    size: [3, 5]
+                });
+            }
+        }
+    });
+}
+
+function bossDeath(boss) {
+    engine.particles.emit(boss.x, boss.y, {
+        count: 50,
+        color: ['#ff00ff', '#ff66ff', '#ffff00'],
+        speed: [150, 300],
+        life: [0.8, 1.5],
+        size: [4, 10]
+    });
+    
+    engine.sound.play('explode');
+    engine.cameraShake(20);
+    
+    engine.destroy(boss);
+    
+    // Victory!
+    engine.after(2, () => {
+        engine.goTo('victory', true);
+    });
+}
+
+// ===== COLLISION HANDLERS =====
+
+function setupCollisions() {
+    // Player bullets hit enemies
+    engine.onCollision('player-bullet', 'enemy', (bullet, enemy) => {
+        if (enemy.takeDamage) {
+            enemy.takeDamage(bullet.damage);
+        }
+        engine.destroy(bullet);
+        
+        engine.particles.emit(bullet.x, bullet.y, {
+            count: 5,
+            color: ['#00ffff', '#ffffff'],
+            speed: [50, 100],
+            life: [0.2, 0.4],
+            size: [2, 4]
+        });
+    });
+    
+    // Enemy bullets hit player
+    engine.onCollision('enemy-bullet', 'player', (bullet, player) => {
+        if (player.takeDamage) {
+            player.takeDamage(bullet.damage);
+        }
+        engine.destroy(bullet);
+        
+        engine.particles.emit(bullet.x, bullet.y, {
+            count: 5,
+            color: ['#ff3333', '#ff6666'],
+            speed: [50, 100],
+            life: [0.2, 0.4],
+            size: [2, 4]
+        });
+    });
+    
+    // Player picks up health
+    engine.onCollision('player', 'health', (player, pickup) => {
+        player.health = Math.min(player.maxHealth, player.health + pickup.healAmount);
+        engine.sound.play('pickup');
+        
+        engine.particles.emit(pickup.x, pickup.y, {
+            count: 10,
+            color: ['#33ff33', '#66ff66'],
+            speed: [80, 150],
+            life: [0.4, 0.7],
+            size: [3, 6]
+        });
+        
+        engine.destroy(pickup);
+    });
+    
+    // Player picks up energy
+    engine.onCollision('player', 'energy', (player, pickup) => {
+        player.energy = Math.min(player.maxEnergy, player.energy + pickup.energyAmount);
+        engine.sound.play('pickup');
+        
+        engine.particles.emit(pickup.x, pickup.y, {
+            count: 10,
+            color: ['#3333ff', '#6666ff'],
+            speed: [80, 150],
+            life: [0.4, 0.7],
+            size: [3, 6]
+        });
+        
+        engine.destroy(pickup);
+    });
+    
+    // Player picks up weapon upgrade
+    engine.onCollision('player', 'upgrade', (player, pickup) => {
+        engine.sound.play('powerup');
+        engine.screenFlash('#ffff00', 0.4, 0.3);
+        
+        // Apply upgrade
+        if (pickup.upgradeType === 'damage') {
+            CONFIG.MELEE_DAMAGE += 10;
+            CONFIG.RANGED_DAMAGE += 5;
+            game.playerData.upgrades.push('damage');
+        } else if (pickup.upgradeType === 'speed') {
+            player.speed += 30;
+            game.playerData.upgrades.push('speed');
+        } else if (pickup.upgradeType === 'energy') {
+            player.maxEnergy += 20;
+            player.energy = player.maxEnergy;
+            game.playerData.upgrades.push('energy');
+        }
+        
+        engine.particles.emit(pickup.x, pickup.y, {
+            count: 25,
+            color: ['#ffff00', '#ffaa00', '#ffffff'],
+            speed: [100, 200],
+            life: [0.6, 1],
+            size: [4, 8]
+        });
+        
+        engine.destroy(pickup);
+    });
+    
+    // Door triggers
+    engine.onCollision('player', 'door', (player, door) => {
+        if (door.targetRoom) {
+            transitionToRoom(door.targetRoom, door.spawnSide);
+        }
+    });
+}
+
+// ===== ROOM TRANSITIONS =====
+
+function transitionToRoom(roomName, spawnSide) {
+    game.currentRoom = roomName;
+    
+    // Save player state
+    const player = engine.findOne('player');
+    if (player) {
+        game.playerData.health = player.health;
+        game.playerData.energy = player.energy;
+    }
+    
+    // Clear current room
+    engine.clear();
+    engine.ui.clear();
+    
+    // Create new room
+    createRoom(roomName);
+    
+    // Spawn player at appropriate position
+    let spawnX = 100;
+    let spawnY = 360;
+    
+    if (spawnSide === 'left') {
+        spawnX = 80;
+    } else if (spawnSide === 'right') {
+        spawnX = 1100;
+    }
+    
+    const newPlayer = createPlayer(spawnX, spawnY);
+    engine.cameraFollow(newPlayer, 0.1);
+    
+    // Setup UI
+    setupGameUI();
+}
+
+// ===== UI =====
+
+function setupGameUI() {
+    const player = engine.findOne('player');
+    if (!player) return;
+    
+    // Health bar
+    engine.ui.healthBar(player, {
+        x: 20,
+        y: 20,
+        width: 200,
+        height: 20,
+        color: '#33ff33',
+        bgColor: '#1a1a2e'
+    });
+    
+    // Energy bar
+    engine.ui.elements.push({
+        type: 'energybar',
+        entity: player,
+        x: 20,
+        y: 50,
+        width: 200,
+        height: 15,
+        color: '#3333ff',
+        bgColor: '#1a1a2e'
+    });
+    
+    // Stats text
+    engine.ui.elements.push({
+        type: 'stats',
+        x: 20,
+        y: 85
+    });
+}
+
+// Custom UI rendering (extend UISystem)
+const originalUIRender = engine.ui.render;
+engine.ui.render = function(ctx) {
+    originalUIRender.call(this, ctx);
+    
+    // Energy bar
+    for (let el of this.elements) {
+        if (el.type === 'energybar') {
+            const percent = Math.max(0, Math.min(1, el.entity.energy / el.entity.maxEnergy));
+            
+            ctx.fillStyle = el.bgColor;
+            ctx.fillRect(el.x, el.y, el.width, el.height);
+            
+            ctx.fillStyle = el.color;
+            ctx.fillRect(el.x, el.y, el.width * percent, el.height);
+            
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(el.x, el.y, el.width, el.height);
+        }
+        
+        if (el.type === 'stats') {
+            const player = engine.findOne('player');
+            if (player) {
+                ctx.font = '14px monospace';
+                ctx.fillStyle = '#00ffcc';
+                ctx.textAlign = 'left';
+                ctx.fillText(`Kills: ${game.playerData.kills}`, el.x, el.y);
+                ctx.fillText(`Room: ${game.currentRoom}`, el.x, el.y + 20);
+                
+                // Upgrades
+                if (game.playerData.upgrades.length > 0) {
+                    ctx.fillStyle = '#ffff00';
+                    ctx.fillText(`Upgrades: ${game.playerData.upgrades.length}`, el.x, el.y + 40);
+                }
+                
+                // Cooldown indicators
+                const yOffset = game.playerData.upgrades.length > 0 ? 65 : 45;
+                ctx.fillStyle = '#888888';
+                if (player.dashCooldown > 0) {
+                    ctx.fillText(`Dash: ${player.dashCooldown.toFixed(1)}s`, el.x, el.y + yOffset);
+                } else {
+                    ctx.fillStyle = '#00ff00';
+                    ctx.fillText(`Dash: Ready (SPACE)`, el.x, el.y + yOffset);
+                }
+            }
+        }
+    }
+    
+    // Boss health bar
+    const boss = engine.findOne('boss');
+    if (boss) {
+        const barWidth = 400;
+        const barHeight = 30;
+        const barX = engine.canvas.width / 2 - barWidth / 2;
+        const barY = 30;
+        
+        const percent = Math.max(0, boss.health / boss.maxHealth);
+        
+        ctx.fillStyle = '#1a1a2e';
+        ctx.fillRect(barX, barY, barWidth, barHeight);
+        
+        ctx.fillStyle = '#ff00ff';
+        ctx.fillRect(barX, barY, barWidth * percent, barHeight);
+        
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(barX, barY, barWidth, barHeight);
+        
+        ctx.font = 'bold 16px monospace';
+        ctx.fillStyle = '#ffffff';
+        ctx.textAlign = 'center';
+        ctx.fillText('BOSS', engine.canvas.width / 2, barY + barHeight / 2 + 6);
+    }
+};
+
+// ===== GAME OVER / VICTORY =====
+
+function playerDeath() {
+    engine.after(1, () => {
+        engine.goTo('gameover', true);
+    });
+}
+
+// ===== SCENES =====
+
+engine.scene('menu', {
+    enter() {
+        engine.ui.screen('menu', {
+            title: 'NEON RONIN',
+            subtitle: 'A cyberpunk samurai tale',
+            button: {
+                text: 'START GAME',
+                action: () => {
+                    engine.goTo('gameplay', true);
+                }
+            }
+        });
+        
+        engine.ui.elements.push({
+            type: 'text',
+            text: 'WASD - Move | SPACE - Dash | Click - Melee | Q - Ranged',
+            x: engine.canvas.width / 2,
+            y: engine.canvas.height - 100,
+            font: '16px monospace',
+            color: '#888888',
+            align: 'center'
+        });
+        
+        // Load save if exists
+        engine.ui.elements.push({
+            type: 'text',
+            text: 'Press L to Load Save',
+            x: engine.canvas.width / 2,
+            y: engine.canvas.height - 50,
+            font: '14px monospace',
+            color: '#00ffcc',
+            align: 'center'
+        });
+    },
+    
+    update(dt) {
+        if (engine.input.keyPressed('l')) {
+            if (loadGame()) {
+                engine.goTo('gameplay', true);
+            }
+        }
+    }
+});
+
+engine.scene('gameplay', {
+    enter() {
+        // Reset or start new game
+        if (!engine.findOne('player')) {
+            createRoom(game.currentRoom);
+            const player = createPlayer(100, 360);
+            engine.cameraFollow(player, 0.1);
+            setupGameUI();
+            setupCollisions();
+        }
+    },
+    
+    update(dt) {
+        // Save game (S key)
+        if (engine.input.keyPressed('p')) {
+            saveGame();
+        }
+    }
+});
+
+engine.scene('gameover', {
+    enter() {
+        engine.ui.screen('gameover', {
+            title: 'DEFEAT',
+            subtitle: `Kills: ${game.playerData.kills}`,
+            button: {
+                text: 'TRY AGAIN',
+                action: () => {
+                    resetGame();
+                    engine.goTo('gameplay', true);
+                }
+            }
+        });
+    }
+});
+
+engine.scene('victory', {
+    enter() {
+        engine.ui.screen('victory', {
+            title: 'VICTORY!',
+            subtitle: `Total Kills: ${game.playerData.kills}`,
+            button: {
+                text: 'MAIN MENU',
+                action: () => {
+                    resetGame();
+                    engine.goTo('menu', true);
+                }
+            }
+        });
+        
+        // Clear save on victory
+        localStorage.removeItem('neonronin_save');
+    }
+});
+
+// ===== SAVE/LOAD =====
+
+function saveGame() {
+    const player = engine.findOne('player');
+    if (!player) return;
+    
+    const saveData = {
+        playerData: {
+            health: player.health,
+            maxHealth: player.maxHealth,
+            energy: player.energy,
+            maxEnergy: player.maxEnergy,
+            kills: game.playerData.kills
+        },
+        currentRoom: game.currentRoom,
+        timestamp: Date.now()
+    };
+    
+    localStorage.setItem('neonronin_save', JSON.stringify(saveData));
+    
+    // Visual feedback
+    engine.particles.emit(player.x, player.y, {
+        count: 20,
+        color: ['#00ffcc', '#00ffff'],
+        speed: [100, 200],
+        life: [0.5, 1],
+        size: [3, 6]
+    });
+    
+    console.log('Game saved!');
+}
+
+function loadGame() {
+    const saveJson = localStorage.getItem('neonronin_save');
+    if (!saveJson) {
+        console.log('No save found');
+        return false;
+    }
+    
+    const saveData = JSON.parse(saveJson);
+    
+    game.playerData = saveData.playerData;
+    game.currentRoom = saveData.currentRoom;
+    
+    console.log('Game loaded!');
+    return true;
+}
+
+function resetGame() {
+    game.currentRoom = 'room1';
+    game.playerData = {
+        health: CONFIG.PLAYER_MAX_HEALTH,
+        maxHealth: CONFIG.PLAYER_MAX_HEALTH,
+        energy: CONFIG.PLAYER_MAX_ENERGY,
+        maxEnergy: CONFIG.PLAYER_MAX_ENERGY,
+        weapon: 'katana',
+        upgrades: [],
+        kills: 0
+    };
+}
+
+// ===== START GAME =====
+
+engine.goTo('menu');
+engine.start();
