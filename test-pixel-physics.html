@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pixel Physics System - Bud Engine v3.0</title>
+    <title>Pixel Physics v3.1 - Emergent Property-Based Materials - Bud Engine</title>
     <style>
         body {
             margin: 0;
@@ -14,12 +14,12 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 20px;
+            gap: 15px;
         }
         
         h1 {
             margin: 0;
-            font-size: 24px;
+            font-size: 28px;
             text-align: center;
             color: #00ffcc;
             text-shadow: 0 0 10px #00ffcc;
@@ -27,9 +27,25 @@
         
         .subtitle {
             margin: 0;
-            font-size: 14px;
-            color: #888;
+            font-size: 16px;
+            color: #ff8800;
             text-align: center;
+            text-shadow: 0 0 8px #ff8800;
+        }
+        
+        .philosophy {
+            max-width: 700px;
+            text-align: center;
+            font-size: 13px;
+            color: #888;
+            border: 1px solid #333;
+            padding: 10px;
+            background: #1a1a2e;
+            margin-bottom: 10px;
+        }
+        
+        .philosophy strong {
+            color: #00ffcc;
         }
         
         #gameCanvas {
@@ -40,20 +56,34 @@
         
         .controls {
             display: flex;
-            gap: 20px;
+            gap: 10px;
             flex-wrap: wrap;
             justify-content: center;
-            max-width: 800px;
+            max-width: 900px;
+        }
+        
+        .control-section {
+            background: #16162e;
+            border: 1px solid #333;
+            padding: 8px;
+            border-radius: 3px;
+        }
+        
+        .control-section h3 {
+            margin: 0 0 8px 0;
+            font-size: 11px;
+            color: #888;
+            text-transform: uppercase;
         }
         
         .material-btn {
-            padding: 10px 20px;
+            padding: 8px 14px;
             background: #1a1a2e;
             border: 2px solid #444;
             color: #fff;
             cursor: pointer;
             font-family: 'Courier New', monospace;
-            font-size: 14px;
+            font-size: 12px;
             transition: all 0.2s;
             position: relative;
         }
@@ -68,34 +98,53 @@
             color: #0a0a14;
             border-color: #00ffcc;
             box-shadow: 0 0 20px rgba(0, 255, 204, 0.5);
+            font-weight: bold;
         }
         
         .material-btn::before {
             content: '';
             display: inline-block;
-            width: 12px;
-            height: 12px;
-            margin-right: 8px;
+            width: 10px;
+            height: 10px;
+            margin-right: 6px;
             border: 1px solid rgba(255, 255, 255, 0.3);
         }
         
+        /* Material colors */
         .material-btn[data-material="sand"]::before { background: #c2b280; }
         .material-btn[data-material="water"]::before { background: #1a6bff; }
+        .material-btn[data-material="ice"]::before { background: #a0d0ff; }
+        .material-btn[data-material="steam"]::before { background: #e0e0e0; }
         .material-btn[data-material="fire"]::before { background: #ff4400; }
         .material-btn[data-material="wood"]::before { background: #8b4513; }
+        .material-btn[data-material="coal"]::before { background: #1a1a1a; }
         .material-btn[data-material="oil"]::before { background: #1a1a1a; }
         .material-btn[data-material="stone"]::before { background: #4a4a4a; }
+        .material-btn[data-material="lava"]::before { background: #ff4400; }
+        .material-btn[data-material="obsidian"]::before { background: #0f0f0f; }
+        .material-btn[data-material="glass"]::before { background: #88ccff; opacity: 0.5; }
         .material-btn[data-material="dirt"]::before { background: #654321; }
+        .material-btn[data-material="mud"]::before { background: #4a3520; }
+        .material-btn[data-material="clay"]::before { background: #a07855; }
+        .material-btn[data-material="iron"]::before { background: #888888; }
         .material-btn[data-material="smoke"]::before { background: #3a3a3a; }
+        .material-btn[data-material="oxygen"]::before { background: #ccffff; opacity: 0.4; }
+        .material-btn[data-material="hydrogen"]::before { background: #ffcccc; opacity: 0.4; }
+        .material-btn[data-material="methane"]::before { background: #cceecc; opacity: 0.4; }
+        .material-btn[data-material="co2"]::before { background: #e0e0e0; opacity: 0.4; }
+        .material-btn[data-material="acid"]::before { background: #88ff44; opacity: 0.7; }
+        .material-btn[data-material="salt"]::before { background: #f0f0f0; }
+        .material-btn[data-material="sulfur"]::before { background: #ffff00; }
+        .material-btn[data-material="gunpowder"]::before { background: #2a2a2a; }
         
         .action-btn {
-            padding: 10px 30px;
+            padding: 10px 20px;
             background: #ff4400;
             border: 2px solid #ff6600;
             color: #fff;
             cursor: pointer;
             font-family: 'Courier New', monospace;
-            font-size: 16px;
+            font-size: 14px;
             font-weight: bold;
             transition: all 0.2s;
         }
@@ -105,94 +154,209 @@
             box-shadow: 0 0 20px rgba(255, 68, 0, 0.5);
         }
         
-        .clear-btn {
+        .action-btn.secondary {
             background: #333;
             border-color: #555;
         }
         
-        .clear-btn:hover {
+        .action-btn.secondary:hover {
             background: #555;
             box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
         }
         
+        .action-btn.heat {
+            background: #ff8800;
+            border-color: #ffaa00;
+        }
+        
+        .action-btn.heat:hover {
+            background: #ffaa00;
+        }
+        
         .info {
             text-align: center;
-            font-size: 12px;
+            font-size: 11px;
             color: #666;
-            max-width: 600px;
+            max-width: 700px;
+            line-height: 1.5;
         }
         
         .info strong {
             color: #00ffcc;
         }
         
+        .info .temp {
+            color: #ff8800;
+        }
+        
         .brush-size {
             display: flex;
             align-items: center;
-            gap: 10px;
-            padding: 10px;
+            gap: 8px;
+            padding: 8px;
             background: #1a1a2e;
             border: 2px solid #444;
         }
         
         .brush-size label {
-            font-size: 14px;
+            font-size: 12px;
         }
         
         .brush-size input {
-            width: 100px;
+            width: 80px;
         }
         
         .stats {
-            font-size: 12px;
+            font-size: 11px;
             color: #888;
             text-align: center;
+        }
+        
+        .temp-display {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(26, 26, 46, 0.95);
+            border: 2px solid #ff8800;
+            padding: 12px 18px;
+            font-size: 16px;
+            color: #ff8800;
+            text-shadow: 0 0 10px #ff8800;
+            display: none;
+            border-radius: 3px;
+        }
+        
+        .temp-display.active {
+            display: block;
+        }
+        
+        .scenario-btn {
+            padding: 8px 16px;
+            background: #2a2a4e;
+            border: 2px solid #5555ff;
+            color: #aaaaff;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+        
+        .scenario-btn:hover {
+            background: #3a3a6e;
+            border-color: #7777ff;
+            color: #ccccff;
         }
     </style>
 </head>
 <body>
-    <h1>🔥 Pixel Physics System 🔥</h1>
-    <p class="subtitle">Bud Engine v3.0 - "Falling Everything" Cellular Automata</p>
+    <h1>⚛️ Emergent Pixel Physics v3.1 ⚛️</h1>
+    <p class="subtitle">Building Earth from Scratch — Property-Based Materials</p>
+    
+    <div class="philosophy">
+        <strong>PHILOSOPHY:</strong> No hardcoded interactions. Materials have real physical properties.
+        Interactions EMERGE from those properties meeting conditions. This is how we build Earth.
+    </div>
     
     <canvas id="gameCanvas"></canvas>
     
-    <div class="controls">
-        <button class="material-btn active" data-material="sand">Sand</button>
-        <button class="material-btn" data-material="water">Water</button>
-        <button class="material-btn" data-material="fire">Fire</button>
-        <button class="material-btn" data-material="wood">Wood</button>
-        <button class="material-btn" data-material="oil">Oil</button>
-        <button class="material-btn" data-material="stone">Stone</button>
-        <button class="material-btn" data-material="dirt">Dirt</button>
-        <button class="material-btn" data-material="smoke">Smoke</button>
+    <div class="temp-display" id="tempDisplay">
+        🌡️ <span id="tempValue">20</span>°C
     </div>
     
-    <div class="controls">
-        <div class="brush-size">
-            <label>Brush Size:</label>
-            <input type="range" id="brushSize" min="5" max="50" value="15">
-            <span id="brushSizeValue">15</span>px
+    <div class="control-section">
+        <h3>🌊 Water Cycle (H₂O)</h3>
+        <div class="controls">
+            <button class="material-btn" data-material="ice">Ice (-10°C)</button>
+            <button class="material-btn" data-material="water">Water (20°C)</button>
+            <button class="material-btn" data-material="steam">Steam (100°C)</button>
+        </div>
+    </div>
+    
+    <div class="control-section">
+        <h3>🪨 Earth & Minerals</h3>
+        <div class="controls">
+            <button class="material-btn active" data-material="sand">Sand (SiO₂)</button>
+            <button class="material-btn" data-material="glass">Glass (1700°C)</button>
+            <button class="material-btn" data-material="stone">Stone</button>
+            <button class="material-btn" data-material="lava">Lava (1200°C)</button>
+            <button class="material-btn" data-material="obsidian">Obsidian</button>
+            <button class="material-btn" data-material="dirt">Dirt</button>
+            <button class="material-btn" data-material="mud">Mud</button>
+            <button class="material-btn" data-material="clay">Clay</button>
+            <button class="material-btn" data-material="iron">Iron</button>
+        </div>
+    </div>
+    
+    <div class="control-section">
+        <h3>🔥 Flammable Materials</h3>
+        <div class="controls">
+            <button class="material-btn" data-material="wood">Wood (300°C)</button>
+            <button class="material-btn" data-material="coal">Coal (350°C)</button>
+            <button class="material-btn" data-material="oil">Oil (210°C)</button>
+            <button class="material-btn" data-material="gunpowder">Gunpowder (280°C)</button>
+            <button class="material-btn" data-material="fire">Fire (800°C)</button>
+        </div>
+    </div>
+    
+    <div class="control-section">
+        <h3>💨 Gases</h3>
+        <div class="controls">
+            <button class="material-btn" data-material="smoke">Smoke</button>
+            <button class="material-btn" data-material="oxygen">Oxygen (O₂)</button>
+            <button class="material-btn" data-material="hydrogen">Hydrogen (H₂)</button>
+            <button class="material-btn" data-material="methane">Methane (CH₄)</button>
+            <button class="material-btn" data-material="co2">CO₂</button>
+        </div>
+    </div>
+    
+    <div class="control-section">
+        <h3>⚗️ Reactive Materials</h3>
+        <div class="controls">
+            <button class="material-btn" data-material="acid">Acid (pH 1)</button>
+            <button class="material-btn" data-material="salt">Salt (NaCl)</button>
+            <button class="material-btn" data-material="sulfur">Sulfur (S)</button>
         </div>
     </div>
     
     <div class="controls">
+        <div class="brush-size">
+            <label>Brush:</label>
+            <input type="range" id="brushSize" min="3" max="50" value="12">
+            <span id="brushSizeValue">12</span>px
+        </div>
+    </div>
+    
+    <div class="controls">
+        <button class="action-btn heat" onclick="toggleHeat()">🌡️ Heat View (T)</button>
         <button class="action-btn" onclick="createExplosion()">💥 EXPLODE!</button>
-        <button class="action-btn clear-btn" onclick="clearWorld()">🗑️ Clear All</button>
+        <button class="action-btn secondary" onclick="clearWorld()">🗑️ Clear All</button>
+    </div>
+    
+    <div class="control-section">
+        <h3>📋 Scenarios</h3>
+        <div class="controls">
+            <button class="scenario-btn" onclick="loadScenario('volcano')">🌋 Volcano</button>
+            <button class="scenario-btn" onclick="loadScenario('lab')">🧪 Lab</button>
+            <button class="scenario-btn" onclick="loadScenario('forest')">🔥 Forest Fire</button>
+            <button class="scenario-btn" onclick="loadScenario('underwater')">🌊 Underwater</button>
+            <button class="scenario-btn" onclick="loadScenario('arctic')">❄️ Arctic</button>
+        </div>
     </div>
     
     <div class="info">
-        <strong>How to use:</strong><br>
-        Click or drag to place materials. Watch them interact!<br>
-        • Water flows and fills containers<br>
-        • Sand falls and piles up<br>
-        • Fire burns wood and oil, produces smoke<br>
-        • Oil floats on water and is very flammable<br>
-        • Explosions destroy and scatter debris<br>
-        • Smoke rises and dissipates
+        <strong>Emergent Physics in Action:</strong><br>
+        • <span class="temp">Heat transfers</span> between materials based on thermal conductivity<br>
+        • Materials <span class="temp">melt, boil, freeze, condense</span> at their real temperatures<br>
+        • Fire requires <strong>oxygen</strong> and ignites materials at their <span class="temp">ignition point</span><br>
+        • Acid + Metal → Hydrogen gas (emergent chemistry!)<br>
+        • Hydrogen + Oxygen + Heat → EXPLOSION → Steam (H₂O)<br>
+        • Sand melts at 1700°C → Glass<br>
+        • Lava cools → Obsidian<br>
+        • Hover to see temperature • Press <strong>T</strong> for heat view • Press <strong>`</strong> for debug
     </div>
     
     <div class="stats">
-        <div>Press <strong>`</strong> for debug overlay • FPS: <span id="fps">60</span></div>
+        FPS: <span id="fps">60</span> • Materials: 25 • Properties: REAL • Interactions: EMERGENT
     </div>
 
     <script src="bud.js"></script>
@@ -201,7 +365,7 @@
         const engine = new BudEngine({
             width: 800,
             height: 600,
-            backgroundColor: '#1a1a2e'
+            backgroundColor: '#0f0f1e'
         });
 
         // Initialize pixel physics
@@ -209,7 +373,7 @@
 
         // Current selected material and brush size
         let selectedMaterial = 'sand';
-        let brushSize = 15;
+        let brushSize = 12;
         let isMouseDown = false;
         let lastMouseX = 0;
         let lastMouseY = 0;
@@ -231,9 +395,31 @@
             brushSizeValue.textContent = brushSize;
         });
 
+        // Temperature display on hover
+        const tempDisplay = document.getElementById('tempDisplay');
+        const tempValue = document.getElementById('tempValue');
+        
+        engine.canvas.addEventListener('mousemove', (e) => {
+            const rect = engine.canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            const temp = engine.physics.getTemp(x, y);
+            tempValue.textContent = Math.round(temp);
+            
+            if (!isMouseDown) {
+                tempDisplay.classList.add('active');
+            }
+        });
+        
+        engine.canvas.addEventListener('mouseleave', () => {
+            tempDisplay.classList.remove('active');
+        });
+
         // Mouse interaction for placing materials
         engine.canvas.addEventListener('mousedown', (e) => {
             isMouseDown = true;
+            tempDisplay.classList.remove('active');
             const rect = engine.canvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
@@ -316,41 +502,123 @@
             isMouseDown = false;
         });
 
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 't' || e.key === 'T') {
+                toggleHeat();
+            }
+        });
+
+        // Heat visualization toggle
+        function toggleHeat() {
+            engine.physics.toggleHeatView();
+        }
+
         // Explosion function
         function createExplosion() {
             const x = engine.canvas.width / 2 + (Math.random() - 0.5) * 200;
             const y = engine.canvas.height / 2 + (Math.random() - 0.5) * 200;
-            engine.physics.explode(x, y, 60, 150);
-            
-            // Camera shake for impact
+            engine.physics.explode(x, y, 70, 200);
             engine.cameraShake(10);
         }
 
         // Clear world function
         function clearWorld() {
             engine.physics.clearArea(0, 0, engine.canvas.width, engine.canvas.height);
+            buildInitialWorld();
+        }
+
+        // Load scenario
+        function loadScenario(name) {
+            clearWorld();
+            
+            if (name === 'volcano') {
+                // Lava chamber
+                engine.physics.fill(300, 400, 500, 500, 'lava');
+                // Stone walls
+                engine.physics.fill(200, 300, 280, 550, 'stone');
+                engine.physics.fill(520, 300, 600, 550, 'stone');
+                // Water pool on one side
+                engine.physics.fill(50, 450, 150, 550, 'water');
+                // Wooden platforms
+                engine.physics.fill(150, 350, 200, 370, 'wood');
+                
+                console.log('🌋 Volcano: Watch lava heat the environment. Pour water on it!');
+            } else if (name === 'lab') {
+                // Test tubes
+                engine.physics.fill(150, 450, 170, 550, 'glass');
+                engine.physics.fill(150, 480, 170, 530, 'acid');
+                
+                engine.physics.fill(250, 450, 270, 550, 'glass');
+                engine.physics.fill(250, 480, 270, 530, 'water');
+                
+                engine.physics.fill(350, 450, 370, 550, 'glass');
+                engine.physics.fill(350, 480, 370, 530, 'hydrogen');
+                
+                engine.physics.fill(450, 450, 470, 550, 'glass');
+                engine.physics.fill(450, 480, 470, 530, 'oxygen');
+                
+                // Metal samples
+                engine.physics.fill(600, 480, 640, 500, 'iron');
+                
+                // Flammable materials
+                engine.physics.fill(100, 300, 130, 330, 'oil');
+                engine.physics.fill(200, 300, 230, 330, 'gunpowder');
+                
+                console.log('🧪 Lab: Drop acid on metal. Mix hydrogen + oxygen, then ignite!');
+            } else if (name === 'forest') {
+                // Trees (wood)
+                for (let i = 0; i < 8; i++) {
+                    const x = 100 + i * 90;
+                    engine.physics.fill(x, 350, x + 40, 550, 'wood');
+                }
+                // Ground
+                engine.physics.fill(0, 550, 800, 600, 'dirt');
+                // Some coal deposits
+                engine.physics.fill(300, 520, 340, 550, 'coal');
+                // Starting fire
+                engine.physics.circle(100, 400, 15, 'fire');
+                
+                console.log('🔥 Forest Fire: Watch fire spread, heat neighbors, and consume oxygen');
+            } else if (name === 'underwater') {
+                // Water
+                engine.physics.fill(0, 100, 800, 600, 'water');
+                // Sand bottom
+                engine.physics.fill(0, 550, 800, 600, 'sand');
+                // Underwater volcano
+                engine.physics.fill(350, 500, 450, 550, 'stone');
+                engine.physics.circle(400, 520, 30, 'lava');
+                
+                console.log('🌊 Underwater: Lava + Water = Steam! Watch it rise');
+            } else if (name === 'arctic') {
+                // Ice shelf
+                engine.physics.fill(0, 300, 800, 400, 'ice');
+                // Water below
+                engine.physics.fill(0, 400, 800, 600, 'water');
+                // Some lava to melt it
+                engine.physics.circle(400, 350, 40, 'lava');
+                
+                console.log('❄️ Arctic: Watch ice melt into water, then boil into steam');
+            }
         }
 
         // Build some initial structures
         function buildInitialWorld() {
             // Bottom stone floor
-            engine.physics.fill(0, 550, 800, 600, 'stone');
+            engine.physics.fill(0, 560, 800, 600, 'stone');
             
             // Stone walls on sides
-            engine.physics.fill(0, 0, 30, 600, 'stone');
-            engine.physics.fill(770, 0, 800, 600, 'stone');
+            engine.physics.fill(0, 0, 25, 600, 'stone');
+            engine.physics.fill(775, 0, 800, 600, 'stone');
             
             // Some wooden platforms
-            engine.physics.fill(100, 450, 300, 470, 'wood');
-            engine.physics.fill(500, 350, 700, 370, 'wood');
-            engine.physics.fill(200, 250, 400, 270, 'wood');
+            engine.physics.fill(100, 480, 280, 495, 'wood');
+            engine.physics.fill(520, 400, 700, 415, 'wood');
+            engine.physics.fill(200, 300, 380, 315, 'wood');
             
             // Stone pillars
-            engine.physics.fill(150, 380, 180, 450, 'stone');
-            engine.physics.fill(620, 280, 650, 350, 'stone');
-            
-            // Small pool at bottom
-            engine.physics.fill(350, 520, 450, 550, 'stone');
+            engine.physics.fill(150, 420, 175, 480, 'stone');
+            engine.physics.fill(625, 330, 650, 400, 'stone');
         }
 
         // Initialize world
@@ -359,19 +627,17 @@
         // Main scene
         engine.scene('main', {
             enter() {
-                console.log('[PixelPhysics Demo] Welcome to the Falling Everything engine!');
+                console.log('[PixelPhysics v3.1] Emergent property-based physics initialized!');
+                console.log('• Temperature simulation active');
+                console.log('• State transitions: melting, boiling, freezing, condensing');
+                console.log('• Emergent combustion with oxygen requirement');
+                console.log('• Property-based chemical reactions');
+                console.log('• Press T for heat visualization');
             },
             
             update(dt) {
                 // Update FPS display
                 document.getElementById('fps').textContent = engine.fps;
-                
-                // Random fire sparks occasionally
-                if (Math.random() < 0.01) {
-                    const x = 100 + Math.random() * 600;
-                    const y = 50 + Math.random() * 200;
-                    engine.physics.set(x, y, 'fire');
-                }
             }
         });
 
@@ -379,12 +645,25 @@
         engine.goTo('main');
         engine.start();
 
-        console.log('[PixelPhysics Demo] v3.0 loaded successfully!');
-        console.log('- Paint materials by clicking and dragging');
-        console.log('- Light wood on fire and watch it burn');
-        console.log('- Pour water to extinguish fires');
-        console.log('- Create explosive chain reactions with oil');
-        console.log('- Press ` for debug overlay');
+        console.log('═══════════════════════════════════════════════════════════');
+        console.log('🌍 EMERGENT PIXEL PHYSICS v3.1 - Building Earth from Scratch');
+        console.log('═══════════════════════════════════════════════════════════');
+        console.log('PHILOSOPHY: No hardcoded interactions.');
+        console.log('Materials have REAL physical and chemical properties.');
+        console.log('Interactions EMERGE from those properties meeting conditions.');
+        console.log('');
+        console.log('🔬 TRY THESE EXPERIMENTS:');
+        console.log('  • Heat sand to 1700°C → becomes glass');
+        console.log('  • Pour water on lava → creates obsidian + steam');
+        console.log('  • Drop acid on iron → produces hydrogen gas');
+        console.log('  • Mix hydrogen + oxygen, then ignite → EXPLOSION → water');
+        console.log('  • Light wood on fire → consumes oxygen, heats neighbors');
+        console.log('  • Freeze water → ice (less dense, floats!)');
+        console.log('  • Pour oil on water → floats (density difference)');
+        console.log('  • Gunpowder + fire → BOOM!');
+        console.log('');
+        console.log('Press T to see heat flowing through materials');
+        console.log('═══════════════════════════════════════════════════════════');
     </script>
 </body>
 </html>
