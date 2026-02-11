@@ -43,6 +43,9 @@ engine.scene('gameplay', {
 
         // Spawn player
         const spawnPoint = engine.findOne('spawn');
+        if (!spawnPoint) {
+            console.error('[Platformer] No spawn point found! Creating default at (100, 100)');
+        }
         const player = engine.spawn('player', {
             x: spawnPoint ? spawnPoint.x : 100,
             y: spawnPoint ? spawnPoint.y : 100,
@@ -95,7 +98,7 @@ engine.scene('gameplay', {
                         winGame();
                     } else {
                         gameState.level++;
-                        engine.goTo('gameplay');
+                        engine.goTo('gameplay', true); // Use transition
                     }
                 }, 500);
             }
@@ -113,7 +116,7 @@ engine.scene('gameplay', {
                     winGame();
                 } else {
                     gameState.level++;
-                    engine.goTo('gameplay');
+                    engine.goTo('gameplay', true); // Use transition
                 }
             }
         });

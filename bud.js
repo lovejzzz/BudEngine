@@ -136,15 +136,15 @@ class BudEngine {
         this.lastFrameTime = timestamp;
         this.fps = elapsed > 0 ? Math.round(1000 / elapsed) : 60;
 
+        this.render(); // Render first so UI can process input
+
         if (!this.paused) {
             this.update(this.dt);
             this.frame++;
             this.time += this.dt;
         }
 
-        this.render();
-
-        // Clear input flags AFTER render so UI can check them
+        // Clear input flags AFTER update() so both update and render can use them
         this.input.update();
 
         requestAnimationFrame((t) => this.gameLoop(t));
@@ -274,10 +274,6 @@ class BudEngine {
             ctx.fillStyle = `rgba(10, 10, 20, ${alpha})`;
             ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         }
-
-        // Camera shake decay
-        this.camera.shake.x *= this.camera.shake.decay;
-        this.camera.shake.y *= this.camera.shake.decay;
     }
 
     updateCamera(dt) {
@@ -290,6 +286,10 @@ class BudEngine {
             this.camera.x += (targetX - this.camera.x) * this.camera.followSpeed;
             this.camera.y += (targetY - this.camera.y) * this.camera.followSpeed;
         }
+
+        // Camera shake decay (frame-rate independent)
+        this.camera.shake.x *= Math.pow(this.camera.shake.decay, dt * 60);
+        this.camera.shake.y *= Math.pow(this.camera.shake.decay, dt * 60);
     }
 
     // ===== ENTITY SYSTEM =====
@@ -742,11 +742,23 @@ class InputSystem {
         this.engine.canvas.addEventListener('mousedown', (e) => {
             if (!this.mouseDown) this.mousePressed = true;
             this.mouseDown = true;
+            e.preventDefault(); // Prevent default behavior
         });
 
         this.engine.canvas.addEventListener('mouseup', (e) => {
             this.mouseDown = false;
             this.mouseReleased = true;
+            e.preventDefault();
+        });
+
+        // Add click event for better button detection
+        this.engine.canvas.addEventListener('click', (e) => {
+            const rect = this.engine.canvas.getBoundingClientRect();
+            this.mouse.x = e.clientX - rect.left;
+            this.mouse.y = e.clientY - rect.top;
+            this.updateMouseWorld();
+            this.mousePressed = true; // Ensure this is set for UI buttons
+            e.preventDefault();
         });
     }
 
@@ -1157,7 +1169,14 @@ class SoundSystem {
         
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
-        osc.connect(gain);
+        
+        // Add a low-pass filter for smoother sound
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 2000;
+        
+        osc.connect(filter);
+        filter.connect(gain);
         gain.connect(ctx.destination);
 
         const now = ctx.currentTime;
@@ -1167,28 +1186,33 @@ class SoundSystem {
                 osc.type = 'square';
                 osc.frequency.setValueAtTime(400, now);
                 osc.frequency.exponentialRampToValueAtTime(100, now + 0.1);
-                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.setValueAtTime(0.2, now); // Reduced volume
                 gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                filter.frequency.setValueAtTime(2000, now);
+                filter.frequency.exponentialRampToValueAtTime(500, now + 0.1);
                 osc.start(now);
                 osc.stop(now + 0.1);
                 break;
             
             case 'hit':
-                osc.type = 'sawtooth';
+                osc.type = 'triangle'; // Softer than sawtooth
                 osc.frequency.setValueAtTime(200, now);
                 osc.frequency.exponentialRampToValueAtTime(50, now + 0.05);
-                gain.gain.setValueAtTime(0.4, now);
+                gain.gain.setValueAtTime(0.25, now);
                 gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+                filter.frequency.setValueAtTime(1000, now);
                 osc.start(now);
                 osc.stop(now + 0.05);
                 break;
             
             case 'explode':
-                osc.type = 'sawtooth';
+                osc.type = 'triangle';
                 osc.frequency.setValueAtTime(100, now);
                 osc.frequency.exponentialRampToValueAtTime(30, now + 0.3);
-                gain.gain.setValueAtTime(0.5, now);
+                gain.gain.setValueAtTime(0.3, now);
                 gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+                filter.frequency.setValueAtTime(800, now);
+                filter.frequency.exponentialRampToValueAtTime(200, now + 0.3);
                 osc.start(now);
                 osc.stop(now + 0.3);
                 break;
@@ -1197,8 +1221,9 @@ class SoundSystem {
                 osc.type = 'sine';
                 osc.frequency.setValueAtTime(600, now);
                 osc.frequency.exponentialRampToValueAtTime(1200, now + 0.1);
-                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.setValueAtTime(0.25, now);
                 gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                filter.frequency.setValueAtTime(3000, now);
                 osc.start(now);
                 osc.stop(now + 0.1);
                 break;
@@ -1207,18 +1232,34 @@ class SoundSystem {
                 osc.type = 'sine';
                 osc.frequency.setValueAtTime(300, now);
                 osc.frequency.exponentialRampToValueAtTime(600, now + 0.15);
-                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.setValueAtTime(0.18, now);
                 gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+                filter.frequency.setValueAtTime(2500, now);
                 osc.start(now);
                 osc.stop(now + 0.15);
                 break;
 
             case 'hurt':
-                osc.type = 'sawtooth';
+                osc.type = 'triangle';
                 osc.frequency.setValueAtTime(150, now);
                 osc.frequency.exponentialRampToValueAtTime(50, now + 0.2);
-                gain.gain.setValueAtTime(0.35, now);
+                gain.gain.setValueAtTime(0.28, now);
                 gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                filter.frequency.setValueAtTime(1200, now);
+                filter.frequency.exponentialRampToValueAtTime(400, now + 0.2);
+                osc.start(now);
+                osc.stop(now + 0.2);
+                break;
+            
+            case 'powerup':
+                // New sound for wave start
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.exponentialRampToValueAtTime(800, now + 0.05);
+                osc.frequency.exponentialRampToValueAtTime(600, now + 0.2);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+                filter.frequency.setValueAtTime(3000, now);
                 osc.start(now);
                 osc.stop(now + 0.2);
                 break;
@@ -1398,6 +1439,18 @@ class Tilemap {
     door(x, y, direction) {
         // Remove wall tile for door
         this.tiles.delete(`${x},${y}`);
+        
+        // Also remove the wall collider entity
+        const worldX = x * this.tileSize + this.tileSize / 2;
+        const worldY = y * this.tileSize + this.tileSize / 2;
+        
+        const walls = this.engine.findByTag('wall');
+        for (let wall of walls) {
+            if (Math.abs(wall.x - worldX) < 1 && Math.abs(wall.y - worldY) < 1) {
+                this.engine.destroy(wall);
+                break;
+            }
+        }
     }
 
     room(x, y, w, h, floorType, wallType) {

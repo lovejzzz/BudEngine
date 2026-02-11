@@ -59,8 +59,10 @@ engine.scene('gameplay', {
             health: 100,
             maxHealth: 100,
             speed: 250,
+            baseSpeed: 250,
+            speedBoostTime: 0,
             shootCooldown: 0,
-            damageCooldown: 3.0,
+            damageCooldown: 0,
             score: 0,
             tags: ['player', 'friendly']
         });
@@ -86,12 +88,16 @@ engine.scene('gameplay', {
             engine.destroy(bullet);
 
             if (enemy.health <= 0) {
+                const enemyX = enemy.x;
+                const enemyY = enemy.y;
+                const isBomber = enemy.type === 'bomber';
+                
                 engine.destroy(enemy);
                 gameState.score += 10;
                 gameState.kills++;
                 player.score = gameState.score;
                 
-                engine.particles.emit(enemy.x, enemy.y, {
+                engine.particles.emit(enemyX, enemyY, {
                     count: 30,
                     color: ['#ff3333', '#ff8800', '#ffcc00'],
                     speed: [100, 250],
@@ -102,9 +108,21 @@ engine.scene('gameplay', {
                 engine.sound.play('explode');
                 engine.cameraShake(5);
 
-                // Chance to spawn health pickup
-                if (Math.random() < 0.2) {
-                    spawnHealthPickup(enemy.x, enemy.y);
+                // Bomber explodes into projectiles
+                if (isBomber) {
+                    for (let i = 0; i < 8; i++) {
+                        const angle = (i / 8) * Math.PI * 2;
+                        const speed = 200;
+                        shootEnemyBulletAngle(enemyX, enemyY, angle, speed);
+                    }
+                }
+
+                // Chance to spawn pickups
+                const rand = Math.random();
+                if (rand < 0.15) {
+                    spawnHealthPickup(enemyX, enemyY);
+                } else if (rand < 0.25) {
+                    spawnSpeedPickup(enemyX, enemyY);
                 }
             }
         });
@@ -131,6 +149,21 @@ engine.scene('gameplay', {
                 speed: [80, 200],
                 life: [0.4, 0.8],
                 size: [2, 6],
+                fade: true
+            });
+        });
+
+        engine.onCollision('player', 'speed-pickup', (player, pickup) => {
+            player.speed = 350; // Boost speed
+            player.speedBoostTime = 5; // 5 seconds
+            engine.destroy(pickup);
+            engine.sound.play('powerup');
+            engine.particles.emit(pickup.x, pickup.y, {
+                count: 25,
+                color: ['#ffcc00', '#ff8800', '#ffff00'],
+                speed: [100, 250],
+                life: [0.5, 1.0],
+                size: [3, 7],
                 fade: true
             });
         });
@@ -170,6 +203,14 @@ engine.scene('gameplay', {
         // Damage cooldown
         if (player.damageCooldown > 0) {
             player.damageCooldown -= dt;
+        }
+
+        // Speed boost timer
+        if (player.speedBoostTime > 0) {
+            player.speedBoostTime -= dt;
+            if (player.speedBoostTime <= 0) {
+                player.speed = player.baseSpeed; // Reset to normal speed
+            }
         }
 
         // Player movement
@@ -216,6 +257,8 @@ engine.scene('gameplay', {
                 updateChaser(enemy, player, dt);
             } else if (enemy.type === 'turret') {
                 updateTurret(enemy, player, dt);
+            } else if (enemy.type === 'bomber') {
+                updateBomber(enemy, player, dt);
             }
         }
 
@@ -247,6 +290,13 @@ engine.scene('gameplay', {
         engine.ui.text(`KILLS: ${gameState.kills}`, { 
             x: 1260, y: 85, align: 'right', font: '16px monospace', color: '#888888' 
         });
+
+        // Speed boost indicator
+        if (player.speedBoostTime > 0) {
+            engine.ui.text(`⚡ SPEED BOOST: ${Math.ceil(player.speedBoostTime)}s`, {
+                x: 20, y: 55, font: 'bold 18px monospace', color: '#ffcc00'
+            });
+        }
 
         if (enemies.length === 0 && gameState.nextWaveTimer > 0) {
             engine.ui.text(`Next wave in ${Math.ceil(gameState.nextWaveTimer)}...`, {
@@ -345,6 +395,15 @@ function spawnWave() {
         }
     }
 
+    // Spawn bombers (from wave 4)
+    if (wave >= 4) {
+        const bomberCount = Math.min(wave - 3, 3);
+        for (let i = 0; i < bomberCount; i++) {
+            const pos = engine.choose(spawnPoints);
+            spawnBomber(pos.x + engine.random(-60, 60), pos.y + engine.random(-60, 60));
+        }
+    }
+
     engine.sound.play('powerup');
 }
 
@@ -398,6 +457,22 @@ function spawnTurret(x, y) {
     });
 }
 
+function spawnBomber(x, y) {
+    const bomber = engine.spawn('bomber', {
+        x, y,
+        sprite: engine.art.enemy({ 
+            body: 'circle', 
+            color: '#ff00ff', 
+            size: 22,
+            glow: true
+        }),
+        collider: { type: 'circle', radius: 20 },
+        health: 150,
+        speed: 80,
+        tags: ['enemy']
+    });
+}
+
 // ===== ENEMY AI =====
 
 function updatePatrolDrone(enemy, player, dt) {
@@ -425,6 +500,18 @@ function updateTurret(enemy, player, dt) {
     if (enemy.shootCooldown <= 0) {
         shootEnemyBullet(enemy, player.x, player.y);
         enemy.shootCooldown = 2.5;
+    }
+}
+
+function updateBomber(enemy, player, dt) {
+    // Move slowly toward player
+    const dx = player.x - enemy.x;
+    const dy = player.y - enemy.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    
+    if (dist > 0) {
+        enemy.x += (dx / dist) * enemy.speed * dt;
+        enemy.y += (dy / dist) * enemy.speed * dt;
     }
 }
 
@@ -483,6 +570,23 @@ function shootEnemyBullet(enemy, targetX, targetY) {
     engine.sound.play('shoot');
 }
 
+function shootEnemyBulletAngle(x, y, angle, speed) {
+    const bullet = engine.spawn('enemy-bullet', {
+        x, y,
+        velocity: { x: Math.cos(angle) * speed, y: Math.sin(angle) * speed },
+        sprite: engine.art.particle({ color: '#ff00ff', size: 6 }),
+        collider: { type: 'circle', radius: 6 },
+        tags: ['enemy-bullet'],
+        layer: 1
+    });
+
+    setTimeout(() => {
+        if (engine.entities.includes(bullet)) {
+            engine.destroy(bullet);
+        }
+    }, 3000);
+}
+
 // ===== PICKUPS =====
 
 function spawnHealthPickup(x, y) {
@@ -496,6 +600,20 @@ function spawnHealthPickup(x, y) {
         }),
         collider: { type: 'circle', radius: 10 },
         tags: ['pickup']
+    });
+}
+
+function spawnSpeedPickup(x, y) {
+    engine.spawn('speed-pickup', {
+        x, y,
+        sprite: engine.art.character({ 
+            body: 'star', 
+            color: '#ffcc00', 
+            size: 14,
+            glow: true
+        }),
+        collider: { type: 'circle', radius: 10 },
+        tags: ['speed-pickup']
     });
 }
 
