@@ -11,7 +11,8 @@ let gameState = {
     wave: 0,
     score: 0,
     kills: 0,
-    nextWaveTimer: 0
+    nextWaveTimer: 0,
+    waveAnnouncementTimer: 0
 };
 
 // ===== MENU SCENE =====
@@ -185,6 +186,18 @@ engine.scene('gameplay', {
             moveY /= len;
             player.x += moveX * player.speed * dt;
             player.y += moveY * player.speed * dt;
+
+            // Leave trail particles when moving
+            if (engine.frame % 3 === 0) {
+                engine.particles.emit(player.x, player.y, {
+                    count: 2,
+                    color: ['#00ffcc', '#00ff88'],
+                    speed: [20, 40],
+                    life: [0.3, 0.5],
+                    size: [2, 4],
+                    fade: true
+                });
+            }
         }
 
         // Player shooting
@@ -212,8 +225,14 @@ engine.scene('gameplay', {
             if (gameState.nextWaveTimer <= 0) {
                 gameState.wave++;
                 gameState.nextWaveTimer = 3;
+                gameState.waveAnnouncementTimer = 2; // Show announcement for 2 seconds
                 spawnWave();
             }
+        }
+
+        // Update wave announcement timer
+        if (gameState.waveAnnouncementTimer > 0) {
+            gameState.waveAnnouncementTimer -= dt;
         }
 
         // UI
@@ -232,6 +251,18 @@ engine.scene('gameplay', {
         if (enemies.length === 0 && gameState.nextWaveTimer > 0) {
             engine.ui.text(`Next wave in ${Math.ceil(gameState.nextWaveTimer)}...`, {
                 x: 640, y: 360, align: 'center', font: 'bold 32px monospace', color: '#ffcc00'
+            });
+        }
+
+        // Wave announcement
+        if (gameState.waveAnnouncementTimer > 0) {
+            const alpha = Math.min(1, gameState.waveAnnouncementTimer);
+            const scale = 1 + (2 - gameState.waveAnnouncementTimer) * 0.5;
+            const fontSize = Math.floor(64 * scale);
+            engine.ui.text(`WAVE ${gameState.wave}`, {
+                x: 640, y: 300, align: 'center', 
+                font: `bold ${fontSize}px monospace`, 
+                color: `rgba(255, 51, 51, ${alpha})`
             });
         }
     },

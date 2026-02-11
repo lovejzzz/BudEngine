@@ -87,6 +87,16 @@ class BudEngine {
 
         // Gravity (optional, for platformers)
         this.gravity = config.gravity || 0;
+
+        // Scene transitions
+        this.transition = {
+            active: false,
+            type: 'fade',
+            progress: 0,
+            duration: 0.5,
+            fadeOut: false,
+            nextScene: null
+        };
     }
 
     // ===== GAME LOOP =====
@@ -125,10 +135,33 @@ class BudEngine {
 
         this.render();
 
+        // Clear input flags AFTER render so UI can check them
+        this.input.update();
+
         requestAnimationFrame((t) => this.gameLoop(t));
     }
 
     update(dt) {
+        // Update scene transitions
+        if (this.transition.active) {
+            this.transition.progress += dt / this.transition.duration;
+            
+            if (this.transition.progress >= 1) {
+                this.transition.progress = 1;
+                
+                if (this.transition.fadeOut) {
+                    // Fade out complete, switch scene
+                    this.goTo(this.transition.nextScene, false);
+                } else {
+                    // Fade in complete, end transition
+                    this.transition.active = false;
+                }
+            }
+            
+            // Don't update game during transitions
+            if (this.transition.fadeOut) return;
+        }
+
         // Update current scene
         if (this.currentScene && this.scenes[this.currentScene]) {
             const scene = this.scenes[this.currentScene];
@@ -165,8 +198,7 @@ class BudEngine {
         // Update camera
         this.updateCamera(dt);
 
-        // Update input
-        this.input.update();
+        // NOTE: input.update() moved to AFTER render so UI can check mousePressed
     }
 
     render() {
@@ -225,6 +257,13 @@ class BudEngine {
         if (this.currentScene && this.scenes[this.currentScene]) {
             const scene = this.scenes[this.currentScene];
             if (scene.draw) scene.draw(ctx);
+        }
+
+        // Render scene transitions
+        if (this.transition.active) {
+            const alpha = this.transition.fadeOut ? this.transition.progress : 1 - this.transition.progress;
+            ctx.fillStyle = `rgba(10, 10, 20, ${alpha})`;
+            ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         }
 
         // Camera shake decay
@@ -422,15 +461,19 @@ class BudEngine {
         const aSolid = a.tags.includes('solid') || a.tags.includes('wall');
         const bSolid = b.tags.includes('solid') || b.tags.includes('wall');
         
-        if (aSolid && !bSolid && b.collider) {
+        // Check if entity should collide with walls (enemies now collide too!)
+        const aBlockedByWalls = !a.tags.includes('bullet') && !a.tags.includes('pickup') && !a.tags.includes('coin');
+        const bBlockedByWalls = !b.tags.includes('bullet') && !b.tags.includes('pickup') && !b.tags.includes('coin');
+        
+        if (aSolid && !bSolid && b.collider && bBlockedByWalls) {
             this.resolveOverlap(b, a);
-        } else if (bSolid && !aSolid && a.collider) {
+        } else if (bSolid && !aSolid && a.collider && aBlockedByWalls) {
             this.resolveOverlap(a, b);
         }
     }
     
     resolveOverlap(mover, solid) {
-        // Push mover out of solid (AABB resolution)
+        // Push mover out of solid (improved resolution)
         if (solid.collider.type === 'aabb') {
             const halfW = solid.collider.width / 2;
             const halfH = solid.collider.height / 2;
@@ -444,10 +487,22 @@ class BudEngine {
             const overlapY = halfH + moverR - Math.abs(dy);
             
             if (overlapX > 0 && overlapY > 0) {
+                // Push out on axis with least penetration (more stable)
                 if (overlapX < overlapY) {
-                    mover.x += dx > 0 ? overlapX : -overlapX;
+                    const pushX = dx > 0 ? overlapX : -overlapX;
+                    mover.x += pushX;
+                    // Also zero out velocity in that direction to prevent sticking
+                    if (mover.velocity) {
+                        if (dx > 0 && mover.velocity.x < 0) mover.velocity.x = 0;
+                        if (dx < 0 && mover.velocity.x > 0) mover.velocity.x = 0;
+                    }
                 } else {
-                    mover.y += dy > 0 ? overlapY : -overlapY;
+                    const pushY = dy > 0 ? overlapY : -overlapY;
+                    mover.y += pushY;
+                    if (mover.velocity) {
+                        if (dy > 0 && mover.velocity.y < 0) mover.velocity.y = 0;
+                        if (dy < 0 && mover.velocity.y > 0) mover.velocity.y = 0;
+                    }
                 }
             }
         }
@@ -498,7 +553,16 @@ class BudEngine {
         this.scenes[name] = definition;
     }
 
-    goTo(name) {
+    goTo(name, useTransition = false) {
+        if (useTransition && !this.transition.active) {
+            // Start fade out transition
+            this.transition.active = true;
+            this.transition.fadeOut = true;
+            this.transition.progress = 0;
+            this.transition.nextScene = name;
+            return;
+        }
+
         // Exit current scene
         if (this.currentScene && this.scenes[this.currentScene]) {
             const scene = this.scenes[this.currentScene];
@@ -518,6 +582,12 @@ class BudEngine {
         if (this.scenes[name]) {
             const scene = this.scenes[name];
             if (scene.enter) scene.enter();
+        }
+
+        // Start fade in if transitioning
+        if (useTransition) {
+            this.transition.fadeOut = false;
+            this.transition.progress = 0;
         }
     }
 
@@ -679,29 +749,52 @@ class ArtSystem {
 
         const size = opts.size || 24;
         const canvas = document.createElement('canvas');
-        canvas.width = size * 2;
-        canvas.height = size * 2;
+        canvas.width = size * 3; // Increased for glow
+        canvas.height = size * 3;
         const ctx = canvas.getContext('2d');
 
-        ctx.translate(size, size);
+        ctx.translate(size * 1.5, size * 1.5);
 
-        // Glow
+        const color = opts.color || '#00ffcc';
+
+        // Outer glow
         if (opts.glow) {
-            ctx.shadowBlur = 20;
-            ctx.shadowColor = opts.color || '#00ffcc';
+            ctx.shadowBlur = 30;
+            ctx.shadowColor = color;
         }
 
-        // Body
-        ctx.fillStyle = opts.color || '#00ffcc';
+        // Body with gradient
+        const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, size);
+        gradient.addColorStop(0, this.lightenColor(color, 50));
+        gradient.addColorStop(0.6, color);
+        gradient.addColorStop(1, this.darkenColor(color, 20));
+        ctx.fillStyle = gradient;
         this.drawShape(ctx, opts.body || 'circle', size * 0.8);
         ctx.fill();
 
+        // Reset shadow for other elements
+        ctx.shadowBlur = 0;
+
+        // Outline
+        ctx.strokeStyle = this.lightenColor(color, 80);
+        ctx.lineWidth = 2;
+        this.drawShape(ctx, opts.body || 'circle', size * 0.8);
+        ctx.stroke();
+
         // Eyes
         if (opts.eyes) {
+            // White eyes
             ctx.fillStyle = '#ffffff';
             ctx.beginPath();
-            ctx.arc(-size * 0.2, -size * 0.15, size * 0.1, 0, Math.PI * 2);
-            ctx.arc(size * 0.2, -size * 0.15, size * 0.1, 0, Math.PI * 2);
+            ctx.arc(-size * 0.2, -size * 0.15, size * 0.12, 0, Math.PI * 2);
+            ctx.arc(size * 0.2, -size * 0.15, size * 0.12, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Black pupils
+            ctx.fillStyle = '#0a0a14';
+            ctx.beginPath();
+            ctx.arc(-size * 0.2, -size * 0.15, size * 0.06, 0, Math.PI * 2);
+            ctx.arc(size * 0.2, -size * 0.15, size * 0.06, 0, Math.PI * 2);
             ctx.fill();
         }
 
@@ -715,23 +808,52 @@ class ArtSystem {
 
         const size = opts.size || 24;
         const canvas = document.createElement('canvas');
-        canvas.width = size * 2;
-        canvas.height = size * 2;
+        canvas.width = size * 3; // Increased for glow
+        canvas.height = size * 3;
         const ctx = canvas.getContext('2d');
 
-        ctx.translate(size, size);
+        ctx.translate(size * 1.5, size * 1.5);
 
-        // Body
-        ctx.fillStyle = opts.color || '#ff3333';
+        const color = opts.color || '#ff3333';
+
+        // Outer glow
+        ctx.shadowBlur = 30;
+        ctx.shadowColor = color;
+        
+        // Body with gradient
+        const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, size);
+        gradient.addColorStop(0, this.lightenColor(color, 40));
+        gradient.addColorStop(0.7, color);
+        gradient.addColorStop(1, this.darkenColor(color, 30));
+        ctx.fillStyle = gradient;
+        
         this.drawShape(ctx, opts.body || 'diamond', size * 0.8);
         ctx.fill();
 
+        // Reset shadow for outline
+        ctx.shadowBlur = 0;
+
+        // Bright outline
+        ctx.strokeStyle = this.lightenColor(color, 60);
+        ctx.lineWidth = 2;
+        this.drawShape(ctx, opts.body || 'diamond', size * 0.8);
+        ctx.stroke();
+
+        // Inner highlight
+        ctx.globalAlpha = 0.6;
+        ctx.fillStyle = this.lightenColor(color, 80);
+        this.drawShape(ctx, opts.body || 'diamond', size * 0.4);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+
         // Spikes
         if (opts.spikes) {
-            ctx.fillStyle = opts.color || '#ff3333';
-            const spikes = 6;
-            for (let i = 0; i < spikes; i++) {
-                const angle = (i / spikes) * Math.PI * 2;
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = color;
+            ctx.fillStyle = color;
+            const spikeCount = 6;
+            for (let i = 0; i < spikeCount; i++) {
+                const angle = (i / spikeCount) * Math.PI * 2;
                 ctx.save();
                 ctx.rotate(angle);
                 ctx.beginPath();
@@ -745,6 +867,22 @@ class ArtSystem {
 
         this.cache.set(key, canvas);
         return canvas;
+    }
+
+    lightenColor(color, percent) {
+        const num = parseInt(color.replace('#', ''), 16);
+        const r = Math.min(255, ((num >> 16) & 255) + percent);
+        const g = Math.min(255, ((num >> 8) & 255) + percent);
+        const b = Math.min(255, (num & 255) + percent);
+        return `rgb(${r},${g},${b})`;
+    }
+
+    darkenColor(color, percent) {
+        const num = parseInt(color.replace('#', ''), 16);
+        const r = Math.max(0, ((num >> 16) & 255) - percent);
+        const g = Math.max(0, ((num >> 8) & 255) - percent);
+        const b = Math.max(0, (num & 255) - percent);
+        return `rgb(${r},${g},${b})`;
     }
 
     tile(opts = {}) {

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Bud Engine - Visual Test</title>
+    <style>
+        body { margin: 0; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        canvas { border: 2px solid #00ffcc; }
+    </style>
+</head>
+<body>
+    <script src="bud.js"></script>
+    <script>
+        const engine = new BudEngine({ width: 1280, height: 720 });
+
+        engine.scene('test', {
+            enter() {
+                // Spawn player to test improved visuals
+                const player = engine.spawn('player', {
+                    x: 300, y: 360,
+                    sprite: engine.art.character({ 
+                        body: 'circle', 
+                        color: '#00ffcc', 
+                        size: 30,
+                        eyes: true,
+                        glow: true
+                    }),
+                    collider: { type: 'circle', radius: 24 }
+                });
+
+                // Spawn enemies to test improved art
+                const enemy1 = engine.spawn('enemy1', {
+                    x: 600, y: 360,
+                    sprite: engine.art.enemy({ 
+                        body: 'diamond', 
+                        color: '#ff3333', 
+                        size: 28 
+                    }),
+                    collider: { type: 'circle', radius: 22 }
+                });
+
+                const enemy2 = engine.spawn('enemy2', {
+                    x: 800, y: 300,
+                    sprite: engine.art.enemy({ 
+                        body: 'triangle', 
+                        color: '#ff8800', 
+                        size: 30,
+                        spikes: true
+                    }),
+                    collider: { type: 'circle', radius: 24 }
+                });
+
+                const enemy3 = engine.spawn('enemy3', {
+                    x: 1000, y: 360,
+                    sprite: engine.art.enemy({ 
+                        body: 'hexagon', 
+                        color: '#8833ff', 
+                        size: 32 
+                    }),
+                    collider: { type: 'circle', radius: 26 }
+                });
+
+                // Add some particles
+                setInterval(() => {
+                    engine.particles.emit(player.x, player.y, {
+                        count: 5,
+                        color: ['#00ffcc', '#00ff88'],
+                        speed: [30, 60],
+                        life: [0.5, 1],
+                        size: [3, 6],
+                        fade: true
+                    });
+                }, 100);
+
+                // UI
+                engine.ui.text('IMPROVED PROCEDURAL ART TEST', {
+                    x: 640, y: 50, align: 'center',
+                    font: 'bold 32px monospace', color: '#ff3333'
+                });
+                engine.ui.text('Player (left) | Enemies (right)', {
+                    x: 640, y: 90, align: 'center',
+                    font: '20px monospace', color: '#00ffcc'
+                });
+                engine.ui.text('✓ Glow effects  ✓ Gradients  ✓ Outlines  ✓ Details', {
+                    x: 640, y: 650, align: 'center',
+                    font: '18px monospace', color: '#ffcc00'
+                });
+            }
+        });
+
+        engine.goTo('test');
+        engine.start();
+
+        // Log to console
+        console.log('✅ Visual test loaded. Check the canvas for improved procedural art!');
+    </script>
+</body>
+</html>
