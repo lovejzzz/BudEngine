@@ -8786,7 +8786,8 @@ class PixelPhysics {
                                     for (const [ex, ey] of emitDirs) {
                                         if (!this.inBounds(ex, ey)) continue;
                                         const eidx = this.index(ex, ey);
-                                        if (this.grid[eidx] === 0 && Math.random() < 0.3) {
+                                        if (this.grid[eidx] === 0 && Math.random() < 0.3 && ey > 1) {
+                                            // ey > 1: don't spawn fire in top 2 rows (ceiling)
                                             this.grid[eidx] = fireId;
                                             this.temperatureGrid[eidx] = 700 + Math.random() * 200;
                                             if (fireMat && fireMat.lifetime) {
@@ -10549,8 +10550,17 @@ class PixelPhysics {
      * @private
      */
     simulateGas(x, y, mat, id) {
-        // v5.0: Hot gas (fire) actively spreads to adjacent flammable materials
+        // v5.1: Fire at ceiling or surrounded by non-air dies faster
         const myIdx = this.index(x, y);
+        if (mat.heatEmission > 0 && mat.lifetime) {
+            // Can't rise? Burn out faster
+            const aboveBlocked = !this.inBounds(x, y - 1) || this.grid[this.index(x, y - 1)] !== 0;
+            if (aboveBlocked) {
+                this.lifetimeGrid[myIdx] -= 0.05; // Extra decay when trapped
+            }
+        }
+        
+        // v5.0: Hot gas (fire) actively spreads to adjacent flammable materials
         if (mat.heatEmission > 0 && this.temperatureGrid[myIdx] > 400) {
             const spreadDirs = [
                 [x-1,y], [x+1,y], [x,y-1], [x,y+1],
