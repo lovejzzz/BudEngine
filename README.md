@@ -8,6 +8,7 @@ A single-file 2D web game engine with pixel physics, procedural sound, and emerg
 A god-simulation where building the world = composing music. Your instrument is the Earth.
 
 ## Features
+- **Pixel-Art UI** (v4.4): ALL UI elements rendered as pixel art on the main canvas. No HTML overlays — everything is part of the pixel world. 3x5 bitmap font, material palette with actual material color swatches, mode buttons, HUD with creature icons, O₂ bars, health indicators, day/night icons. Material tooltips with 2-second auto-dismiss. Touch-routed through pixel UI for seamless interaction. "Everything on the UI will be pixel using our engine, no more normal buttons, this is its own world and art" — SKYX
 - **Pixel Physics**: 30+ materials with real scientific properties — emergent reactions, no hardcoded interactions
 - **Living Ecosystem**: Worms 🪱, fish 🐟, bugs 🐛, birds 🐦 — visible multi-pixel creatures that eat, reproduce, and die. Soil fertility, O₂/CO₂ balance, food chains. Birds are apex predators (eat bugs, disperse seeds)
 - **Creature Glow Effect** (v4.3.2): Semi-transparent colored halos around creatures for better visibility. Worm=pink, fish=orange, bug=green, bird=blue (brighter). Makes creatures visible even in complex terrain

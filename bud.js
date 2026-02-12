@@ -1,11 +1,23 @@
 /**
- * BUD ENGINE v4.3.2
+ * BUD ENGINE v4.4
  * A 2D web game engine designed for AI-human collaboration
  * 
  * Philosophy: AI can write, TEST, and iterate on games independently.
  * Killer feature: AI Testing API + auto-playtest bot
  * 
  * Architecture: Single-file, no build tools, runs in browser
+ * 
+ * v4.4 PIXEL-ART UI — EVERYTHING IS PIXEL:
+ * - Complete replacement of HTML UI with pixel-art canvas rendering (PixelUI class)
+ * - 3x5 bitmap font system for all text rendering (compact, crispy pixel text)
+ * - Material palette rendered as 16x16 pixel swatches using actual material colors from the physics engine
+ * - Mode buttons (CREATE/LISTEN/CONDUCT/GARDEN) rendered as pixel-art buttons with pixel text
+ * - HUD rendered with pixel text and icons: epoch name, score, creature counts with 5x5 pixel icons, O₂ percentage, health heart (color-coded), day/night indicator (sun/moon)
+ * - Material tooltips show on palette tap, 2-second auto-dismiss, pixel text
+ * - Touch input routing: UI areas intercept touches, game receives only non-UI touches
+ * - Zero HTML overlays during gameplay (except welcome screen on first visit)
+ * - "Everything on the UI will be pixel using our engine, no more normal buttons, this is its own world and art" — SKYX
+ * - Canvas is truly fullscreen — the pixel world extends to all UI elements
  * 
  * v4.3.2 CREATURE GLOW, AUTO-GARDEN, PINCH ZOOM, MATERIAL TOOLTIPS, ECOSYSTEM HEALTH:
  * - Creature glow effect: Semi-transparent colored halos around creatures for better visibility (worm=pink, fish=orange, bug=green, bird=blue brighter)
@@ -12016,6 +12028,491 @@ class AcousticEngine {
         }
     }
 }
+
+/**
+ * @class PixelUI
+ * Pixel-art UI system for Bud Engine
+ * Renders all UI elements (HUD, palette, buttons) as pixel art on the main canvas
+ * No HTML overlays - everything is part of the pixel world
+ * 
+ * v4.4: Complete replacement of HTML UI with canvas-rendered pixel art
+ */
+class PixelUI {
+    /**
+     * Create a new PixelUI system
+     * @param {BudEngine} engine - Engine instance
+     */
+    constructor(engine) {
+        this.engine = engine;
+        this.physics = engine.physics;
+        
+        // Material palette configuration
+        this.materials = [
+            { name: 'stone', emoji: '🪨', info: 'Stone — Density: 2600 kg/m³, Melting: 1200°C' },
+            { name: 'water', emoji: '💧', info: 'Water — Freezes at 0°C, Boils at 100°C' },
+            { name: 'sand', emoji: '⏳', info: 'Sand — Fine particles, Melting: 1700°C' },
+            { name: 'dirt', emoji: '🟫', info: 'Dirt — Supports plant growth, stores fertility' },
+            { name: 'wood', emoji: '🪵', info: 'Wood — Flammable, Ignites at 300°C' },
+            { name: 'fire', emoji: '🔥', info: 'Fire — Consumes oxygen, spreads heat' },
+            { name: 'plant', emoji: '🌱', info: 'Plant — Produces O₂, depletes soil fertility' },
+            { name: 'ice', emoji: '🧊', info: 'Ice — Frozen water, Melts at 0°C' },
+            { name: 'lava', emoji: '🌋', info: 'Lava — Molten rock, 700-1200°C' },
+            { name: 'glass', emoji: '💎', info: 'Glass — Transparent solid, Melting: 1400°C' },
+            { name: 'iron', emoji: '⚙️', info: 'Iron — Dense metal, Density: 7870 kg/m³' },
+            { name: 'acid', emoji: '🧪', info: 'Acid — Corrosive liquid, dissolves materials' },
+            { name: 'worm', emoji: '🪱', info: 'Worm — Eats decay, lives in dirt, enriches soil' },
+            { name: 'fish', emoji: '🐟', info: 'Fish — Aquatic herbivore, eats plants in water' },
+            { name: 'bug', emoji: '🐛', info: 'Bug — Surface herbivore, eats plants in air' },
+            { name: 'bird', emoji: '🐦', info: 'Bird — Apex predator, flies in air, eats bugs' }
+        ];
+        
+        // UI state
+        this.selectedMaterial = 'stone';
+        this.paletteScrollOffset = 0;
+        this.mode = 'creation'; // 'creation', 'listening', 'conducting'
+        this.showTooltip = false;
+        this.tooltipText = '';
+        this.tooltipTimer = 0;
+        
+        // Material swatches (pre-rendered for performance)
+        this.materialSwatches = new Map();
+        this.swatchSize = 16;
+        
+        // UI layout (dimensions in pixels)
+        this.paletteHeight = 60;
+        this.buttonHeight = 30;
+        this.hudHeight = 40;
+        this.swatchGap = 2;
+        
+        // Touch state
+        this.lastTouchX = 0;
+        this.lastTouchY = 0;
+        
+        // 3x5 Bitmap Font (compact pixel font)
+        this.FONT_3x5 = {
+            'A': [0x7,0x5,0x7,0x5,0x5], 'B': [0x6,0x5,0x6,0x5,0x6],
+            'C': [0x7,0x4,0x4,0x4,0x7], 'D': [0x6,0x5,0x5,0x5,0x6],
+            'E': [0x7,0x4,0x7,0x4,0x7], 'F': [0x7,0x4,0x7,0x4,0x4],
+            'G': [0x7,0x4,0x5,0x5,0x7], 'H': [0x5,0x5,0x7,0x5,0x5],
+            'I': [0x7,0x2,0x2,0x2,0x7], 'J': [0x1,0x1,0x1,0x5,0x7],
+            'K': [0x5,0x5,0x6,0x5,0x5], 'L': [0x4,0x4,0x4,0x4,0x7],
+            'M': [0x5,0x7,0x5,0x5,0x5], 'N': [0x5,0x7,0x7,0x5,0x5],
+            'O': [0x7,0x5,0x5,0x5,0x7], 'P': [0x7,0x5,0x7,0x4,0x4],
+            'Q': [0x7,0x5,0x5,0x7,0x1], 'R': [0x7,0x5,0x7,0x6,0x5],
+            'S': [0x7,0x4,0x7,0x1,0x7], 'T': [0x7,0x2,0x2,0x2,0x2],
+            'U': [0x5,0x5,0x5,0x5,0x7], 'V': [0x5,0x5,0x5,0x5,0x2],
+            'W': [0x5,0x5,0x5,0x7,0x5], 'X': [0x5,0x5,0x2,0x5,0x5],
+            'Y': [0x5,0x5,0x7,0x2,0x2], 'Z': [0x7,0x1,0x2,0x4,0x7],
+            '0': [0x7,0x5,0x5,0x5,0x7], '1': [0x2,0x6,0x2,0x2,0x7],
+            '2': [0x7,0x1,0x7,0x4,0x7], '3': [0x7,0x1,0x7,0x1,0x7],
+            '4': [0x5,0x5,0x7,0x1,0x1], '5': [0x7,0x4,0x7,0x1,0x7],
+            '6': [0x7,0x4,0x7,0x5,0x7], '7': [0x7,0x1,0x1,0x1,0x1],
+            '8': [0x7,0x5,0x7,0x5,0x7], '9': [0x7,0x5,0x7,0x1,0x7],
+            ' ': [0x0,0x0,0x0,0x0,0x0], ':': [0x0,0x2,0x0,0x2,0x0],
+            '%': [0x5,0x1,0x2,0x4,0x5], '.': [0x0,0x0,0x0,0x0,0x2],
+            '-': [0x0,0x0,0x7,0x0,0x0], '/': [0x1,0x1,0x2,0x4,0x4],
+            '+': [0x0,0x2,0x7,0x2,0x0], '=': [0x0,0x7,0x0,0x7,0x0],
+            '♥': [0x5,0x7,0x7,0x2,0x0], '☀': [0x5,0x2,0x7,0x2,0x5],
+            '☾': [0x6,0x4,0x4,0x4,0x6], '₂': [0x0,0x0,0x3,0x1,0x3]
+        };
+        
+        // Pre-render material swatches
+        this.initMaterialSwatches();
+    }
+    
+    /**
+     * Initialize material swatches (pre-render for performance)
+     */
+    initMaterialSwatches() {
+        this.materials.forEach(mat => {
+            const material = this.physics.materials.get(mat.name);
+            if (!material) return;
+            
+            // Create offscreen canvas for swatch
+            const canvas = document.createElement('canvas');
+            canvas.width = this.swatchSize;
+            canvas.height = this.swatchSize;
+            const ctx = canvas.getContext('2d');
+            
+            // Fill with material colors (random variation for pixel-art look)
+            const colors = material.color || ['#808080'];
+            for (let y = 0; y < this.swatchSize; y++) {
+                for (let x = 0; x < this.swatchSize; x++) {
+                    const color = colors[Math.floor(Math.random() * colors.length)];
+                    ctx.fillStyle = color;
+                    ctx.fillRect(x, y, 1, 1);
+                }
+            }
+            
+            this.materialSwatches.set(mat.name, canvas);
+        });
+    }
+    
+    /**
+     * Draw pixel text using 3x5 bitmap font
+     * @param {CanvasRenderingContext2D} ctx - Canvas context
+     * @param {string} text - Text to draw (auto-converts to uppercase)
+     * @param {number} x - X position
+     * @param {number} y - Y position
+     * @param {string} color - Fill color
+     * @param {number} scale - Scale multiplier (1 = 3x5, 2 = 6x10, etc)
+     */
+    drawText(ctx, text, x, y, color, scale = 2) {
+        text = text.toString().toUpperCase();
+        let cursorX = x;
+        
+        for (let i = 0; i < text.length; i++) {
+            const char = text[i];
+            const glyph = this.FONT_3x5[char];
+            
+            if (!glyph) {
+                cursorX += 4 * scale; // Space for unknown char
+                continue;
+            }
+            
+            // Draw each row of the character
+            for (let row = 0; row < 5; row++) {
+                const bits = glyph[row];
+                for (let col = 0; col < 3; col++) {
+                    const bit = (bits >> (2 - col)) & 1;
+                    if (bit) {
+                        ctx.fillStyle = color;
+                        ctx.fillRect(
+                            cursorX + col * scale,
+                            y + row * scale,
+                            scale,
+                            scale
+                        );
+                    }
+                }
+            }
+            
+            cursorX += 4 * scale; // 3px char + 1px spacing
+        }
+    }
+    
+    /**
+     * Measure pixel text width
+     */
+    measureText(text, scale = 2) {
+        return text.toString().length * 4 * scale;
+    }
+    
+    /**
+     * Draw a pixel-art rounded rectangle
+     */
+    drawRoundRect(ctx, x, y, w, h, color, borderColor = null) {
+        // Simple rounded corners (1px chamfer)
+        ctx.fillStyle = color;
+        ctx.fillRect(x + 1, y, w - 2, h);
+        ctx.fillRect(x, y + 1, w, h - 2);
+        
+        if (borderColor) {
+            ctx.strokeStyle = borderColor;
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
+        }
+    }
+    
+    /**
+     * Draw creature icon (5x5 pixel simple shapes)
+     */
+    drawCreatureIcon(ctx, x, y, type, scale = 1) {
+        const patterns = {
+            worm: [[0,2],[1,2],[2,2],[2,1],[3,1],[3,0]], // Squiggle
+            fish: [[0,2],[1,1],[1,2],[1,3],[2,0],[2,1],[2,2],[2,3],[2,4],[3,1],[3,3]], // Arrow shape
+            bug: [[1,0],[1,4],[2,1],[2,2],[2,3],[3,0],[3,4]], // Legs + body
+            bird: [[1,1],[2,0],[2,1],[2,2],[3,1],[4,2]] // V shape
+        };
+        
+        const colors = {
+            worm: '#ff8877',
+            fish: '#ffaa33',
+            bug: '#66ff44',
+            bird: '#4488ff'
+        };
+        
+        const pattern = patterns[type] || [];
+        ctx.fillStyle = colors[type] || '#ffffff';
+        
+        pattern.forEach(([px, py]) => {
+            ctx.fillRect(x + px * scale, y + py * scale, scale, scale);
+        });
+    }
+    
+    /**
+     * Render the pixel HUD at the top
+     */
+    renderHUD(ctx) {
+        const state = this.engine.composition.getState();
+        const eco = this.engine.test.getEcosystemState();
+        const width = ctx.canvas.width;
+        
+        // Semi-transparent background strip
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(0, 0, width, this.hudHeight);
+        
+        // Epoch name (large)
+        const epoch = state.epoch.toUpperCase();
+        this.drawText(ctx, epoch, 10, 8, '#ffffff', 3);
+        
+        // Score
+        const scoreX = 10 + this.measureText(epoch, 3) + 15;
+        this.drawText(ctx, 'SCORE:' + state.score, scoreX, 10, 'rgba(255,255,255,0.8)', 2);
+        
+        // Creature counts with icons (second row)
+        let creatureX = 10;
+        const creatureY = 25;
+        
+        // Worm
+        this.drawCreatureIcon(ctx, creatureX, creatureY, 'worm', 1);
+        this.drawText(ctx, eco.creatures.worm || 0, creatureX + 8, creatureY, '#ff8877', 1);
+        creatureX += 25;
+        
+        // Fish
+        this.drawCreatureIcon(ctx, creatureX, creatureY, 'fish', 1);
+        this.drawText(ctx, eco.creatures.fish || 0, creatureX + 8, creatureY, '#ffaa33', 1);
+        creatureX += 25;
+        
+        // Bug
+        this.drawCreatureIcon(ctx, creatureX, creatureY, 'bug', 1);
+        this.drawText(ctx, eco.creatures.bug || 0, creatureX + 8, creatureY, '#66ff44', 1);
+        creatureX += 25;
+        
+        // Bird
+        this.drawCreatureIcon(ctx, creatureX, creatureY, 'bird', 1);
+        this.drawText(ctx, eco.creatures.bird || 0, creatureX + 8, creatureY, '#4488ff', 1);
+        creatureX += 30;
+        
+        // O₂ percentage
+        const o2Val = parseFloat(eco.atmosphere.oxygen) || 0;
+        const o2Pct = Math.round((o2Val / 600) * 100);
+        this.drawText(ctx, 'O:' + o2Pct + '%', creatureX, creatureY, '#88ccff', 1);
+        creatureX += 40;
+        
+        // Health indicator (heart with color)
+        const creatureTypes = [
+            eco.creatures.worm > 0,
+            eco.creatures.fish > 0,
+            eco.creatures.bug > 0,
+            eco.creatures.bird > 0
+        ].filter(Boolean).length;
+        const fertility = parseFloat(eco.soilFertility) || 0;
+        
+        let heartColor = '#ff4444'; // Red (dying)
+        if (creatureTypes >= 3 && o2Pct > 60 && fertility > 0.4) {
+            heartColor = '#44ff44'; // Green (healthy)
+        } else if (creatureTypes >= 2 || (o2Pct >= 40 && o2Pct <= 60)) {
+            heartColor = '#ffff44'; // Yellow (stressed)
+        }
+        this.drawText(ctx, '♥', creatureX, creatureY, heartColor, 1);
+        creatureX += 10;
+        
+        // Day/night indicator
+        const brightness = this.physics.dayBrightness || 1.0;
+        const dayIcon = brightness > 0.5 ? '☀' : '☾';
+        this.drawText(ctx, dayIcon, creatureX, creatureY, '#ffdd88', 1);
+    }
+    
+    /**
+     * Render material palette at the bottom
+     */
+    renderPalette(ctx) {
+        const width = ctx.canvas.width;
+        const height = ctx.canvas.height;
+        const paletteY = height - this.paletteHeight - this.buttonHeight;
+        
+        // Background strip
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+        ctx.fillRect(0, paletteY, width, this.paletteHeight);
+        
+        // Draw material swatches
+        const swatchTotal = this.swatchSize + this.swatchGap;
+        let x = 10 - this.paletteScrollOffset;
+        
+        this.materials.forEach(mat => {
+            // Skip if out of visible area
+            if (x + swatchTotal < 0 || x > width) {
+                x += swatchTotal;
+                return;
+            }
+            
+            const y = paletteY + (this.paletteHeight - this.swatchSize) / 2;
+            
+            // Draw swatch
+            const swatch = this.materialSwatches.get(mat.name);
+            if (swatch) {
+                ctx.drawImage(swatch, x, y);
+            }
+            
+            // Selection border
+            if (mat.name === this.selectedMaterial) {
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(x - 2, y - 2, this.swatchSize + 4, this.swatchSize + 4);
+            }
+            
+            x += swatchTotal;
+        });
+    }
+    
+    /**
+     * Render mode buttons at the bottom
+     */
+    renderButtons(ctx) {
+        const width = ctx.canvas.width;
+        const height = ctx.canvas.height;
+        const buttonY = height - this.buttonHeight;
+        
+        // Background strip
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+        ctx.fillRect(0, buttonY, width, this.buttonHeight);
+        
+        // Button configuration
+        const buttons = [
+            { mode: 'creation', label: 'CREATE', emoji: '🎨' },
+            { mode: 'listening', label: 'LISTEN', emoji: '👂' },
+            { mode: 'conducting', label: 'CONDUCT', emoji: '🎵' },
+            { mode: 'garden', label: 'GARDEN', emoji: '🌿' }
+        ];
+        
+        const buttonWidth = (width - 20) / buttons.length - 5;
+        let x = 10;
+        
+        buttons.forEach(btn => {
+            const isActive = btn.mode === this.mode;
+            const bgColor = isActive ? 'rgba(123, 97, 255, 0.5)' : 'rgba(0, 0, 0, 0.6)';
+            const borderColor = isActive ? '#7b61ff' : 'rgba(255, 255, 255, 0.3)';
+            
+            // Button background
+            this.drawRoundRect(ctx, x, buttonY + 5, buttonWidth, 20, bgColor, borderColor);
+            
+            // Button text (centered)
+            const textWidth = this.measureText(btn.label, 1);
+            const textX = x + (buttonWidth - textWidth) / 2;
+            const textColor = isActive ? '#ffffff' : 'rgba(255, 255, 255, 0.7)';
+            this.drawText(ctx, btn.label, textX, buttonY + 10, textColor, 1);
+            
+            x += buttonWidth + 5;
+        });
+    }
+    
+    /**
+     * Render tooltip (if active)
+     */
+    renderTooltip(ctx) {
+        if (!this.showTooltip || !this.tooltipText) return;
+        
+        const width = ctx.canvas.width;
+        const height = ctx.canvas.height;
+        const tooltipY = height - this.paletteHeight - this.buttonHeight - 40;
+        
+        // Measure text
+        const textWidth = this.measureText(this.tooltipText, 1);
+        const tooltipWidth = textWidth + 20;
+        const tooltipX = (width - tooltipWidth) / 2;
+        
+        // Background
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+        ctx.fillRect(tooltipX, tooltipY, tooltipWidth, 20);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(tooltipX, tooltipY, tooltipWidth, 20);
+        
+        // Text
+        this.drawText(ctx, this.tooltipText, tooltipX + 10, tooltipY + 7, '#ffffff', 1);
+    }
+    
+    /**
+     * Main render method - called every frame
+     */
+    render(ctx) {
+        this.renderHUD(ctx);
+        this.renderPalette(ctx);
+        this.renderButtons(ctx);
+        this.renderTooltip(ctx);
+        
+        // Update tooltip timer
+        if (this.showTooltip) {
+            this.tooltipTimer--;
+            if (this.tooltipTimer <= 0) {
+                this.showTooltip = false;
+            }
+        }
+    }
+    
+    /**
+     * Handle touch/click input
+     * Returns true if UI consumed the input (don't pass to game)
+     */
+    handleTouch(x, y, isStart = false) {
+        const width = this.engine.config.width;
+        const height = this.engine.config.height;
+        
+        // Check HUD area (top 40px) - toggle stats
+        if (y < this.hudHeight) {
+            if (isStart) {
+                // Toggle sparkline/stats panel (future feature)
+                console.log('[PixelUI] HUD tapped');
+            }
+            return true;
+        }
+        
+        // Check palette area
+        const paletteY = height - this.paletteHeight - this.buttonHeight;
+        if (y >= paletteY && y < paletteY + this.paletteHeight) {
+            if (isStart) {
+                const swatchTotal = this.swatchSize + this.swatchGap;
+                const localX = x + this.paletteScrollOffset - 10;
+                const index = Math.floor(localX / swatchTotal);
+                
+                if (index >= 0 && index < this.materials.length) {
+                    const mat = this.materials[index];
+                    this.selectedMaterial = mat.name;
+                    this.showTooltip = true;
+                    this.tooltipText = mat.info;
+                    this.tooltipTimer = 120; // 2 seconds at 60fps
+                }
+            }
+            return true;
+        }
+        
+        // Check button area
+        const buttonY = height - this.buttonHeight;
+        if (y >= buttonY) {
+            if (isStart) {
+                const buttons = ['creation', 'listening', 'conducting', 'garden'];
+                const buttonWidth = (width - 20) / buttons.length - 5;
+                const index = Math.floor((x - 10) / (buttonWidth + 5));
+                
+                if (index >= 0 && index < buttons.length) {
+                    const mode = buttons[index];
+                    if (mode === 'garden') {
+                        // Load garden scenario
+                        this.engine.test.clearWorld();
+                        this.engine.test.loadScenario('garden');
+                    } else {
+                        this.mode = mode;
+                        this.engine.composition.setMode(mode);
+                    }
+                }
+            }
+            return true;
+        }
+        
+        // Input not consumed by UI
+        return false;
+    }
+    
+    /**
+     * Get selected material
+     */
+    getSelectedMaterial() {
+        return this.selectedMaterial;
+    }
+}
+
+
 
 /**
  * @class CompositionGame
