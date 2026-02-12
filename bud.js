@@ -12130,7 +12130,8 @@ class PixelUI {
      */
     initMaterialSwatches() {
         this.materials.forEach(mat => {
-            const material = this.physics.materials.get(mat.name);
+            const matId = this.physics.getMaterialId(mat.name);
+            const material = matId != null ? this.physics.materials.get(matId) : null;
             if (!material) return;
             
             // Create offscreen canvas for swatch
