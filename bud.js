@@ -13493,6 +13493,75 @@ class PixelUI {
     /**
      * Render material palette as a 画图工具-style grid at the bottom
      */
+    /**
+     * Render brush size selector and save/load buttons
+     */
+    renderControls(ctx) {
+        const width = ctx.canvas.width;
+        const height = ctx.canvas.height;
+        const controlY = height - this.paletteHeight - this.buttonHeight - 35;
+        
+        // Only show when palette is open
+        if (!this.paletteOpen) return;
+        
+        // Brush size buttons (S/M/L)
+        const brushSizes = [
+            { label: 'S', size: 3 },
+            { label: 'M', size: 8 },
+            { label: 'L', size: 15 }
+        ];
+        
+        const buttonW = 25;
+        const buttonH = 20;
+        let x = 10;
+        
+        // Label
+        this.drawText(ctx, 'BRUSH:', x, controlY, 'rgba(255, 255, 255, 0.6)', 1);
+        x += 30;
+        
+        brushSizes.forEach(btn => {
+            const isActive = this.brushSize === btn.size;
+            const bgColor = isActive ? 'rgba(123, 97, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)';
+            const borderColor = isActive ? '#7b61ff' : 'rgba(255, 255, 255, 0.3)';
+            
+            this.drawRoundRect(ctx, x, controlY - 2, buttonW, buttonH, bgColor, borderColor);
+            
+            const textWidth = this.measureText(btn.label, 1);
+            const textX = x + (buttonW - textWidth) / 2;
+            this.drawText(ctx, btn.label, textX, controlY + 3, '#ffffff', 1);
+            
+            x += buttonW + 5;
+        });
+        
+        // Save/Load buttons (right side)
+        let rightX = width - 10 - buttonW * 2 - 5;
+        
+        // Save button
+        this.drawRoundRect(ctx, rightX, controlY - 2, buttonW, buttonH, 'rgba(0, 0, 0, 0.6)', 'rgba(255, 255, 255, 0.3)');
+        const saveTextWidth = this.measureText('💾', 1);
+        this.drawText(ctx, '💾', rightX + (buttonW - saveTextWidth) / 2, controlY + 3, '#ffffff', 1);
+        rightX += buttonW + 5;
+        
+        // Load button
+        this.drawRoundRect(ctx, rightX, controlY - 2, buttonW, buttonH, 'rgba(0, 0, 0, 0.6)', 'rgba(255, 255, 255, 0.3)');
+        const loadTextWidth = this.measureText('📂', 1);
+        this.drawText(ctx, '📂', rightX + (buttonW - loadTextWidth) / 2, controlY + 3, '#ffffff', 1);
+        
+        // Feedback message (SAVED!/LOADED!)
+        if (this.feedbackMessage && this.feedbackTimer > 0) {
+            const msgWidth = this.measureText(this.feedbackMessage, 2);
+            const msgX = (width - msgWidth) / 2;
+            const msgY = height / 2 - 20;
+            
+            // Semi-transparent background
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+            ctx.fillRect(msgX - 10, msgY - 5, msgWidth + 20, 20);
+            
+            this.drawText(ctx, this.feedbackMessage, msgX, msgY, '#44ff44', 2);
+            this.feedbackTimer--;
+        }
+    }
+
     renderPalette(ctx) {
         if (!this.paletteOpen) return;
         
@@ -13620,6 +13689,7 @@ class PixelUI {
         this.updateRelease();
         
         this.renderHUD(ctx);
+        this.renderControls(ctx);
         this.renderPalette(ctx);
         this.renderButtons(ctx);
         this.renderTooltip(ctx);
@@ -13671,6 +13741,53 @@ class PixelUI {
             this.epochTapTimeout--;
             if (this.epochTapTimeout === 0) {
                 this.epochTapCount = 0;
+            }
+        }
+        
+        // Check control buttons area (brush size + save/load)
+        const controlY = height - this.paletteHeight - this.buttonHeight - 35;
+        if (this.paletteOpen && isStart && y >= controlY - 2 && y < controlY + 20) {
+            const buttonW = 25;
+            const buttonH = 20;
+            
+            // Brush size buttons
+            let btnX = 40; // After "BRUSH:" label
+            const brushSizes = [3, 8, 15];
+            for (let i = 0; i < brushSizes.length; i++) {
+                if (x >= btnX && x < btnX + buttonW) {
+                    this.brushSize = brushSizes[i];
+                    return true;
+                }
+                btnX += buttonW + 5;
+            }
+            
+            // Save/Load buttons (right side)
+            let rightX = width - 10 - buttonW * 2 - 5;
+            
+            // Save button
+            if (x >= rightX && x < rightX + buttonW) {
+                if (window.saveComposition) {
+                    window.saveComposition();
+                    this.feedbackMessage = 'SAVED!';
+                    this.feedbackTimer = 60;
+                }
+                return true;
+            }
+            rightX += buttonW + 5;
+            
+            // Load button
+            if (x >= rightX && x < rightX + buttonW) {
+                if (window.loadComposition) {
+                    const success = window.loadComposition();
+                    if (success) {
+                        this.feedbackMessage = 'LOADED!';
+                        this.feedbackTimer = 60;
+                    } else {
+                        this.feedbackMessage = 'NO SAVE';
+                        this.feedbackTimer = 60;
+                    }
+                }
+                return true;
             }
         }
         
