@@ -6850,9 +6850,9 @@ class PixelPhysics {
             reactivity: 1.0,
             solubility: null,
             color: ['#ff4400', '#ff8800', '#ffcc00', '#ff6600', '#ff2200'],
-            lifetime: [0.2, 0.6],
+            lifetime: [1.0, 2.5],
             produces: 'smoke',
-            heatEmission: 500, // °C per second to neighbors
+            heatEmission: 800, // °C per second to neighbors
             // v5.0: Universal chemistry properties
             oxidizer: true,  // Fire is oxidizing
             reducer: false,
@@ -10412,6 +10412,35 @@ class PixelPhysics {
      * @private
      */
     simulateGas(x, y, mat, id) {
+        // v5.0: Hot gas (fire) actively spreads to adjacent flammable materials
+        if (mat.heatEmission > 0 && this.temperatureGrid[this.index(x, y)] > 400) {
+            const spreadDirs = [
+                [x-1,y], [x+1,y], [x,y-1], [x,y+1],
+                [x-1,y-1], [x+1,y-1], [x-1,y+1], [x+1,y+1]
+            ];
+            for (const [nx, ny] of spreadDirs) {
+                if (!this.inBounds(nx, ny)) continue;
+                const nidx = this.index(nx, ny);
+                const nid = this.grid[nidx];
+                if (nid === 0) continue;
+                const nmat = this.getMaterial(nid);
+                if (!nmat) continue;
+                // Directly heat flammable neighbors
+                if (nmat.flammability > 0) {
+                    this.temperatureGrid[nidx] += mat.heatEmission * 0.02;
+                    this.heatSources.add(nidx);
+                    // Chance to ignite based on flammability and proximity to ignition point
+                    const ignPt = this.ignitionPointArr[nid];
+                    if (ignPt < 999999 && this.temperatureGrid[nidx] >= ignPt * 0.8) {
+                        if (Math.random() < nmat.flammability * 0.15 && this.hasOxygenNearby(nx, ny)) {
+                            this.igniteMaterial(nx, ny, nmat, nidx);
+                            this.activateChunk(nx, ny);
+                        }
+                    }
+                }
+            }
+        }
+        
         // v3.5: Gases rise if density is negative (hot gases) - use flat array
         const density = this.densityArr[id];
         const rising = density < 0;
