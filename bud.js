@@ -7808,6 +7808,11 @@ class PixelPhysics {
                         // Upward cells get bonus priority (smaller effective distance)
                         // This helps bugs spawn above the dirt surface
                     }
+                } else if (type === 'bird') {
+                    // Birds need air to fly
+                    if (id === 0) {
+                        isValid = true;
+                    }
                 }
                 
                 if (isValid && dist < bestDist) {
@@ -8883,6 +8888,27 @@ class PixelPhysics {
                     this.totalCreatures++;
                     this.activateChunk(nx, ny);
                     break;
+                }
+            }
+        }
+        
+        // 4.5. GRAVITY for bugs — fall if no solid below
+        if (creatureType === 'bug') {
+            const belowY = y + 1;
+            if (this.inBounds(x, belowY)) {
+                const belowIdx = this.index(x, belowY);
+                const belowId = this.grid[belowIdx];
+                if (belowId === 0) {
+                    // Nothing below — fall!
+                    this.grid[belowIdx] = this.grid[idx];
+                    this.temperatureGrid[belowIdx] = this.temperatureGrid[idx];
+                    this.lifetimeGrid[belowIdx] = this.lifetimeGrid[idx];
+                    this.grid[idx] = 0;
+                    this.temperatureGrid[idx] = this.ambientTemp;
+                    this.lifetimeGrid[idx] = 0;
+                    this.activateChunk(x, y);
+                    this.activateChunk(x, belowY);
+                    return; // Skip normal movement this frame
                 }
             }
         }
