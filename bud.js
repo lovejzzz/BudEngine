@@ -12076,11 +12076,14 @@ class PixelUI {
         
         // Material swatches (pre-rendered for performance)
         this.materialSwatches = new Map();
-        this.swatchSize = 16;
+        this.swatchSize = 20;
         
         // UI layout (dimensions in pixels)
-        this.paletteHeight = 60;
-        this.buttonHeight = 30;
+        this.gridCols = 4;
+        this.gridRows = Math.ceil(this.materials.length / this.gridCols); // 4 rows for 16 materials
+        this.paletteHeight = this.gridRows * (this.swatchSize + this.swatchGap) + 8; // grid height + padding
+        this.buttonHeight = 28;
+        this.paletteOpen = true; // palette grid visible by default
         this.hudHeight = 40;
         this.swatchGap = 2;
         
@@ -12315,44 +12318,57 @@ class PixelUI {
     }
     
     /**
-     * Render material palette at the bottom
+     * Render material palette as a 画图工具-style grid at the bottom
      */
     renderPalette(ctx) {
+        if (!this.paletteOpen) return;
+        
         const width = ctx.canvas.width;
         const height = ctx.canvas.height;
         const paletteY = height - this.paletteHeight - this.buttonHeight;
-        
-        // Background strip
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
-        ctx.fillRect(0, paletteY, width, this.paletteHeight);
-        
-        // Draw material swatches
         const swatchTotal = this.swatchSize + this.swatchGap;
-        let x = 10 - this.paletteScrollOffset;
         
-        this.materials.forEach(mat => {
-            // Skip if out of visible area
-            if (x + swatchTotal < 0 || x > width) {
-                x += swatchTotal;
-                return;
-            }
-            
-            const y = paletteY + (this.paletteHeight - this.swatchSize) / 2;
+        // Grid dimensions — center the grid
+        const gridW = this.gridCols * swatchTotal;
+        const gridX = (width - gridW) / 2;
+        
+        // Background panel with pixel border
+        const panelPad = 4;
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+        ctx.fillRect(gridX - panelPad, paletteY - panelPad, gridW + panelPad * 2, this.paletteHeight + panelPad);
+        // Pixel border
+        ctx.strokeStyle = '#555555';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(gridX - panelPad, paletteY - panelPad, gridW + panelPad * 2, this.paletteHeight + panelPad);
+        // Inner highlight border
+        ctx.strokeStyle = '#333333';
+        ctx.strokeRect(gridX - panelPad + 1, paletteY - panelPad + 1, gridW + panelPad * 2 - 2, this.paletteHeight + panelPad - 2);
+        
+        // Draw material swatches in grid
+        this.materials.forEach((mat, i) => {
+            const col = i % this.gridCols;
+            const row = Math.floor(i / this.gridCols);
+            const x = gridX + col * swatchTotal;
+            const y = paletteY + row * swatchTotal + 4;
             
             // Draw swatch
             const swatch = this.materialSwatches.get(mat.name);
             if (swatch) {
-                ctx.drawImage(swatch, x, y);
+                ctx.drawImage(swatch, 0, 0, swatch.width, swatch.height, x, y, this.swatchSize, this.swatchSize);
             }
             
-            // Selection border
+            // Selection border — bright white with inner glow
             if (mat.name === this.selectedMaterial) {
                 ctx.strokeStyle = '#ffffff';
                 ctx.lineWidth = 2;
                 ctx.strokeRect(x - 2, y - 2, this.swatchSize + 4, this.swatchSize + 4);
+                // Draw tiny material initial in the corner
+                this.drawText(ctx, mat.name[0].toUpperCase(), x + 1, y + 1, '#ffffff', 0.8);
             }
             
-            x += swatchTotal;
+            // Draw tiny label below each swatch
+            const label = mat.name.substring(0, 3).toUpperCase();
+            this.drawText(ctx, label, x + 1, y + this.swatchSize + 1, '#888888', 0.5);
         });
     }
     
@@ -12458,20 +12474,24 @@ class PixelUI {
             return true;
         }
         
-        // Check palette area
+        // Check palette area (grid)
         const paletteY = height - this.paletteHeight - this.buttonHeight;
-        if (y >= paletteY && y < paletteY + this.paletteHeight) {
+        if (this.paletteOpen && y >= paletteY - 4 && y < paletteY + this.paletteHeight) {
             if (isStart) {
                 const swatchTotal = this.swatchSize + this.swatchGap;
-                const localX = x + this.paletteScrollOffset - 10;
-                const index = Math.floor(localX / swatchTotal);
+                const gridW = this.gridCols * swatchTotal;
+                const gridX = (width - gridW) / 2;
                 
-                if (index >= 0 && index < this.materials.length) {
+                const col = Math.floor((x - gridX) / swatchTotal);
+                const row = Math.floor((y - paletteY - 4) / swatchTotal);
+                const index = row * this.gridCols + col;
+                
+                if (col >= 0 && col < this.gridCols && row >= 0 && row < this.gridRows && index >= 0 && index < this.materials.length) {
                     const mat = this.materials[index];
                     this.selectedMaterial = mat.name;
                     this.showTooltip = true;
                     this.tooltipText = mat.info;
-                    this.tooltipTimer = 120; // 2 seconds at 60fps
+                    this.tooltipTimer = 120;
                 }
             }
             return true;
