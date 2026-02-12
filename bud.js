@@ -6960,7 +6960,7 @@ class PixelPhysics {
         // FIRE (plasma-like combustion)
         this.material('fire', {
             state: 'gas',
-            density: -0.5, // negative = rises (hot gas)
+            density: -0.2, // negative = rises (hot gas) - v5.7: slower rise for torch-like flame
             temperature: 800,
             meltingPoint: null,
             boilingPoint: null,
@@ -8912,13 +8912,20 @@ class PixelPhysics {
                                     this.heatSources.add(idx);
                                     
                                     // Spawn fire in nearby empty cells (especially above)
+                                    // v5.7: Favor upward spawning for torch-like column (70% up, 30% diagonals, 10% sides)
                                     const fireId = this.getMaterialId('fire');
                                     const fireMat = this.getMaterial(fireId);
-                                    const emitDirs = [[x,y-1],[x-1,y-1],[x+1,y-1],[x-1,y],[x+1,y]];
-                                    for (const [ex, ey] of emitDirs) {
+                                    const emitDirs = [
+                                        {pos: [x,y-1], chance: 0.7},      // Up
+                                        {pos: [x-1,y-1], chance: 0.3},    // Up-left diagonal
+                                        {pos: [x+1,y-1], chance: 0.3},    // Up-right diagonal
+                                        {pos: [x-1,y], chance: 0.1},      // Left
+                                        {pos: [x+1,y], chance: 0.1}       // Right
+                                    ];
+                                    for (const {pos: [ex, ey], chance} of emitDirs) {
                                         if (!this.inBounds(ex, ey)) continue;
                                         const eidx = this.index(ex, ey);
-                                        if (this.grid[eidx] === 0 && Math.random() < 0.3 && ey > 1) {
+                                        if (this.grid[eidx] === 0 && Math.random() < chance && ey > 1) {
                                             // ey > 1: don't spawn fire in top 2 rows (ceiling)
                                             this.grid[eidx] = fireId;
                                             this.temperatureGrid[eidx] = 700 + Math.random() * 200;
@@ -10891,9 +10898,11 @@ class PixelPhysics {
         }
         
         // Spread horizontally (wind biases direction)
-        if (Math.random() < 0.4) {
-            const spreadChance = Math.abs(this.wind.x) > 0.1 ? Math.random() : 0.5;
-            const spreadDir = this.wind.x > 0.1 ? 1 : (this.wind.x < -0.1 ? -1 : (spreadChance < 0.5 ? -1 : 1));
+        // v5.7: Fire spreads less horizontally (15% vs 40%) for torch-like column
+        const spreadChance = (mat.heatEmission && mat.heatEmission > 0) ? 0.15 : 0.4;
+        if (Math.random() < spreadChance) {
+            const windChance = Math.abs(this.wind.x) > 0.1 ? Math.random() : 0.5;
+            const spreadDir = this.wind.x > 0.1 ? 1 : (this.wind.x < -0.1 ? -1 : (windChance < 0.5 ? -1 : 1));
             if (this.tryMove(x, y, x + spreadDir, y, id)) return;
         }
     }
@@ -11058,6 +11067,35 @@ class PixelPhysics {
                     let g = cachedColor.g;
                     let b = cachedColor.b;
                     const a = cachedColor.a;
+                    
+                    // v5.7: Fire color gradient based on lifetime (torch-like flame)
+                    if (mat.name === 'fire' || (mat.heatEmission > 0 && mat.lifetime)) {
+                        const life = this.lifetimeGrid[idx];
+                        const lifeRatio = life / 4.0; // approximate max lifetime (fire lifetime is [2.0, 4.0])
+                        
+                        if (lifeRatio > 0.7) {
+                            // Hot core: bright yellow-white
+                            r = 255;
+                            g = 220 + Math.floor(Math.random() * 35);
+                            b = Math.floor(Math.random() * 100);
+                        } else if (lifeRatio > 0.3) {
+                            // Mid: orange
+                            r = 255;
+                            g = 100 + Math.floor(Math.random() * 80);
+                            b = 0;
+                        } else {
+                            // Dying: dark red
+                            r = 200 + Math.floor(Math.random() * 55);
+                            g = Math.floor(Math.random() * 50);
+                            b = 0;
+                        }
+                        
+                        // Add flame flicker (brightness variation)
+                        const flicker = 0.8 + Math.random() * 0.4; // 80% to 120% brightness
+                        r = Math.min(255, Math.floor(r * flicker));
+                        g = Math.min(255, Math.floor(g * flicker));
+                        b = Math.min(255, Math.floor(b * flicker));
+                    }
                     
                     // v4.3: Enhanced fertile soil visualization - blend toward target colors
                     if (mat.name === 'dirt' && this.fertilityGrid) {
