@@ -6145,6 +6145,13 @@ class PixelPhysics {
             solubility: null,
             color: ['#00000000'],
             supportsCombustion: true, // Oxygen in air
+            // v5.0: Universal chemistry properties
+            oxidizer: true,  // Air contains oxygen
+            reducer: false,
+            organic: false,
+            mineral: false,
+            noble: false,
+            volatile: false,
             // Acoustic properties (real scientific values)
             speedOfSound: 343,           // m/s — measured value
             acousticImpedance: 0.0004,   // MRayl (density × speed / 1e6)
@@ -6181,6 +6188,14 @@ class PixelPhysics {
             solidForm: 'ice',
             gasForm: 'steam',
             viscosity: 0.5,
+            // v5.0: Universal chemistry properties
+            oxidizer: false,
+            reducer: false,
+            organic: false,
+            mineral: false,
+            noble: false,
+            volatile: false,
+            solventType: 'water',  // Water is a universal solvent
             // Acoustic properties (real scientific values)
             speedOfSound: 1480,          // m/s
             acousticImpedance: 1.48,     // MRayl
@@ -6214,6 +6229,13 @@ class PixelPhysics {
             color: ['#a0d0ff', '#b5e0ff', '#c0f0ff'],
             liquidForm: 'water',
             immovable: false, // ice can slide eventually
+            // v5.0: Universal chemistry properties
+            oxidizer: false,
+            reducer: false,
+            organic: false,
+            mineral: false,
+            noble: true,  // Doesn't react
+            volatile: false,
             // Acoustic properties
             speedOfSound: 3280,
             acousticImpedance: 3.01,
@@ -6248,6 +6270,13 @@ class PixelPhysics {
             liquidForm: 'water',
             lifetime: [2.0, 4.0], // condenses over time
             alpha: 0.5,
+            // v5.0: Universal chemistry properties
+            oxidizer: false,
+            reducer: false,
+            organic: false,
+            mineral: false,
+            noble: false,
+            volatile: true,
             // Acoustic properties
             speedOfSound: 405,
             acousticImpedance: 0.0003,
@@ -6283,6 +6312,13 @@ class PixelPhysics {
             color: ['#c2b280', '#d4c494', '#b0a070', '#a89060'],
             friction: 0.5,
             liquidForm: 'glass', // melted sand becomes glass!
+            // v5.0: Universal chemistry properties
+            oxidizer: false,
+            reducer: false,
+            organic: false,
+            mineral: true,
+            noble: false,
+            volatile: false,
             // Acoustic properties
             speedOfSound: 500,
             acousticImpedance: 0.80,
@@ -6316,6 +6352,13 @@ class PixelPhysics {
             color: ['#88ccff40', '#99ddff50', '#aaeeff48'],
             immovable: true,
             alpha: 0.3,
+            // v5.0: Universal chemistry properties
+            oxidizer: false,
+            reducer: false,
+            organic: false,
+            mineral: true,
+            noble: true,  // Glass doesn't react
+            volatile: false,
             // Acoustic properties
             speedOfSound: 5640,
             acousticImpedance: 14.1,
@@ -6349,6 +6392,13 @@ class PixelPhysics {
             color: ['#4a4a4a', '#555555', '#3f3f3f', '#5a5a5a'],
             immovable: true,
             liquidForm: 'lava',
+            // v5.0: Universal chemistry properties (calcium carbonate)
+            oxidizer: false,
+            reducer: false,
+            organic: false,
+            mineral: true,
+            noble: false,  // Reacts with acid to produce CO2
+            volatile: false,
             // Acoustic properties
             speedOfSound: 5950,
             acousticImpedance: 16.1,
@@ -6383,6 +6433,13 @@ class PixelPhysics {
             solidForm: 'obsidian',
             viscosity: 0.9,
             heatEmission: 300,  // actively radiates heat like fire
+            // v5.0: Universal chemistry properties
+            oxidizer: false,
+            reducer: false,
+            organic: false,
+            mineral: true,
+            noble: false,
+            volatile: false,
             // v3.2: Dynamic lighting
             lightRadius: 40,
             lightColor: '#ff4400',
@@ -6420,6 +6477,13 @@ class PixelPhysics {
             color: ['#1a1a1a', '#0f0f0f', '#252525'],
             immovable: true,
             liquidForm: 'lava',
+            // v5.0: Universal chemistry properties
+            oxidizer: false,
+            reducer: false,
+            organic: false,
+            mineral: true,
+            noble: true,  // Obsidian doesn't react
+            volatile: false,
             // Acoustic properties
             speedOfSound: 5900,
             acousticImpedance: 15.3,
@@ -6453,6 +6517,13 @@ class PixelPhysics {
             color: ['#654321', '#7a5230', '#553311', '#6b4423'],
             friction: 0.8,
             cohesion: 0.3,
+            // v5.0: Universal chemistry properties
+            oxidizer: false,
+            reducer: false,
+            organic: true,  // Contains organic matter
+            mineral: true,  // Mixed organic and mineral
+            noble: false,
+            volatile: false,
             // Acoustic properties
             speedOfSound: 400,
             acousticImpedance: 0.52,
@@ -6486,6 +6557,13 @@ class PixelPhysics {
             color: ['#4a3520', '#5a4530', '#3a2510'],
             solidForm: 'dirt', // dries out
             viscosity: 0.9,
+            // v5.0: Universal chemistry properties
+            oxidizer: false,
+            reducer: false,
+            organic: true,
+            mineral: true,
+            noble: false,
+            volatile: false,
             // Acoustic properties
             speedOfSound: 800,
             acousticImpedance: 1.12,
@@ -6519,6 +6597,13 @@ class PixelPhysics {
             color: ['#a07855', '#b08865', '#906845'],
             friction: 0.9,
             cohesion: 0.7,
+            // v5.0: Universal chemistry properties
+            oxidizer: false,
+            reducer: false,
+            organic: false,
+            mineral: true,
+            noble: false,
+            volatile: false,
             // Acoustic properties
             speedOfSound: 2000,
             acousticImpedance: 4.0,
@@ -6554,6 +6639,14 @@ class PixelPhysics {
             color: ['#888888', '#999999', '#777777'],
             immovable: true,
             metal: true,
+            // v5.0: Universal chemistry properties
+            oxidizer: false,
+            reducer: true,  // Metals give up electrons
+            organic: false,
+            mineral: true,
+            noble: false,
+            volatile: false,
+            oxidationProduct: 'dirt',  // Rust → reddish dirt (no rust material)
             // Acoustic properties
             speedOfSound: 5960,
             acousticImpedance: 46.9,
@@ -6588,8 +6681,15 @@ class PixelPhysics {
             solubility: null,
             color: ['#8b4513', '#a0522d', '#7a3f0f', '#9a5523'],
             immovable: true,
-            combustionProducts: ['smoke', 'fire'],
+            combustionProducts: ['smoke', 'fire', 'co2'],
             combustionEnergy: 16, // MJ/kg
+            // v5.0: Universal chemistry properties
+            oxidizer: false,
+            reducer: false,
+            organic: true,  // Carbon-based
+            mineral: false,
+            noble: false,
+            volatile: false,
             // Acoustic properties
             speedOfSound: 3850,
             acousticImpedance: 2.31,
@@ -6622,8 +6722,15 @@ class PixelPhysics {
             solubility: null,
             color: ['#1a1a1a', '#2a2a2a', '#0f0f0f'],
             immovable: true,
-            combustionProducts: ['smoke', 'fire'],
+            combustionProducts: ['smoke', 'fire', 'co2'],
             combustionEnergy: 24,
+            // v5.0: Universal chemistry properties
+            oxidizer: false,
+            reducer: true,  // Carbon reduces metal oxides
+            organic: true,  // Carbon-based
+            mineral: false,
+            noble: false,
+            volatile: false,
             // Acoustic properties
             speedOfSound: 2700,
             acousticImpedance: 3.78,
@@ -6656,8 +6763,15 @@ class PixelPhysics {
             solubility: null,
             color: ['#1a1a1a', '#2a2a2a', '#0f0f0f', '#353535'],
             viscosity: 0.7,
-            combustionProducts: ['smoke', 'fire'],
+            combustionProducts: ['smoke', 'fire', 'co2'],
             combustionEnergy: 42,
+            // v5.0: Universal chemistry properties
+            oxidizer: false,
+            reducer: false,
+            organic: true,  // Hydrocarbon
+            mineral: false,
+            noble: false,
+            volatile: true,  // Easily vaporizes
             // Acoustic properties
             speedOfSound: 1740,
             acousticImpedance: 1.57,
@@ -6693,8 +6807,16 @@ class PixelPhysics {
             explosive: true,
             explosionRadius: 50,
             explosionPower: 200,
-            combustionProducts: ['smoke'],
+            combustionProducts: ['smoke', 'co2'],
             combustionEnergy: 3,
+            blastProducts: ['smoke', 'co2'],
+            // v5.0: Universal chemistry properties
+            oxidizer: true,  // Contains saltpeter (oxidizer)
+            reducer: true,   // Contains carbon
+            organic: false,
+            mineral: true,
+            noble: false,
+            volatile: false,
             // Acoustic properties
             speedOfSound: 400,
             acousticImpedance: 0.68,
@@ -6731,6 +6853,13 @@ class PixelPhysics {
             lifetime: [0.2, 0.6],
             produces: 'smoke',
             heatEmission: 500, // °C per second to neighbors
+            // v5.0: Universal chemistry properties
+            oxidizer: true,  // Fire is oxidizing
+            reducer: false,
+            organic: false,
+            mineral: false,
+            noble: false,
+            volatile: true,
             // v3.2: Dynamic lighting
             lightRadius: 60,
             lightColor: '#ff6600',
@@ -6768,6 +6897,13 @@ class PixelPhysics {
             color: ['#3a3a3a', '#4a4a4a', '#5a5a5a', '#2a2a2a'],
             lifetime: [1.5, 3.0],
             alpha: 0.6,
+            // v5.0: Universal chemistry properties
+            oxidizer: false,
+            reducer: false,
+            organic: false,
+            mineral: false,
+            noble: false,
+            volatile: true,
             // Acoustic properties
             speedOfSound: 350,
             acousticImpedance: 0.0004,
@@ -6801,6 +6937,13 @@ class PixelPhysics {
             color: ['#ccffff40', '#ddeeff50'],
             supportsCombustion: true,
             alpha: 0.3,
+            // v5.0: Universal chemistry properties
+            oxidizer: true,  // Pure oxidizer
+            reducer: false,
+            organic: false,
+            mineral: false,
+            noble: false,
+            volatile: true,
             // Acoustic properties
             speedOfSound: 330,
             acousticImpedance: 0.0004,
@@ -6835,6 +6978,13 @@ class PixelPhysics {
             combustionProducts: ['steam'], // H₂ + O₂ → H₂O!
             combustionEnergy: 142,
             alpha: 0.25,
+            // v5.0: Universal chemistry properties
+            oxidizer: false,
+            reducer: true,  // Hydrogen is a strong reducer
+            organic: false,
+            mineral: false,
+            noble: false,
+            volatile: true,
             // Acoustic properties
             speedOfSound: 1270,
             acousticImpedance: 0.0001,
@@ -6866,9 +7016,16 @@ class PixelPhysics {
             reactivity: 0.6,
             solubility: null,
             color: ['#cceecc30', '#ddffdd40'],
-            combustionProducts: ['smoke', 'steam'],
+            combustionProducts: ['smoke', 'steam', 'co2'],
             combustionEnergy: 55,
             alpha: 0.3,
+            // v5.0: Universal chemistry properties
+            oxidizer: false,
+            reducer: false,
+            organic: true,  // Hydrocarbon
+            mineral: false,
+            noble: false,
+            volatile: true,
             // Acoustic properties
             speedOfSound: 450,
             acousticImpedance: 0.0003,
@@ -6902,6 +7059,14 @@ class PixelPhysics {
             color: ['#e0e0e040', '#f0f0f050'],
             extinguishesFire: true, // fire suppression
             alpha: 0.3,
+            // v5.0: Universal chemistry properties
+            oxidizer: false,
+            reducer: false,
+            organic: false,
+            mineral: false,
+            noble: false,
+            volatile: true,
+            smothering: true,  // Smothers fire
             // Acoustic properties
             speedOfSound: 267,
             acousticImpedance: 0.0005,
@@ -6938,6 +7103,14 @@ class PixelPhysics {
             viscosity: 0.3,
             corrosive: true,
             alpha: 0.7,
+            // v5.0: Universal chemistry properties
+            oxidizer: false,
+            reducer: false,
+            organic: false,
+            mineral: false,
+            noble: false,
+            volatile: false,
+            solventType: 'acid',
             // Acoustic properties
             speedOfSound: 1500,
             acousticImpedance: 1.80,
@@ -6970,6 +7143,14 @@ class PixelPhysics {
             solubility: 'water', // dissolves in water
             color: ['#f0f0f0', '#ffffff', '#e8e8e8'],
             friction: 0.4,
+            // v5.0: Universal chemistry properties
+            oxidizer: false,
+            reducer: false,
+            organic: false,
+            mineral: true,
+            noble: false,
+            volatile: false,
+            solubleIn: ['water'],
             // Acoustic properties
             speedOfSound: 4500,
             acousticImpedance: 9.72,
@@ -7002,8 +7183,15 @@ class PixelPhysics {
             solubility: null,
             color: ['#ffff00', '#f0f000', '#eeee00'],
             friction: 0.5,
-            combustionProducts: ['smoke'],
+            combustionProducts: ['smoke', 'co2'],
             combustionEnergy: 9,
+            // v5.0: Universal chemistry properties
+            oxidizer: false,
+            reducer: true,  // Sulfur can reduce
+            organic: false,
+            mineral: true,
+            noble: false,
+            volatile: false,
             // Acoustic properties
             speedOfSound: 2200,
             acousticImpedance: 4.55,
@@ -7042,6 +7230,12 @@ class PixelPhysics {
             living: true,
             combustionProducts: ['smoke', 'co2'],
             combustionEnergy: 8,
+            // v5.0: Universal chemistry properties
+            oxidizer: false,
+            reducer: false,
+            mineral: false,
+            noble: false,
+            volatile: false,
             // Acoustic properties
             speedOfSound: 1000,
             acousticImpedance: 0.50,
@@ -7087,6 +7281,12 @@ class PixelPhysics {
             living: true,
             combustionProducts: ['smoke', 'co2'],
             combustionEnergy: 10,
+            // v5.0: Universal chemistry properties
+            oxidizer: false,
+            reducer: false,
+            mineral: false,
+            noble: false,
+            volatile: false,
             // Acoustic properties
             speedOfSound: 1000,
             acousticImpedance: 0.40,
@@ -7133,6 +7333,12 @@ class PixelPhysics {
             living: true,
             combustionProducts: ['smoke'],
             combustionEnergy: 6,
+            // v5.0: Universal chemistry properties
+            oxidizer: false,
+            reducer: false,
+            mineral: false,
+            noble: false,
+            volatile: false,
             // Acoustic properties
             speedOfSound: 900,
             acousticImpedance: 0.41,
@@ -7179,6 +7385,14 @@ class PixelPhysics {
             living: false,
             combustionProducts: ['smoke', 'co2'],
             combustionEnergy: 5,
+            // v5.0: Universal chemistry properties
+            oxidizer: false,
+            reducer: false,
+            mineral: false,
+            noble: false,
+            volatile: false,
+            decompositionProducts: ['dirt', 'methane'],
+            decompositionTemp: 40,  // Biological decomposition at warm temps
             // Acoustic properties
             speedOfSound: 800,
             acousticImpedance: 0.56,
@@ -7218,6 +7432,12 @@ class PixelPhysics {
             living: true,
             combustionProducts: ['smoke'],
             combustionEnergy: 5,
+            // v5.0: Universal chemistry properties
+            oxidizer: false,
+            reducer: false,
+            mineral: false,
+            noble: false,
+            volatile: false,
             // Acoustic properties
             speedOfSound: 1050,
             acousticImpedance: 0.84,
@@ -7260,6 +7480,12 @@ class PixelPhysics {
             creature: true,
             combustionProducts: ['smoke'],
             combustionEnergy: 4,
+            // v5.0: Universal chemistry properties
+            oxidizer: false,
+            reducer: false,
+            mineral: false,
+            noble: false,
+            volatile: false,
             // Acoustic properties
             speedOfSound: 1100,
             acousticImpedance: 0.66,
@@ -7306,6 +7532,12 @@ class PixelPhysics {
             creature: true,
             combustionProducts: ['smoke'],
             combustionEnergy: 3,
+            // v5.0: Universal chemistry properties
+            oxidizer: false,
+            reducer: false,
+            mineral: false,
+            noble: false,
+            volatile: false,
             // Acoustic properties
             speedOfSound: 1400,
             acousticImpedance: 1.47,
@@ -7353,6 +7585,12 @@ class PixelPhysics {
             creature: true,
             combustionProducts: ['smoke'],
             combustionEnergy: 3,
+            // v5.0: Universal chemistry properties
+            oxidizer: false,
+            reducer: false,
+            mineral: false,
+            noble: false,
+            volatile: false,
             // Acoustic properties
             speedOfSound: 950,
             acousticImpedance: 0.52,
@@ -7400,6 +7638,12 @@ class PixelPhysics {
             creature: true,
             combustionProducts: ['smoke'],
             combustionEnergy: 4,
+            // v5.0: Universal chemistry properties
+            oxidizer: false,
+            reducer: false,
+            mineral: false,
+            noble: false,
+            volatile: false,
             // Acoustic properties - high-pitched tweet
             speedOfSound: 1000,
             acousticImpedance: 0.30,
@@ -7447,6 +7691,12 @@ class PixelPhysics {
             creature: true,
             combustionProducts: ['smoke'],
             combustionEnergy: 3,
+            // v5.0: Universal chemistry properties
+            oxidizer: false,
+            reducer: false,
+            mineral: false,
+            noble: false,
+            volatile: false,
             // Acoustic properties - tiny high-pitched clicks
             speedOfSound: 900,
             acousticImpedance: 0.45,
@@ -7500,13 +7750,41 @@ class PixelPhysics {
     }
 
     /**
-     * Register chemical reaction rules (property-based, not hardcoded!)
+     * v5.0: Universal property-based chemical reaction rules (NO material names!)
+     * Each reaction is a first principle that works on ANY materials with the right properties.
+     * Products automatically chain because they inherit properties.
      * @private
      */
     registerReactionRules() {
-        // ========== ACID REACTIONS (pH-based, emergent) ==========
-        
-        // Acid + Metal → Hydrogen gas + heat (any acid + any metal)
+        // ========== 1. COMBUSTION: flammable + oxidizer + heat → combustionProducts + energy ==========
+        this.reactionRules.push({
+            condition: (matA, matB) => {
+                const temp = Math.max(
+                    this.temperatureGrid?.[this.index(0,0)] || 20, 
+                    this.temperatureGrid?.[this.index(0,0)] || 20
+                );
+                return (matA.flammability > 0 && matB.oxidizer && temp > (matA.ignitionPoint || 999)) ||
+                       (matB.flammability > 0 && matA.oxidizer && temp > (matB.ignitionPoint || 999));
+            },
+            react: (x, y, matA, matB, idxA, idxB) => {
+                const fuelMat = matA.flammability > 0 ? matA : matB;
+                const fuelIdx = matA.flammability > 0 ? idxA : idxB;
+                const chance = fuelMat.flammability * 0.25; // 0.8 flammability = 20% chance
+                
+                if (Math.random() < chance && fuelMat.combustionProducts && fuelMat.combustionProducts.length > 0) {
+                    // Convert fuel to combustion product
+                    const product = fuelMat.combustionProducts[Math.floor(Math.random() * fuelMat.combustionProducts.length)];
+                    this.grid[fuelIdx] = this.getMaterialId(product);
+                    
+                    // Add heat from combustion
+                    const energy = fuelMat.combustionEnergy || 10;
+                    this.temperatureGrid[fuelIdx] += energy * 30; // Scale to useful temp rise
+                    this.temperatureGrid[fuelIdx] = Math.min(this.temperatureGrid[fuelIdx], 1500);
+                }
+            }
+        });
+
+        // ========== 2. ACID + METAL: low pH + metal → hydrogen + heat ==========
         this.reactionRules.push({
             condition: (matA, matB) => {
                 return (matA.pH != null && matA.pH < 3 && matB.metal) ||
@@ -7514,215 +7792,252 @@ class PixelPhysics {
             },
             react: (x, y, matA, matB, idxA, idxB) => {
                 if (Math.random() < 0.05) {
-                    const acidIdx = matA.pH != null && matA.pH < 3 ? idxA : idxB;
+                    const acidIdx = (matA.pH != null && matA.pH < 3) ? idxA : idxB;
                     this.grid[acidIdx] = this.getMaterialId('hydrogen');
                     this.temperatureGrid[acidIdx] += 15;
                 }
             }
         });
 
-        // Acid + Water → dilution (acid slowly neutralizes in water)
+        // ========== 3. ACID + MINERAL: low pH + mineral (non-noble) → CO₂ + heat ==========
         this.reactionRules.push({
             condition: (matA, matB) => {
-                return (matA.pH != null && matA.pH < 3 && matB.name === 'water') ||
-                       (matB.pH != null && matB.pH < 3 && matA.name === 'water');
+                return ((matA.pH != null && matA.pH < 3) && (matB.mineral && !matB.noble)) ||
+                       ((matB.pH != null && matB.pH < 3) && (matA.mineral && !matA.noble));
             },
             react: (x, y, matA, matB, idxA, idxB) => {
-                // Acid dilutes into water over time
-                if (Math.random() < 0.02) {
+                if (Math.random() < 0.03) {
                     const acidIdx = (matA.pH != null && matA.pH < 3) ? idxA : idxB;
-                    this.grid[acidIdx] = this.getMaterialId('water');
-                    this.temperatureGrid[acidIdx] += 5; // slight exothermic
+                    this.grid[acidIdx] = this.getMaterialId('co2');
+                    this.temperatureGrid[acidIdx] += 10;
                 }
             }
         });
 
-        // Acid dissolves organic solids (wood, dirt, coal)
+        // ========== 4. ACID + ORGANIC: low pH + organic → smoke + heat ==========
         this.reactionRules.push({
             condition: (matA, matB) => {
-                const organic = ['wood', 'dirt', 'coal'];
-                return (matA.pH != null && matA.pH < 3 && organic.includes(matB.name)) ||
-                       (matB.pH != null && matB.pH < 3 && organic.includes(matA.name));
+                return ((matA.pH != null && matA.pH < 3) && matB.organic) ||
+                       ((matB.pH != null && matB.pH < 3) && matA.organic);
             },
             react: (x, y, matA, matB, idxA, idxB) => {
                 if (Math.random() < 0.03) {
-                    const solidIdx = (matA.pH != null && matA.pH < 3) ? idxB : idxA;
-                    this.grid[solidIdx] = this.getMaterialId('smoke');
-                    this.temperatureGrid[solidIdx] += 10;
+                    const organicIdx = (matA.pH != null && matA.pH < 3) ? idxB : idxA;
+                    this.grid[organicIdx] = this.getMaterialId('smoke');
+                    this.temperatureGrid[organicIdx] += 10;
                 }
             }
         });
 
-        // ========== WATER REACTIONS ==========
-
-        // Water + Salt → dissolves (salt disappears into water)
+        // ========== 5. ACID + BASE NEUTRALIZATION: pH < 3 meets pH > 11 → salt + water ==========
         this.reactionRules.push({
             condition: (matA, matB) => {
-                return (matA.name === 'water' && matB.name === 'salt') ||
-                       (matB.name === 'water' && matA.name === 'salt');
-            },
-            react: (x, y, matA, matB, idxA, idxB) => {
-                if (Math.random() < 0.04) {
-                    const saltIdx = matA.name === 'salt' ? idxA : idxB;
-                    this.grid[saltIdx] = this.getMaterialId('water');
-                }
-            }
-        });
-
-        // Water + Dirt → Mud
-        this.reactionRules.push({
-            condition: (matA, matB) => {
-                return (matA.name === 'water' && matB.name === 'dirt') ||
-                       (matB.name === 'water' && matA.name === 'dirt');
-            },
-            react: (x, y, matA, matB, idxA, idxB) => {
-                if (Math.random() < 0.03) {
-                    const waterIdx = matA.name === 'water' ? idxA : idxB;
-                    const dirtIdx = matA.name === 'dirt' ? idxA : idxB;
-                    this.grid[waterIdx] = 0; // water absorbed
-                    this.grid[dirtIdx] = this.getMaterialId('mud');
-                }
-            }
-        });
-
-        // Water + Clay powder (if clay is powder state) → hardens clay
-        // Water on lava → obsidian + steam (temperature handles most, but ensure contact reaction)
-        this.reactionRules.push({
-            condition: (matA, matB) => {
-                return (matA.name === 'water' && matB.name === 'lava') ||
-                       (matB.name === 'water' && matA.name === 'lava');
-            },
-            react: (x, y, matA, matB, idxA, idxB) => {
-                if (Math.random() < 0.15) {
-                    const lavaIdx = matA.name === 'lava' ? idxA : idxB;
-                    const waterIdx = matA.name === 'water' ? idxA : idxB;
-                    this.grid[lavaIdx] = this.getMaterialId('obsidian');
-                    this.grid[waterIdx] = this.getMaterialId('steam');
-                    this.temperatureGrid[lavaIdx] = 400;
-                    this.temperatureGrid[waterIdx] = 100;
-                }
-            }
-        });
-
-        // ========== GAS REACTIONS ==========
-
-        // Hydrogen + Oxygen + heat → Water + EXPLOSION
-        this.reactionRules.push({
-            condition: (matA, matB) => {
-                const hasH = matA.name === 'hydrogen' || matB.name === 'hydrogen';
-                const hasO = matA.name === 'oxygen' || matB.name === 'oxygen' ||
-                             matA.supportsCombustion || matB.supportsCombustion;
-                const idxA_t = this.temperatureGrid ? true : false;
-                // Check if either cell is hot enough
-                return hasH && hasO;
-            },
-            react: (x, y, matA, matB, idxA, idxB) => {
-                const temp = Math.max(this.temperatureGrid[idxA], this.temperatureGrid[idxB]);
-                if (temp > 500 && Math.random() < 0.3) {
-                    const worldX = x * this.cellSize;
-                    const worldY = y * this.cellSize;
-                    this.explode(worldX, worldY, 30, 100);
-                    this.grid[idxA] = this.getMaterialId('steam');
-                    this.temperatureGrid[idxA] = 100;
-                }
-            }
-        });
-
-        // Methane + fire/heat → CO2 + Water + explosion
-        this.reactionRules.push({
-            condition: (matA, matB) => {
-                const hasMethane = matA.name === 'methane' || matB.name === 'methane';
-                const hasFire = matA.name === 'fire' || matB.name === 'fire' ||
-                                matA.name === 'oxygen' || matB.name === 'oxygen';
-                return hasMethane && hasFire;
-            },
-            react: (x, y, matA, matB, idxA, idxB) => {
-                const temp = Math.max(
-                    this.temperatureGrid[idxA] || 20,
-                    this.temperatureGrid[idxB] || 20
-                );
-                if (temp > 580 && Math.random() < 0.2) {
-                    const methIdx = matA.name === 'methane' ? idxA : idxB;
-                    this.grid[methIdx] = this.getMaterialId('co2');
-                    this.temperatureGrid[methIdx] += 200;
-                    // Small explosion
-                    const worldX = x * this.cellSize;
-                    const worldY = y * this.cellSize;
-                    this.explode(worldX, worldY, 15, 50);
-                }
-            }
-        });
-
-        // CO2 extinguishes fire (displaces oxygen)
-        this.reactionRules.push({
-            condition: (matA, matB) => {
-                return (matA.name === 'co2' && matB.name === 'fire') ||
-                       (matB.name === 'co2' && matA.name === 'fire');
-            },
-            react: (x, y, matA, matB, idxA, idxB) => {
-                if (Math.random() < 0.3) {
-                    const fireIdx = matA.name === 'fire' ? idxA : idxB;
-                    this.grid[fireIdx] = this.getMaterialId('smoke');
-                    this.temperatureGrid[fireIdx] -= 100;
-                }
-            }
-        });
-
-        // ========== MATERIAL TRANSFORMATION ==========
-
-        // Oil + Water → they don't mix (oil floats — handled by density)
-        // But oil + fire near water → steam
-        
-        // Gunpowder + fire/heat → massive explosion
-        this.reactionRules.push({
-            condition: (matA, matB) => {
-                const hasGP = matA.name === 'gunpowder' || matB.name === 'gunpowder';
-                const hasFire = matA.name === 'fire' || matB.name === 'fire';
-                return hasGP && hasFire;
-            },
-            react: (x, y, matA, matB, idxA, idxB) => {
-                if (Math.random() < 0.5) {
-                    const worldX = x * this.cellSize;
-                    const worldY = y * this.cellSize;
-                    this.explode(worldX, worldY, 50, 200);
-                    this.grid[idxA] = this.getMaterialId('smoke');
-                    this.grid[idxB] = this.getMaterialId('smoke');
-                    this.temperatureGrid[idxA] = 500;
-                }
-            }
-        });
-
-        // Sulfur + Fire → SO2 (toxic smoke) + heat
-        this.reactionRules.push({
-            condition: (matA, matB) => {
-                return (matA.name === 'sulfur' && matB.name === 'fire') ||
-                       (matB.name === 'sulfur' && matA.name === 'fire');
+                return (matA.pH != null && matA.pH < 3 && matB.pH != null && matB.pH > 11) ||
+                       (matB.pH != null && matB.pH < 3 && matA.pH != null && matA.pH > 11);
             },
             react: (x, y, matA, matB, idxA, idxB) => {
                 if (Math.random() < 0.1) {
-                    const sulfIdx = matA.name === 'sulfur' ? idxA : idxB;
-                    this.grid[sulfIdx] = this.getMaterialId('smoke');
-                    this.temperatureGrid[sulfIdx] += 100;
+                    this.grid[idxA] = this.getMaterialId('water');
+                    this.grid[idxB] = this.getMaterialId('salt');
+                    this.temperatureGrid[idxA] += 20;
+                    this.temperatureGrid[idxB] += 20;
                 }
             }
         });
 
-        // ========== CORROSION (property-based) ==========
-
-        // Any corrosive material eats through non-stone solids slowly
+        // ========== 6. DISSOLUTION: solvent meets material with matching solubleIn ==========
         this.reactionRules.push({
             condition: (matA, matB) => {
-                const aCorrosive = matA.corrosive && matB.state === 'solid' && matB.hardness < 6;
-                const bCorrosive = matB.corrosive && matA.state === 'solid' && matA.hardness < 6;
-                return aCorrosive || bCorrosive;
+                return (matA.solventType && matB.solubleIn && matB.solubleIn.includes(matA.solventType)) ||
+                       (matB.solventType && matA.solubleIn && matA.solubleIn.includes(matB.solventType));
             },
             react: (x, y, matA, matB, idxA, idxB) => {
-                // Harder materials resist longer
-                const solid = matA.corrosive ? matB : matA;
-                const chance = 0.01 * (1 - solid.hardness / 10);
-                if (Math.random() < chance) {
-                    const solidIdx = matA.corrosive ? idxB : idxA;
-                    this.grid[solidIdx] = this.getMaterialId('smoke');
+                if (Math.random() < 0.02) {
+                    const soluteIdx = matA.solventType ? idxB : idxA;
+                    const solventIdx = matA.solventType ? idxA : idxB;
+                    // Solute dissolves into solvent
+                    this.grid[soluteIdx] = this.grid[solventIdx];
+                }
+            }
+        });
+
+        // ========== 7. OXIDATION/RUST: reducer + oxidizer at low temp → slow degradation ==========
+        this.reactionRules.push({
+            condition: (matA, matB) => {
+                const temp = Math.max(
+                    this.temperatureGrid?.[this.index(0,0)] || 20,
+                    this.temperatureGrid?.[this.index(0,0)] || 20
+                );
+                return (matA.reducer && matB.oxidizer && temp < 100) ||
+                       (matB.reducer && matA.oxidizer && temp < 100);
+            },
+            react: (x, y, matA, matB, idxA, idxB) => {
+                if (Math.random() < 0.005) { // Very slow
+                    const metalMat = matA.reducer ? matA : matB;
+                    const metalIdx = matA.reducer ? idxA : idxB;
+                    
+                    if (metalMat.oxidationProduct) {
+                        this.grid[metalIdx] = this.getMaterialId(metalMat.oxidationProduct);
+                    } else {
+                        this.grid[metalIdx] = this.getMaterialId('smoke');
+                    }
+                }
+            }
+        });
+
+        // ========== 8. EXPLOSIVE DECOMPOSITION: explosive + heat/fire → explosion ==========
+        this.reactionRules.push({
+            condition: (matA, matB) => {
+                const temp = Math.max(
+                    this.temperatureGrid?.[this.index(0,0)] || 20,
+                    this.temperatureGrid?.[this.index(0,0)] || 20
+                );
+                const hotEnough = temp > 250;
+                return (matA.explosive && (hotEnough || matB.temperature > 500)) ||
+                       (matB.explosive && (hotEnough || matA.temperature > 500));
+            },
+            react: (x, y, matA, matB, idxA, idxB) => {
+                const explosiveMat = matA.explosive ? matA : matB;
+                const explosiveIdx = matA.explosive ? idxA : idxB;
+                
+                if (Math.random() < 0.3) {
+                    const worldX = x * this.cellSize;
+                    const worldY = y * this.cellSize;
+                    this.explode(worldX, worldY, explosiveMat.explosionRadius || 40, explosiveMat.explosionPower || 150);
+                    
+                    // Convert to blast products
+                    if (explosiveMat.blastProducts && explosiveMat.blastProducts.length > 0) {
+                        const product = explosiveMat.blastProducts[Math.floor(Math.random() * explosiveMat.blastProducts.length)];
+                        this.grid[explosiveIdx] = this.getMaterialId(product);
+                    } else {
+                        this.grid[explosiveIdx] = this.getMaterialId('smoke');
+                    }
+                    this.temperatureGrid[explosiveIdx] = 800;
+                }
+            }
+        });
+
+        // ========== 9. THERMAL DECOMPOSITION: handled in temperature update loop, not here ==========
+        // (This reaction doesn't need a neighbor, just high temperature)
+
+        // ========== 10. WATER + LAVA type: liquid with low boilingPoint + very hot material ==========
+        this.reactionRules.push({
+            condition: (matA, matB) => {
+                return (matA.state === 'liquid' && matA.boilingPoint < 200 && matB.temperature > 800) ||
+                       (matB.state === 'liquid' && matB.boilingPoint < 200 && matA.temperature > 800);
+            },
+            react: (x, y, matA, matB, idxA, idxB) => {
+                if (Math.random() < 0.15) {
+                    const liquidMat = (matA.state === 'liquid' && matA.boilingPoint < 200) ? matA : matB;
+                    const liquidIdx = (matA.state === 'liquid' && matA.boilingPoint < 200) ? idxA : idxB;
+                    const hotMat = (matA.temperature > 800) ? matA : matB;
+                    const hotIdx = (matA.temperature > 800) ? idxA : idxB;
+                    
+                    // Liquid → its gasForm (steam)
+                    if (liquidMat.gasForm) {
+                        this.grid[liquidIdx] = this.getMaterialId(liquidMat.gasForm);
+                        this.temperatureGrid[liquidIdx] = liquidMat.boilingPoint || 100;
+                    }
+                    
+                    // Hot material → its solidForm if it has one (lava → obsidian)
+                    if (hotMat.solidForm) {
+                        this.grid[hotIdx] = this.getMaterialId(hotMat.solidForm);
+                        this.temperatureGrid[hotIdx] = 400;
+                    }
+                }
+            }
+        });
+
+        // ========== 11. CO₂ SMOTHERING: non-oxidizer gas cools hot gas (fire suppression) ==========
+        this.reactionRules.push({
+            condition: (matA, matB) => {
+                return (matA.smothering && matB.temperature > 400) ||
+                       (matB.smothering && matA.temperature > 400) ||
+                       (matA.state === 'gas' && !matA.oxidizer && matB.state === 'gas' && matB.temperature > 400) ||
+                       (matB.state === 'gas' && !matB.oxidizer && matA.state === 'gas' && matA.temperature > 400);
+            },
+            react: (x, y, matA, matB, idxA, idxB) => {
+                if (Math.random() < 0.3) {
+                    const hotIdx = (matA.temperature > 400) ? idxA : idxB;
+                    const hotMat = (matA.temperature > 400) ? matA : matB;
+                    
+                    // Cool the hot gas
+                    this.temperatureGrid[hotIdx] -= 200;
+                    
+                    // If it drops below ignition, convert to smoke
+                    if (this.temperatureGrid[hotIdx] < (hotMat.ignitionPoint || 300)) {
+                        this.grid[hotIdx] = this.getMaterialId('smoke');
+                    }
+                }
+            }
+        });
+
+        // ========== 12. ORGANIC DECAY: organic + water + warm temp → methane + dirt ==========
+        this.reactionRules.push({
+            condition: (matA, matB) => {
+                const temp = Math.max(
+                    this.temperatureGrid?.[this.index(0,0)] || 20,
+                    this.temperatureGrid?.[this.index(0,0)] || 20
+                );
+                const warmEnough = temp >= 10 && temp <= 60;
+                return warmEnough && 
+                       ((matA.organic && matA.state === 'solid' && matB.state === 'liquid') ||
+                        (matB.organic && matB.state === 'solid' && matA.state === 'liquid'));
+            },
+            react: (x, y, matA, matB, idxA, idxB) => {
+                if (Math.random() < 0.001) { // Very slow biological process
+                    const organicIdx = (matA.organic && matA.state === 'solid') ? idxA : idxB;
+                    this.grid[organicIdx] = this.getMaterialId('dirt');
+                    
+                    // Try to release methane nearby
+                    const dirs = [[-1,0], [1,0], [0,-1], [0,1]];
+                    const [dx, dy] = dirs[Math.floor(Math.random() * dirs.length)];
+                    const nx = x + dx;
+                    const ny = y + dy;
+                    if (this.inBounds(nx, ny)) {
+                        const nidx = this.index(nx, ny);
+                        if (this.grid[nidx] === 0) { // Air
+                            this.grid[nidx] = this.getMaterialId('methane');
+                        }
+                    }
+                }
+            }
+        });
+
+        // ========== 13. REDUCTION (smelting): reducer + oxidized metal at high temp → pure metal ==========
+        this.reactionRules.push({
+            condition: (matA, matB) => {
+                const temp = Math.max(
+                    this.temperatureGrid?.[this.index(0,0)] || 20,
+                    this.temperatureGrid?.[this.index(0,0)] || 20
+                );
+                return temp > 500 &&
+                       ((matA.reducer && !matA.metal && matB.oxidationProduct) ||
+                        (matB.reducer && !matB.metal && matA.oxidationProduct));
+            },
+            react: (x, y, matA, matB, idxA, idxB) => {
+                if (Math.random() < 0.02) {
+                    // This is a placeholder - full implementation would require reverse lookup
+                    // For now, just produce smoke as a product
+                    const oxidizedIdx = (matA.oxidationProduct) ? idxA : idxB;
+                    this.grid[oxidizedIdx] = this.getMaterialId('smoke');
+                    this.temperatureGrid[oxidizedIdx] += 50;
+                }
+            }
+        });
+
+        // ========== LEGACY COMPATIBILITY: Water + Dirt → Mud (keep this one hardcoded) ==========
+        this.reactionRules.push({
+            condition: (matA, matB) => {
+                return (matA.solventType === 'water' && matB.name === 'dirt') ||
+                       (matB.solventType === 'water' && matA.name === 'dirt');
+            },
+            react: (x, y, matA, matB, idxA, idxB) => {
+                if (Math.random() < 0.03) {
+                    const waterIdx = matA.solventType === 'water' ? idxA : idxB;
+                    const dirtIdx = matA.name === 'dirt' ? idxA : idxB;
+                    this.grid[waterIdx] = 0; // water absorbed
+                    this.grid[dirtIdx] = this.getMaterialId('mud');
                 }
             }
         });
