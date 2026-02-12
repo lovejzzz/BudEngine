@@ -9,10 +9,14 @@ A god-simulation where building the world = composing music. Your instrument is 
 
 ## Features
 - **Pixel Physics**: 30+ materials with real scientific properties — emergent reactions, no hardcoded interactions
-- **Living Ecosystem**: Worms 🪱, fish 🐟, bugs 🐛 — visible multi-pixel creatures that eat, reproduce, and die. Soil fertility, O₂/CO₂ balance, food chains
-- **Scientific Acoustic Physics**: ALL sounds derived from real physics formulas, not arbitrary frequencies. Impact sounds use f = (1/(2*L)) * sqrt(E/ρ) with actual Young's modulus and density. Water splashes use real bubble acoustics. Fire sounds from turbulent combustion. Creature bioacoustics (worms: 20-60Hz infrasound, fish: swim bladder resonance 100-500Hz, bugs: stridulation 1000-4000Hz). Sounds are what physics predicts they should be
+- **Living Ecosystem**: Worms 🪱, fish 🐟, bugs 🐛, birds 🐦 — visible multi-pixel creatures that eat, reproduce, and die. Soil fertility, O₂/CO₂ balance, food chains. Birds are apex predators (eat bugs, disperse seeds)
+- **Day/Night Cycle** (v4.3): 14-minute day/night cycle with smooth sinusoidal brightness. Temperature drops at night, worms surface, bugs chirp more. Sun ☀️ and moon 🌙 indicators in HUD
+- **Fertile Soil Visualization** (v4.3): Dirt color reflects fertility — rich dark-green for fertile (>0.7), grayish for depleted (<0.3). Worms enrich soil by eating decay, plants deplete it
+- **Population Dynamics Graph** (v4.3): Real-time sparkline chart shows last 60 seconds of population history. Toggle with 📊 button. Worm=pink, fish=orange, bug=green, bird=blue
+- **Epoch Progression** (v4.3): Genesis → Formation (terrain built) → Life (creatures survive 60s) → Civilization (50+ creatures) → Transcendence (self-sustaining 5 min)
+- **Scientific Acoustic Physics**: ALL sounds derived from real physics formulas, not arbitrary frequencies. Impact sounds use f = (1/(2*L)) * sqrt(E/ρ) with actual Young's modulus and density. Water splashes use real bubble acoustics. Fire sounds from turbulent combustion. Creature bioacoustics (worms: 20-60Hz infrasound, fish: swim bladder resonance 100-500Hz, bugs: stridulation 1000-4000Hz, birds: high-pitched tweets 2000Hz). Sounds are what physics predicts they should be
 - **Conducting Mode**: Become a god — swipe for wind, tap for rain, long-press for warmth. Shape the ecosystem with gestures
-- **Biology**: Plants → vegetation → wood lifecycle. Seeds spread with wind. Decay composts into fertile soil
+- **Biology**: Plants → vegetation → wood lifecycle. Seeds spread with wind (and by birds). Decay composts into fertile soil
 - **Seasons & Weather**: Spring/Summer/Fall/Winter with rain, snow, wind
 - **Erosion**: Water, wind, and thermal erosion reshape terrain over geological time
 - **Procedural Worlds**: Seeded generation with 7 biomes and cave systems
@@ -23,7 +27,7 @@ A god-simulation where building the world = composing music. Your instrument is 
 ## Quick Start
 **Play online:** [https://lovejzzz.github.io/BudEngine/](https://lovejzzz.github.io/BudEngine/)
 
-First visit shows a welcome screen — tap to begin. The Garden ecosystem loads automatically with worms in dirt, fish in water, bugs on surfaces, and plants growing. Switch to 🎵 Conduct mode to interact with gestures.
+First visit shows a welcome screen — tap to begin. The Garden ecosystem loads automatically with worms in dirt, fish in water, bugs on surfaces, birds flying above, and plants growing. Watch the day/night cycle (14 min), observe dirt color change as worms enrich it, see population dynamics in the 📊 sparkline graph. Switch to 🎵 Conduct mode to interact with gestures.
 
 Or run locally — open `composition.html` in any browser (mobile or desktop).
 
@@ -53,9 +57,10 @@ Every sound in Bud Engine is derived from real physics, not arbitrary frequency 
 - Reaction energy scales amplitude
 
 **Creature Bioacoustics** — Real biology:
-- Worms: 20-60 Hz infrasound from soil displacement (barely audible)
+- Worms: 20-60 Hz infrasound from soil displacement (barely audible, move faster at night)
 - Fish: Swim bladder resonance 100-500 Hz, short pulsed sounds
 - Bugs: Stridulation 1000-4000 Hz, rapid click series (temperature affects chirp rate via Dolbear's law)
+- Birds (v4.3): High-pitched tweets 2000 Hz, fly horizontally with slight vertical drift, glide down gradually, RARE (max 10 population cap), disperse plant seeds
 
 All frequencies calculated from material properties: `youngsModulus`, `density`, `dampening`, `speedOfSound`, `acousticImpedance`. The Composition sounds like Earth should.
 

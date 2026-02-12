@@ -7,13 +7,34 @@
  * 
  * Architecture: Single-file, no build tools, runs in browser
  * 
- * v4.3 SCIENTIFIC ACOUSTIC PHYSICS - Sound from Real Material Properties:
+ * v4.3 DAY/NIGHT CYCLE, BIRDS, FERTILE SOIL VIZ, POPULATION GRAPH, EPOCH MILESTONES:
+ * - Day/night cycle: 14-minute cycle, smooth sinusoidal brightness (0.15-1.0), dims whole scene at night
+ * - Dynamic temperature: ambient temp 15°C + 10°C * dayBrightness (cooler at night, warmer at day)
+ * - Creature night behavior: worms move 1.5x faster at night (surface at night IRL)
+ * - Birds (🐦): New apex predator creature, flies in air, eats bugs, disperses plant seeds
+ * - Bird behavior: Horizontal flight with slight vertical drift, gradual glide, V-shaped multi-pixel rendering (3px)
+ * - Bird population cap: RARE (max 10 birds), only reproduces when hunger > 40000 and bird count < 10
+ * - Bird bioacoustics: High-pitched tweets 2000 Hz resonance frequency
+ * - Fertile soil visualization: Dirt color reflects fertility — rich brown-green (>0.7), grayish depleted (<0.3)
+ * - Population dynamics sparkline: Real-time graph shows last 60 seconds of creature populations
+ * - Sparkline colors: worm=pink, fish=orange, bug=green, bird=blue (200x60px canvas, toggle with 📊)
+ * - Epoch progression based on ecosystem milestones, NOT score:
+ *   - Genesis: Default (empty world)
+ *   - Formation: >500 non-air cells (terrain built)
+ *   - Life: Any creature survived 60+ seconds (creatureMaxAge >= 3600 frames)
+ *   - Civilization: Total creatures > 50
+ *   - Transcendence: Ecosystem self-sustaining for 5 minutes (creatures > 10 for 18000 frames)
+ * - New epoch counters: creatureMaxAge (increments each frame creatures exist), sustainedTime (when creatures > 10)
+ * - Sun ☀️ and moon 🌙 indicators in HUD based on brightness
+ * - The Garden now includes 3 birds flying above
+ * 
+ * v4.2+ SCIENTIFIC ACOUSTIC PHYSICS - Sound from Real Material Properties:
  * - ALL sounds derived from actual physics formulas, not arbitrary frequency ranges
  * - Impact sounds: f = (1/(2*L)) * sqrt(E/rho) using real Young's modulus and density
  * - Water/liquid sounds: Real bubble acoustics f = (1/r) * sqrt(3*gamma*P/rho_water)
  * - Fire/combustion: Turbulent flow broadband noise, frequency scales with temperature
  * - Chemical reactions: Exothermic expansion creates pressure waves, gas release = hiss
- * - Creature bioacoustics: Worms (20-60Hz infrasound), Fish (swim bladder 100-500Hz), Bugs (stridulation 1000-4000Hz)
+ * - Creature bioacoustics: Worms (20-60Hz infrasound), Fish (swim bladder 100-500Hz), Bugs (stridulation 1000-4000Hz), Birds (2000Hz tweets)
  * - Wind/erosion: Aeolian tones f = 0.2 * v / d
  * - Material properties drive everything: youngsModulus, density, dampening, speedOfSound
  * - "Think the sound that makes sense scientifically" - SKYX
@@ -4198,6 +4219,13 @@ class TestingAPI {
                     this.engine.physics.spawnCreature('bug', bx, by);
                 }
                 
+                // v4.3: Birds flying in the air (apex predators)
+                for (let i = 0; i < 3; i++) {
+                    const birdX = Math.random() * w;
+                    const birdY = h*0.3 + Math.random() * (h*0.3); // Mid-air
+                    this.engine.physics.spawnCreature('bird', birdX, birdY);
+                }
+                
                 // Activate all chunks
                 for (let gx = 0; gx < this.engine.physics.gridWidth; gx += this.engine.physics.chunkSize) {
                     for (let gy = 0; gy < this.engine.physics.gridHeight; gy += this.engine.physics.chunkSize) {
@@ -4363,10 +4391,13 @@ class TestingAPI {
                 worm: physics.creaturePopulation ? physics.creaturePopulation.worm : 0,
                 fish: physics.creaturePopulation ? physics.creaturePopulation.fish : 0,
                 bug: physics.creaturePopulation ? physics.creaturePopulation.bug : 0,
+                bird: physics.creaturePopulation ? physics.creaturePopulation.bird : 0,
                 total: physics.totalCreatures || 0,
                 max: physics.maxCreatures || 200,
-                births: physics.creatureBirths || { worm: 0, fish: 0, bug: 0 },
-                deaths: physics.creatureDeaths || { worm: 0, fish: 0, bug: 0 }
+                births: physics.creatureBirths || { worm: 0, fish: 0, bug: 0, bird: 0 },
+                deaths: physics.creatureDeaths || { worm: 0, fish: 0, bug: 0, bird: 0 },
+                maxAge: physics.creatureMaxAge || 0,
+                sustainedTime: physics.sustainedTime || 0
             },
             
             // v4.1: Soil fertility (average)
@@ -5828,6 +5859,10 @@ class PixelPhysics {
         
         // Track last year for event checking
         this.lastEventCheck = -1;
+        
+        // v4.3: Day/night cycle
+        this.dayTime = 0; // 0-1 float (0=midnight, 0.25=dawn, 0.5=noon, 0.75=dusk)
+        this.dayBrightness = 1.0; // Calculated brightness based on dayTime
     }
 
     /**
@@ -5861,20 +5896,27 @@ class PixelPhysics {
         this.creaturePopulation = {
             worm: 0,
             fish: 0,
-            bug: 0
+            bug: 0,
+            bird: 0
         };
         this.creatureBirths = {
             worm: 0,
             fish: 0,
-            bug: 0
+            bug: 0,
+            bird: 0
         };
         this.creatureDeaths = {
             worm: 0,
             fish: 0,
-            bug: 0
+            bug: 0,
+            bird: 0
         };
         this.totalCreatures = 0;
         this.maxCreatures = 200;
+        
+        // v4.3: Epoch progression counters
+        this.creatureMaxAge = 0; // Increments each frame creatures exist
+        this.sustainedTime = 0; // Increments when totalCreatures > 10
         
         // Initialize all cells to ambient temperature and default fertility
         for (let i = 0; i < this.temperatureGrid.length; i++) {
@@ -7139,6 +7181,53 @@ class PixelPhysics {
             diesInWater: true,
             consumesO2: true
         });
+
+        // BIRD (v4.3 - flies in air, eats bugs, apex predator)
+        this.material('bird', {
+            state: 'solid',
+            density: 300,
+            temperature: 40,
+            meltingPoint: null,
+            boilingPoint: null,
+            ignitionPoint: 160,
+            thermalConductivity: 0.35,
+            specificHeat: 3.2,
+            flammability: 0.3,
+            hardness: 0.15,
+            electricConductivity: 0,
+            pH: 7,
+            reactivity: 0,
+            solubility: null,
+            color: ['#4488ff', '#3377ee'],
+            immovable: false,
+            organic: true,
+            living: true,
+            creature: true,
+            combustionProducts: ['smoke'],
+            combustionEnergy: 4,
+            // Acoustic properties - high-pitched tweet
+            speedOfSound: 1000,
+            acousticImpedance: 0.30,
+            absorptionCoeff: 0.30,
+            youngsModulus: 0.2e9,
+            resonanceFreq: 2000,
+            dampening: 0.6,
+            brightness: 0.8,
+            impactSound: 'click',
+            flowSound: null,
+            ambientSound: null,
+            phaseChangeSound: null,
+            // Creature properties
+            creatureType: 'bird',
+            moveSpeed: 0.6,
+            eatsFood: ['bug'],
+            needsEnvironment: null, // Flies in air, doesn't need specific environment
+            minTemp: 0,
+            maxTemp: 45,
+            deathForm: 'decay',
+            diesInWater: true,
+            consumesO2: true
+        });
     }
 
     /**
@@ -7879,6 +7968,7 @@ class PixelPhysics {
             this.creaturePopulation.worm = 0;
             this.creaturePopulation.fish = 0;
             this.creaturePopulation.bug = 0;
+            this.creaturePopulation.bird = 0;
             this.totalCreatures = 0;
             
             // Scan grid for creatures and force their chunks active
@@ -7886,14 +7976,35 @@ class PixelPhysics {
             var wormId = this.getMaterialId('worm');
             var fishId = this.getMaterialId('fish');
             var bugId = this.getMaterialId('bug');
+            var birdId = this.getMaterialId('bird');
             for (var i = 0; i < this.grid.length; i++) {
                 var mid = this.grid[i];
-                if (mid === wormId || mid === fishId || mid === bugId) {
+                if (mid === wormId || mid === fishId || mid === bugId || mid === birdId) {
                     var gx = i % this.gridWidth;
                     var gy = Math.floor(i / this.gridWidth);
                     this.activateChunk(gx, gy);
                 }
             }
+        }
+        
+        // v4.3: Update day/night cycle
+        this.dayTime = (this.dayTime + 0.00002 * this.timeScale) % 1;
+        this.dayBrightness = 0.15 + 0.85 * Math.max(0, Math.sin(this.dayTime * Math.PI * 2));
+        
+        // v4.3: Dynamic ambient temperature based on day/night
+        this.ambientTemp = 15 + 10 * this.dayBrightness;
+        
+        // v4.3: Update epoch progression counters
+        if (this.totalCreatures > 0) {
+            this.creatureMaxAge++;
+        } else {
+            this.creatureMaxAge = 0;
+        }
+        
+        if (this.totalCreatures > 10) {
+            this.sustainedTime++;
+        } else {
+            this.sustainedTime = 0;
         }
         
         // v3.9: Update seasonal cycle and weather
@@ -8756,6 +8867,8 @@ class PixelPhysics {
                 if (creatureType === 'worm' && (nmatName === 'dirt' || nid === 0)) canReproduce = true;
                 if (creatureType === 'fish' && nmatName === 'water') canReproduce = true;
                 if (creatureType === 'bug' && nid === 0) canReproduce = true;
+                // v4.3: Birds reproduce only when well-fed and population < 10
+                if (creatureType === 'bird' && nid === 0 && hunger > 40000 && this.creaturePopulation.bird < 10) canReproduce = true;
                 
                 if (canReproduce) {
                     this.grid[nidx] = this.getMaterialId(mat.name);
@@ -8775,7 +8888,13 @@ class PixelPhysics {
         }
         
         // 5. MOVEMENT
-        if (Math.random() < mat.moveSpeed) {
+        // v4.3: Worms move faster at night (surface at night IRL)
+        var effectiveMoveSpeed = mat.moveSpeed;
+        if (creatureType === 'worm' && this.dayBrightness < 0.3) {
+            effectiveMoveSpeed *= 1.5;
+        }
+        
+        if (Math.random() < effectiveMoveSpeed) {
             // Decrement hunger slowly and increment age timer
             const newHunger = Math.max(0, hunger - 1);
             var newMoveTimer = Math.min(255, moveTimer + 1);
@@ -8786,6 +8905,11 @@ class PixelPhysics {
                 // Bugs ONLY move horizontally (left=6 or right=2)
                 if (creatureType === 'bug') {
                     newDirection = Math.random() < 0.5 ? 2 : 6;
+                }
+                // v4.3: Birds prefer horizontal flight (directions 1,2,3,5,6,7) with slight vertical
+                else if (creatureType === 'bird') {
+                    const dirs = [1, 2, 3, 5, 6, 7]; // mostly horizontal
+                    newDirection = dirs[Math.floor(Math.random() * dirs.length)];
                 } else {
                     newDirection = Math.floor(Math.random() * 8);
                 }
@@ -8794,6 +8918,11 @@ class PixelPhysics {
             // Override bug direction to horizontal only
             if (creatureType === 'bug' && direction !== 2 && direction !== 6) {
                 newDirection = Math.random() < 0.5 ? 2 : 6;
+            }
+            
+            // v4.3: Birds have gravity - small chance to glide down when not moving
+            if (creatureType === 'bird' && Math.random() < 0.05) {
+                newDirection = 4; // down
             }
             
             // Calculate movement direction
@@ -8850,6 +8979,11 @@ class PixelPhysics {
                             }
                         }
                     }
+                } else if (creatureType === 'bird') {
+                    // v4.3: Birds fly through AIR only
+                    if (nid === 0) {
+                        canMove = true;
+                    }
                 }
                 
                 if (canMove) {
@@ -8858,7 +8992,7 @@ class PixelPhysics {
                     var restoreMat = 0; // default: air
                     if (creatureType === 'worm') restoreMat = this.getMaterialId('dirt');
                     else if (creatureType === 'fish') restoreMat = this.getMaterialId('water');
-                    // bugs walk on air, so leave air behind
+                    // bugs and birds walk/fly on air, so leave air behind
                     
                     // Move creature
                     this.grid[nidx] = this.grid[idx];
@@ -8868,6 +9002,20 @@ class PixelPhysics {
                     this.grid[idx] = restoreMat;
                     this.temperatureGrid[idx] = this.ambientTemp;
                     this.lifetimeGrid[idx] = 0;
+                    
+                    // v4.3: Bird seed dispersal - 0.1% chance to drop plant seed below
+                    if (creatureType === 'bird' && Math.random() < 0.001) {
+                        const belowY = ny + 1;
+                        if (this.inBounds(nx, belowY)) {
+                            const belowIdx = this.index(nx, belowY);
+                            const belowId = this.grid[belowIdx];
+                            const belowMat = this.getMaterial(belowId);
+                            if (belowMat && belowMat.name === 'dirt') {
+                                this.grid[belowIdx] = this.getMaterialId('plant');
+                                this.activateChunk(nx, belowY);
+                            }
+                        }
+                    }
                     
                     this.activateChunk(x, y);
                     this.activateChunk(nx, ny);
@@ -9536,18 +9684,25 @@ class PixelPhysics {
                     let b = parseInt(hex.slice(4, 6), 16);
                     const a = hex.length === 8 ? parseInt(hex.slice(6, 8), 16) : 255;
                     
-                    // v4.1: Soil fertility visualization - fertile dirt is greener, depleted is grayer
+                    // v4.3: Enhanced fertile soil visualization - blend toward target colors
                     if (mat.name === 'dirt' && this.fertilityGrid) {
                         const fertility = this.fertilityGrid[idx];
                         if (fertility > 0.7) {
-                            // High fertility - add green tint
-                            g = Math.min(255, g + Math.floor((fertility - 0.7) * 100));
+                            // Rich soil - blend toward dark brown-green (#3d2e1a with green #2a3d1a)
+                            const richness = (fertility - 0.7) / 0.3; // 0-1 in 0.7-1.0 range
+                            const targetR = Math.floor(0x3d * 0.5 + 0x2a * 0.5);
+                            const targetG = Math.floor(0x2e * 0.5 + 0x3d * 0.5);
+                            const targetB = 0x1a;
+                            r = Math.floor(r + (targetR - r) * richness * 0.6);
+                            g = Math.floor(g + (targetG - g) * richness * 0.6);
+                            b = Math.floor(b + (targetB - b) * richness * 0.6);
                         } else if (fertility < 0.3) {
-                            // Low fertility - make grayer
-                            const grayness = (0.3 - fertility) * 0.5;
-                            r = Math.floor(r + (128 - r) * grayness);
-                            g = Math.floor(g + (128 - g) * grayness);
-                            b = Math.floor(b + (128 - b) * grayness);
+                            // Depleted soil - blend toward grayish (#5a5a5a)
+                            const depletion = (0.3 - fertility) / 0.3; // 0-1 in 0-0.3 range
+                            const targetGray = 0x5a;
+                            r = Math.floor(r + (targetGray - r) * depletion * 0.7);
+                            g = Math.floor(g + (targetGray - g) * depletion * 0.7);
+                            b = Math.floor(b + (targetGray - b) * depletion * 0.7);
                         }
                     }
                     
@@ -9629,6 +9784,31 @@ class PixelPhysics {
                                 pixels[upPixelIdx + 2] = b;
                                 pixels[upPixelIdx + 3] = 255;
                             }
+                        } else if (creatureType === 'bird') {
+                            // v4.3: Draw bird as 3 pixels: current + upper-left + upper-right (V shape)
+                            const upY = y > 0 ? y - 1 : y;
+                            const leftX = x > 0 ? x - 1 : x;
+                            const rightX = x < this.gridWidth - 1 ? x + 1 : x;
+                            
+                            // Upper-left pixel
+                            if (leftX >= 0 && upY >= 0) {
+                                const ulIdx = this.index(leftX, upY);
+                                const ulPixelIdx = ulIdx * 4;
+                                pixels[ulPixelIdx] = r;
+                                pixels[ulPixelIdx + 1] = g;
+                                pixels[ulPixelIdx + 2] = b;
+                                pixels[ulPixelIdx + 3] = 255;
+                            }
+                            
+                            // Upper-right pixel
+                            if (rightX < this.gridWidth && upY >= 0) {
+                                const urIdx = this.index(rightX, upY);
+                                const urPixelIdx = urIdx * 4;
+                                pixels[urPixelIdx] = r;
+                                pixels[urPixelIdx + 1] = g;
+                                pixels[urPixelIdx + 2] = b;
+                                pixels[urPixelIdx + 3] = 255;
+                            }
                         }
                     }
                 } else {
@@ -9658,7 +9838,12 @@ class PixelPhysics {
             0, 0, this.width, this.height
         );
         
-        // debug removed
+        // v4.3: Day/night cycle overlay
+        const nightAlpha = (1 - this.dayBrightness) * 0.7;
+        if (nightAlpha > 0) {
+            ctx.fillStyle = `rgba(0, 0, 10, ${nightAlpha})`;
+            ctx.fillRect(0, 0, this.width, this.height);
+        }
         
         ctx.restore();
     }
@@ -12155,15 +12340,35 @@ class CompositionGame {
     updateEpoch() {
         const oldEpoch = this.epoch;
         
-        if (this.score >= this.epochThresholds.transcendence) {
+        // v4.3: Epoch progression based on ecosystem milestones, not score
+        const physics = this.physics;
+        
+        // Count non-air cells for formation
+        let nonAirCells = 0;
+        if (physics.grid) {
+            for (let i = 0; i < physics.grid.length; i++) {
+                if (physics.grid[i] !== 0) nonAirCells++;
+            }
+        }
+        
+        // Transcendence: ecosystem self-sustaining for 5 minutes (300 sec = 18000 frames at 60fps)
+        if (physics.sustainedTime >= 18000) {
             this.epoch = 'transcendence';
-        } else if (this.score >= this.epochThresholds.civilization) {
+        }
+        // Civilization: total creatures > 50
+        else if (physics.totalCreatures > 50) {
             this.epoch = 'civilization';
-        } else if (this.score >= this.epochThresholds.life) {
+        }
+        // Life: any creature survived for 60+ seconds (3600 frames at 60fps)
+        else if (physics.creatureMaxAge >= 3600) {
             this.epoch = 'life';
-        } else if (this.score >= this.epochThresholds.formation) {
+        }
+        // Formation: >500 non-air cells (terrain built)
+        else if (nonAirCells > 500) {
             this.epoch = 'formation';
-        } else {
+        }
+        // Genesis: default
+        else {
             this.epoch = 'genesis';
         }
         

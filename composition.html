@@ -271,6 +271,31 @@
             font-weight: 600;
         }
 
+        /* Population Sparkline (v4.3) */
+        #population-sparkline {
+            position: absolute;
+            top: 100px;
+            right: 20px;
+            width: 200px;
+            height: 60px;
+            background: rgba(0,0,0,0.8);
+            backdrop-filter: blur(20px);
+            border-radius: 8px;
+            padding: 5px;
+            border: 1px solid rgba(255,255,255,0.2);
+            pointer-events: none;
+            display: none;
+        }
+
+        #population-sparkline.visible {
+            display: block;
+        }
+
+        #sparkline-canvas {
+            width: 100%;
+            height: 100%;
+        }
+
         /* Tutorial Overlay */
         #tutorial-overlay {
             position: absolute;
@@ -477,7 +502,9 @@
                     <span class="eco-stat">🪱<span id="worm-count">0</span></span>
                     <span class="eco-stat">🐟<span id="fish-count">0</span></span>
                     <span class="eco-stat">🐛<span id="bug-count">0</span></span>
+                    <span class="eco-stat">🐦<span id="bird-count">0</span></span>
                     <span class="eco-stat">O₂<span id="o2-level">0%</span></span>
+                    <span class="eco-stat" id="day-indicator">☀️</span>
                     <div class="score-bar">
                         <div class="score-bar-fill" id="harmony-bar" style="width: 0%"></div>
                     </div>
@@ -489,6 +516,11 @@
 
             <!-- Score Panel Toggle -->
             <div id="score-toggle">📊</div>
+
+            <!-- Population Sparkline (v4.3) -->
+            <div id="population-sparkline">
+                <canvas id="sparkline-canvas" width="190" height="50"></canvas>
+            </div>
 
             <!-- Score Breakdown Panel -->
             <div id="score-panel">
@@ -561,7 +593,7 @@
         </div>
     </div>
 
-    <script src="bud.js?v=51"></script>
+    <script src="bud.js?v=52"></script>
     <script>
         // The Composition v4.3
         // Your instrument is the Earth
@@ -582,7 +614,8 @@
             { name: 'acid', emoji: '🧪', color: '#00ff00' },
             { name: 'worm', emoji: '🪱', color: '#d4836b' },
             { name: 'fish', emoji: '🐟', color: '#ff9933' },
-            { name: 'bug', emoji: '🐛', color: '#336633' }
+            { name: 'bug', emoji: '🐛', color: '#336633' },
+            { name: 'bird', emoji: '🐦', color: '#4488ff' }
         ];
 
         let selectedMaterial = 'stone';
@@ -669,12 +702,14 @@
             }
         };
 
-        // Score panel toggle
+        // Score panel toggle (v4.3: also toggles sparkline)
         const scoreToggle = document.getElementById('score-toggle');
         const scorePanel = document.getElementById('score-panel');
+        const sparklineDiv = document.getElementById('population-sparkline');
         scoreToggle.onclick = () => {
             scorePanelVisible = !scorePanelVisible;
             scorePanel.classList.toggle('visible', scorePanelVisible);
+            sparklineDiv.classList.toggle('visible', scorePanelVisible);
             scoreToggle.classList.toggle('active', scorePanelVisible);
         };
 
@@ -800,19 +835,105 @@
             }
         }
 
+        // v4.3: Population history for sparkline (last 60 data points)
+        const populationHistory = {
+            worm: [],
+            fish: [],
+            bug: [],
+            bird: []
+        };
+
         // Update ecosystem HUD every second
         function updateEcosystemHUD() {
             if (engine.test && engine.test.getEcosystemState) {
                 const eco = engine.test.getEcosystemState();
-                document.getElementById('worm-count').textContent = eco.creatures.worm || 0;
-                document.getElementById('fish-count').textContent = eco.creatures.fish || 0;
-                document.getElementById('bug-count').textContent = eco.creatures.bug || 0;
+                const wormCount = eco.creatures.worm || 0;
+                const fishCount = eco.creatures.fish || 0;
+                const bugCount = eco.creatures.bug || 0;
+                const birdCount = eco.creatures.bird || 0;
+                
+                document.getElementById('worm-count').textContent = wormCount;
+                document.getElementById('fish-count').textContent = fishCount;
+                document.getElementById('bug-count').textContent = bugCount;
+                document.getElementById('bird-count').textContent = birdCount;
                 
                 // O2 level as percentage (total O2+CO2 = 600, so O2 pct = O2/6)
                 const o2Val = parseFloat(eco.atmosphere.oxygen) || 0;
                 const o2Pct = Math.round((o2Val / 600) * 100);
                 document.getElementById('o2-level').textContent = o2Pct + '%';
+                
+                // v4.3: Day/night indicator
+                const brightness = engine.physics.dayBrightness || 1.0;
+                document.getElementById('day-indicator').textContent = brightness > 0.5 ? '☀️' : '🌙';
+                
+                // v4.3: Update population history for sparkline
+                populationHistory.worm.push(wormCount);
+                populationHistory.fish.push(fishCount);
+                populationHistory.bug.push(bugCount);
+                populationHistory.bird.push(birdCount);
+                
+                // Keep only last 60 data points
+                if (populationHistory.worm.length > 60) populationHistory.worm.shift();
+                if (populationHistory.fish.length > 60) populationHistory.fish.shift();
+                if (populationHistory.bug.length > 60) populationHistory.bug.shift();
+                if (populationHistory.bird.length > 60) populationHistory.bird.shift();
+                
+                // Render sparkline if visible
+                const sparklineDiv = document.getElementById('population-sparkline');
+                if (sparklineDiv.classList.contains('visible')) {
+                    renderSparkline();
+                }
             }
+        }
+        
+        // v4.3: Render population sparkline
+        function renderSparkline() {
+            const canvas = document.getElementById('sparkline-canvas');
+            const ctx = canvas.getContext('2d');
+            const width = canvas.width;
+            const height = canvas.height;
+            
+            // Clear
+            ctx.clearRect(0, 0, width, height);
+            
+            // Find max population for scaling
+            const maxPop = Math.max(
+                Math.max(...populationHistory.worm, 1),
+                Math.max(...populationHistory.fish, 1),
+                Math.max(...populationHistory.bug, 1),
+                Math.max(...populationHistory.bird, 1),
+                10 // Minimum scale
+            );
+            
+            // Draw lines for each creature type
+            const drawLine = (history, color) => {
+                if (history.length < 2) return;
+                
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                
+                const xStep = width / 60;
+                const yScale = height / maxPop;
+                
+                for (let i = 0; i < history.length; i++) {
+                    const x = i * xStep;
+                    const y = height - (history[i] * yScale);
+                    
+                    if (i === 0) {
+                        ctx.moveTo(x, y);
+                    } else {
+                        ctx.lineTo(x, y);
+                    }
+                }
+                
+                ctx.stroke();
+            };
+            
+            drawLine(populationHistory.worm, '#ff6688'); // Pink for worm
+            drawLine(populationHistory.fish, '#ffaa33'); // Orange for fish
+            drawLine(populationHistory.bug, '#66ff44');  // Green for bug
+            drawLine(populationHistory.bird, '#4488ff'); // Blue for bird
         }
         
         setInterval(updateEcosystemHUD, 1000);
