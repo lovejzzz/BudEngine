@@ -10609,6 +10609,18 @@ class PixelPhysics {
      * @private
      */
     simulatePowder(x, y, mat, id) {
+        // v5.3: Check if powder is in liquid - if so, add horizontal drift for dispersal effect
+        const belowIdx = this.index(x, y + 1);
+        const belowId = this.inBounds(x, y + 1) ? this.grid[belowIdx] : 0;
+        const inLiquid = belowId !== 0 && this.stateArr[belowId] === 2;
+        
+        // v5.3: Powder in liquid disperses horizontally (40% chance) before falling
+        if (inLiquid && Math.random() < 0.4) {
+            const driftDir = Math.random() < 0.5 ? -1 : 1;
+            if (this.tryMove(x, y, x + driftDir, y, id)) return;
+            if (this.tryMove(x, y, x - driftDir, y, id)) return;
+        }
+        
         // Try to fall straight down
         if (this.tryMove(x, y, x, y + 1, id)) return;
         
@@ -10648,8 +10660,39 @@ class PixelPhysics {
      * @private
      */
     simulateGas(x, y, mat, id) {
-        // v5.1: Fire at ceiling or surrounded by non-air dies faster
         const myIdx = this.index(x, y);
+        
+        // v5.3: Gas absorption in water - smoke and CO2 can dissolve
+        const adjacentCells = [
+            [x, y+1], [x, y-1], [x-1, y], [x+1, y]
+        ];
+        for (const [nx, ny] of adjacentCells) {
+            if (!this.inBounds(nx, ny)) continue;
+            const nidx = this.index(nx, ny);
+            const nid = this.grid[nidx];
+            if (nid === 0) continue;
+            const nmat = this.getMaterial(nid);
+            if (!nmat || this.stateArr[nid] !== 2) continue; // Only check liquids
+            
+            // Smoke absorption: 5% chance to be absorbed by water
+            if (mat.name === 'smoke' && nmat.name === 'water' && Math.random() < 0.05) {
+                this.grid[myIdx] = 0;
+                this.temperatureGrid[myIdx] = this.ambientTemp;
+                this.lifetimeGrid[myIdx] = 0;
+                // TODO: Could darken the water slightly here
+                return;
+            }
+            
+            // CO2 absorption: 1% chance (carbonated water effect)
+            if (mat.name === 'co2' && nmat.name === 'water' && Math.random() < 0.01) {
+                this.grid[myIdx] = nid; // Convert CO2 to water
+                this.temperatureGrid[myIdx] = this.temperatureGrid[nidx];
+                this.lifetimeGrid[myIdx] = 0;
+                return;
+            }
+        }
+        
+        // v5.1: Fire at ceiling or surrounded by non-air dies faster
         if (mat.heatEmission > 0 && mat.lifetime) {
             // Can't rise? Burn out faster
             const aboveBlocked = !this.inBounds(x, y - 1) || this.grid[this.index(x, y - 1)] !== 0;
@@ -10748,8 +10791,8 @@ class PixelPhysics {
         if (state2 === 1) return false; // solid
         
         // v3.2: Density-based displacement (use flat arrays)
-        // liquids (2) and gases (3) can be displaced
-        const canDisplace = (state2 === 2 || state2 === 3) && this.densityArr[id1] > this.densityArr[id2];
+        // liquids (2), gases (3), and powders (4) can be displaced by denser materials
+        const canDisplace = (state2 === 2 || state2 === 3 || state2 === 4) && this.densityArr[id1] > this.densityArr[id2];
         
         if (canDisplace) {
             // Swap
@@ -10784,6 +10827,25 @@ class PixelPhysics {
                         x: x2,
                         y: y2
                     });
+                }
+            }
+            
+            // v5.3: Add horizontal randomization to displaced material for more visible mixing
+            // This prevents displaced liquids from forming perfect columns
+            if (state2 === 2 && Math.random() < 0.3) { // 30% chance for liquids
+                const pushDir = Math.random() < 0.5 ? -1 : 1;
+                const pushIdx = this.index(x1 + pushDir, y1);
+                if (this.inBounds(x1 + pushDir, y1) && this.grid[pushIdx] === 0) {
+                    // Move the displaced material horizontally
+                    this.grid[pushIdx] = this.grid[idx1];
+                    this.temperatureGrid[pushIdx] = this.temperatureGrid[idx1];
+                    this.lifetimeGrid[pushIdx] = this.lifetimeGrid[idx1];
+                    
+                    this.grid[idx1] = 0;
+                    this.temperatureGrid[idx1] = this.ambientTemp;
+                    this.lifetimeGrid[idx1] = 0;
+                    
+                    this.activateChunk(x1 + pushDir, y1);
                 }
             }
             
