@@ -5036,6 +5036,7 @@ class DebugSystem {
         bottomY += 20;
         this.drawTextWithBackground(ctx, `Memory: ${totalMemory.toFixed(1)} KB`, 10, bottomY, '#cccccc');
 
+        /*
         // v4.6: Draw creature positions as tiny dots
         if (this.overlay && physics.creaturePositions) {
             ctx.fillStyle = 'rgba(255, 255, 0, 0.6)';
@@ -5047,6 +5048,7 @@ class DebugSystem {
                 }
             }
         }
+        */
 
         ctx.restore();
     }
@@ -7636,6 +7638,7 @@ class PixelPhysics {
             consumesO2: true
         });
 
+        /*
         // FISH (lives in water, eats plants)
         this.material('fish', {
             state: 'liquid', // Behaves like liquid (swims)
@@ -7688,7 +7691,9 @@ class PixelPhysics {
             consumesO2: true,
             viscosity: 0.6
         });
+        */
 
+        /*
         // BUG (walks on surfaces, eats plants)
         this.material('bug', {
             state: 'solid',
@@ -7741,7 +7746,9 @@ class PixelPhysics {
             diesInWater: true,
             consumesO2: true
         });
+        */
 
+        /*
         // BIRD (v4.3 - flies in air, eats bugs, apex predator)
         this.material('bird', {
             state: 'solid',
@@ -7794,6 +7801,7 @@ class PixelPhysics {
             diesInWater: true,
             consumesO2: true
         });
+        */
 
         // ANT (v4.5 - social builder, carries dirt, constructs tunnels)
         this.material('ant', {
@@ -8956,12 +8964,14 @@ class PixelPhysics {
                             this.totalCreatures++;
                         }
                         
+                        /*
                         // v4.1: Creature simulation (every few frames for performance)
                         if (mat.creature && this.frameCount % 3 === 0) {
                             this.simulateCreature(x, y, mat, idx);
                             // Keep chunk alive while creatures exist in it
                             this.activateChunk(x, y);
                         }
+                        */
                         */
                         
                         // v3.9: Ecosystem simulation (enhanced biology)
