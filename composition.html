@@ -136,7 +136,7 @@
         </div>
     </div>
 
-    <script src="bud.js?v=58"></script>
+    <script src="bud.js?v=59"></script>
     <script>
         // The Composition v4.4
         // Your instrument is the Earth
@@ -174,6 +174,7 @@
 
         // v4.4: Initialize PixelUI (replaces ALL HTML UI)
         const pixelUI = new PixelUI(engine);
+        window.pixelUI = pixelUI; // expose for debugging
 
         // Touch/mouse input state
         let isDrawing = false;
@@ -286,7 +287,12 @@
 
             draw(ctx) {
                 // v4.4: Render PixelUI on top of everything
+                ctx.save();
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                ctx.globalAlpha = 1;
+                ctx.globalCompositeOperation = 'source-over';
                 pixelUI.render(ctx);
+                ctx.restore();
             }
         });
 
