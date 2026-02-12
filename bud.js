@@ -12076,16 +12076,18 @@ class PixelUI {
         
         // Material swatches (pre-rendered for performance)
         this.materialSwatches = new Map();
-        this.swatchSize = 20;
-        
-        // UI layout (dimensions in pixels)
-        this.swatchGap = 2;
-        this.gridCols = 4;
+        // UI layout — scale to screen width
+        const screenW = this.engine.config.width || 400;
+        this.swatchGap = 3;
+        this.gridCols = 8; // 8 columns × 2 rows = 16 materials
+        this.swatchSize = Math.floor((screenW - 20) / this.gridCols - this.swatchGap); // fill width
+        if (this.swatchSize > 60) this.swatchSize = 60; // cap
+        if (this.swatchSize < 30) this.swatchSize = 30; // min
         this.gridRows = Math.ceil(this.materials.length / this.gridCols);
-        this.paletteHeight = this.gridRows * (this.swatchSize + this.swatchGap) + 8;
-        this.buttonHeight = 28;
+        this.paletteHeight = this.gridRows * (this.swatchSize + this.swatchGap) + 10;
+        this.buttonHeight = 36;
         this.paletteOpen = true;
-        this.hudHeight = 40;
+        this.hudHeight = 44;
         
         // Touch state
         this.lastTouchX = 0;
@@ -12265,33 +12267,34 @@ class PixelUI {
         
         // Creature counts with icons (second row)
         let creatureX = 10;
-        const creatureY = 25;
+        const creatureY = 30;
+        const cs = 2; // creature stat scale
         
         // Worm
-        this.drawCreatureIcon(ctx, creatureX, creatureY, 'worm', 1);
-        this.drawText(ctx, eco.creatures.worm || 0, creatureX + 8, creatureY, '#ff8877', 1);
-        creatureX += 25;
+        this.drawCreatureIcon(ctx, creatureX, creatureY, 'worm', cs);
+        this.drawText(ctx, '' + (eco.creatures.worm || 0), creatureX + 14, creatureY, '#ff8877', cs);
+        creatureX += 40;
         
         // Fish
-        this.drawCreatureIcon(ctx, creatureX, creatureY, 'fish', 1);
-        this.drawText(ctx, eco.creatures.fish || 0, creatureX + 8, creatureY, '#ffaa33', 1);
-        creatureX += 25;
+        this.drawCreatureIcon(ctx, creatureX, creatureY, 'fish', cs);
+        this.drawText(ctx, '' + (eco.creatures.fish || 0), creatureX + 14, creatureY, '#ffaa33', cs);
+        creatureX += 40;
         
         // Bug
-        this.drawCreatureIcon(ctx, creatureX, creatureY, 'bug', 1);
-        this.drawText(ctx, eco.creatures.bug || 0, creatureX + 8, creatureY, '#66ff44', 1);
-        creatureX += 25;
+        this.drawCreatureIcon(ctx, creatureX, creatureY, 'bug', cs);
+        this.drawText(ctx, '' + (eco.creatures.bug || 0), creatureX + 14, creatureY, '#66ff44', cs);
+        creatureX += 40;
         
         // Bird
-        this.drawCreatureIcon(ctx, creatureX, creatureY, 'bird', 1);
-        this.drawText(ctx, eco.creatures.bird || 0, creatureX + 8, creatureY, '#4488ff', 1);
-        creatureX += 30;
+        this.drawCreatureIcon(ctx, creatureX, creatureY, 'bird', cs);
+        this.drawText(ctx, '' + (eco.creatures.bird || 0), creatureX + 14, creatureY, '#4488ff', cs);
+        creatureX += 45;
         
         // O₂ percentage
         const o2Val = parseFloat(eco.atmosphere.oxygen) || 0;
         const o2Pct = Math.round((o2Val / 600) * 100);
-        this.drawText(ctx, 'O:' + o2Pct + '%', creatureX, creatureY, '#88ccff', 1);
-        creatureX += 40;
+        this.drawText(ctx, 'O:' + o2Pct + '%', creatureX, creatureY, '#88ccff', cs);
+        creatureX += 60;
         
         // Health indicator (heart with color)
         const creatureTypes = [
@@ -12308,13 +12311,13 @@ class PixelUI {
         } else if (creatureTypes >= 2 || (o2Pct >= 40 && o2Pct <= 60)) {
             heartColor = '#ffff44'; // Yellow (stressed)
         }
-        this.drawText(ctx, '♥', creatureX, creatureY, heartColor, 1);
-        creatureX += 10;
+        this.drawText(ctx, '♥', creatureX, creatureY, heartColor, cs);
+        creatureX += 15;
         
         // Day/night indicator
         const brightness = this.physics.dayBrightness || 1.0;
         const dayIcon = brightness > 0.5 ? '☀' : '☾';
-        this.drawText(ctx, dayIcon, creatureX, creatureY, '#ffdd88', 1);
+        this.drawText(ctx, dayIcon, creatureX, creatureY, '#ffdd88', cs);
     }
     
     /**
