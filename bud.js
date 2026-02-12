@@ -10290,29 +10290,49 @@ class PixelPhysics {
             return;
         }
         
-        // Normal combustion
-        this.grid[idx] = this.getMaterialId('fire');
+        const fireId = this.getMaterialId('fire');
+        const fireMat = this.getMaterial(fireId);
+        
+        // Convert this cell to fire
+        this.grid[idx] = fireId;
         this.temperatureGrid[idx] = 800;
-        const fireMat = this.getMaterial(this.grid[idx]);
         if (fireMat && fireMat.lifetime) {
             const [min, max] = fireMat.lifetime;
             this.lifetimeGrid[idx] = min + Math.random() * (max - min);
         }
         
-        // Release combustion energy as heat to neighbors
-        if (mat.combustionEnergy) {
-            const neighbors = [
-                [x - 1, y], [x + 1, y],
-                [x, y - 1], [x, y + 1]
-            ];
-            
-            for (let [nx, ny] of neighbors) {
-                if (!this.inBounds(nx, ny)) continue;
-                
-                const nidx = this.index(nx, ny);
-                this.temperatureGrid[nidx] += mat.combustionEnergy * 10;
+        // v5.0: Spawn fire in adjacent empty cells (fire spreads outward from fuel)
+        const dirs = [
+            [x-1,y], [x+1,y], [x,y-1], [x,y+1],
+            [x-1,y-1], [x+1,y-1]  // Especially upward diagonals
+        ];
+        for (const [nx, ny] of dirs) {
+            if (!this.inBounds(nx, ny)) continue;
+            const nidx = this.index(nx, ny);
+            if (this.grid[nidx] === 0 && Math.random() < 0.5) {
+                // Spawn fire in empty neighbor
+                this.grid[nidx] = fireId;
+                this.temperatureGrid[nidx] = 700;
+                if (fireMat && fireMat.lifetime) {
+                    const [min, max] = fireMat.lifetime;
+                    this.lifetimeGrid[nidx] = min + Math.random() * (max - min);
+                }
                 this.heatSources.add(nidx);
+                this.activateChunk(nx, ny);
             }
+        }
+        
+        // Release combustion energy as heat to ALL neighbors (including diagonal)
+        const energy = mat.combustionEnergy || 10;
+        const allNeighbors = [
+            [x-1,y], [x+1,y], [x,y-1], [x,y+1],
+            [x-1,y-1], [x+1,y-1], [x-1,y+1], [x+1,y+1]
+        ];
+        for (const [nx, ny] of allNeighbors) {
+            if (!this.inBounds(nx, ny)) continue;
+            const nidx = this.index(nx, ny);
+            this.temperatureGrid[nidx] += energy * 15;
+            this.heatSources.add(nidx);
         }
     }
 
