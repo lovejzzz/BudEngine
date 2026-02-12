@@ -6256,7 +6256,7 @@ class PixelPhysics {
             density: 0.6, // very light, rises fast
             temperature: 100,
             meltingPoint: null,
-            boilingPoint: null,
+            boilingPoint: 100,
             ignitionPoint: null,
             thermalConductivity: 0.024,
             specificHeat: 2.01,
@@ -6646,7 +6646,7 @@ class PixelPhysics {
             mineral: true,
             noble: false,
             volatile: false,
-            oxidationProduct: 'dirt',  // Rust → reddish dirt (no rust material)
+            oxidationProduct: 'rust',
             // Acoustic properties
             speedOfSound: 5960,
             acousticImpedance: 46.9,
@@ -6659,6 +6659,46 @@ class PixelPhysics {
             flowSound: null,
             ambientSound: null,
             phaseChangeSound: 'sizzle'
+        });
+
+        // RUST (Iron Oxide)
+        this.material('rust', {
+            state: 'solid',
+            density: 5200,
+            temperature: 20,
+            meltingPoint: 1500,
+            boilingPoint: null,
+            ignitionPoint: null,
+            thermalConductivity: 2.0,
+            specificHeat: 0.65,
+            flammability: 0,
+            hardness: 1, // much weaker than iron
+            electricConductivity: 0.01, // poor conductor
+            pH: null,
+            reactivity: 0,
+            solubility: null,
+            color: ['#8b3a1a', '#a0451f', '#6b2d14', '#994020'],
+            immovable: false, // rust crumbles
+            metal: false,
+            // v5.0: Universal chemistry properties
+            oxidizer: false,
+            reducer: false,
+            organic: false,
+            mineral: true,
+            noble: true, // rust doesn't react further
+            volatile: false,
+            // Acoustic properties
+            speedOfSound: 2500,
+            acousticImpedance: 13.0,
+            absorptionCoeff: 0.15,
+            youngsModulus: 50e9,
+            resonanceFreq: 400,
+            dampening: 0.3,
+            brightness: 0.4,
+            impactSound: 'thud',
+            flowSound: null,
+            ambientSound: null,
+            phaseChangeSound: null
         });
 
         // ========== FLAMMABLE MATERIALS ==========
@@ -7228,6 +7268,7 @@ class PixelPhysics {
             immovable: false,
             organic: true,
             living: true,
+            photosynthetic: true,
             combustionProducts: ['smoke', 'co2'],
             combustionEnergy: 8,
             // v5.0: Universal chemistry properties
@@ -7279,6 +7320,7 @@ class PixelPhysics {
             immovable: false,
             organic: true,
             living: true,
+            photosynthetic: true,
             combustionProducts: ['smoke', 'co2'],
             combustionEnergy: 10,
             // v5.0: Universal chemistry properties
@@ -7430,6 +7472,7 @@ class PixelPhysics {
             immovable: false,
             organic: true,
             living: true,
+            photosynthetic: true,
             combustionProducts: ['smoke'],
             combustionEnergy: 5,
             // v5.0: Universal chemistry properties
@@ -8049,6 +8092,24 @@ class PixelPhysics {
                     const dirtIdx = matA.name === 'dirt' ? idxA : idxB;
                     this.grid[waterIdx] = 0; // water absorbed
                     this.grid[dirtIdx] = this.getMaterialId('mud');
+                }
+            }
+        });
+
+        // ========== PHOTOSYNTHESIS: photosynthetic material + CO₂ → oxygen (with light) ==========
+        this.reactionRules.push({
+            condition: (matA, matB) => {
+                return (matA.photosynthetic && matB.name === 'co2') ||
+                       (matB.photosynthetic && matA.name === 'co2');
+            },
+            react: (x, y, matA, matB, idxA, idxB) => {
+                // Only react if there's light above the plant
+                if (!this.hasLightAbove(x, y)) return;
+                
+                // Slow reaction, ~1% chance per frame
+                if (Math.random() < 0.01) {
+                    const co2Idx = matA.name === 'co2' ? idxA : idxB;
+                    this.grid[co2Idx] = this.getMaterialId('oxygen');
                 }
             }
         });
@@ -13361,9 +13422,9 @@ class PixelUI {
                 this.drawText(ctx, mat.name[0].toUpperCase(), x + 1, y + 1, '#ffffff', 0.8);
             }
             
-            // Draw tiny label below each swatch
-            const label = mat.name.substring(0, 3).toUpperCase();
-            this.drawText(ctx, label, x + 1, y + this.swatchSize + 1, '#888888', 0.5);
+            // Draw material name label below each swatch (full name, larger text)
+            const label = mat.name.toUpperCase();
+            this.drawText(ctx, label, x + this.swatchSize / 2, y + this.swatchSize + 2, '#cccccc', 0.7);
         });
     }
     
