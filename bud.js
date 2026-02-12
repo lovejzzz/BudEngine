@@ -10614,11 +10614,28 @@ class PixelPhysics {
         const belowId = this.inBounds(x, y + 1) ? this.grid[belowIdx] : 0;
         const inLiquid = belowId !== 0 && this.stateArr[belowId] === 2;
         
-        // v5.3: Powder in liquid disperses horizontally (40% chance) before falling
-        if (inLiquid && Math.random() < 0.4) {
-            const driftDir = Math.random() < 0.5 ? -1 : 1;
-            if (this.tryMove(x, y, x + driftDir, y, id)) return;
-            if (this.tryMove(x, y, x - driftDir, y, id)) return;
+        if (inLiquid) {
+            // v5.4: Physics-based dispersal - lighter powders drift more in liquid
+            // Heavy powder in light liquid = fast sinking, little drift
+            // Light powder in heavy liquid = more drift (buoyancy resistance)
+            const powderDensity = this.densityArr[id];
+            const liquidDensity = this.densityArr[belowId];
+            const liquidViscosity = this.viscosityArr[belowId];
+            
+            // Density ratio determines base drift (lighter powder drifts more)
+            const baseDrift = 1.0 - (powderDensity / (powderDensity + liquidDensity));
+            // Viscosity reduces drift (thicker liquid = less horizontal movement)
+            const driftChance = baseDrift * (1 - liquidViscosity);
+            
+            // Viscous liquid slows powder sinking (gets stuck in thick liquid)
+            if (Math.random() < liquidViscosity * 0.5) return; // stuck this frame
+            
+            // Try horizontal drift before falling
+            if (Math.random() < driftChance) {
+                const driftDir = Math.random() < 0.5 ? -1 : 1;
+                if (this.tryMove(x, y, x + driftDir, y, id)) return;
+                if (this.tryMove(x, y, x - driftDir, y, id)) return;
+            }
         }
         
         // Try to fall straight down
@@ -10791,8 +10808,9 @@ class PixelPhysics {
         if (state2 === 1) return false; // solid
         
         // v3.2: Density-based displacement (use flat arrays)
-        // liquids (2), gases (3), and powders (4) can be displaced by denser materials
-        const canDisplace = (state2 === 2 || state2 === 3 || state2 === 4) && this.densityArr[id1] > this.densityArr[id2];
+        // Only liquids (2) and gases (3) can be displaced by denser materials
+        // Powders (4) cannot displace other powders (sand shouldn't fall through dirt)
+        const canDisplace = (state2 === 2 || state2 === 3) && this.densityArr[id1] > this.densityArr[id2];
         
         if (canDisplace) {
             // Swap
