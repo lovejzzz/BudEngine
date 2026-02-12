@@ -6350,7 +6350,7 @@ class PixelPhysics {
             reactivity: 0,
             solubility: null,
             color: ['#88ccff40', '#99ddff50', '#aaeeff48'],
-            immovable: true,
+            immovable: false,
             alpha: 0.3,
             // v5.0: Universal chemistry properties
             oxidizer: false,
@@ -6390,7 +6390,7 @@ class PixelPhysics {
             reactivity: 0,
             solubility: null,
             color: ['#4a4a4a', '#555555', '#3f3f3f', '#5a5a5a'],
-            immovable: true,
+            immovable: false,
             liquidForm: 'lava',
             // v5.0: Universal chemistry properties (calcium carbonate)
             oxidizer: false,
@@ -6475,7 +6475,7 @@ class PixelPhysics {
             reactivity: 0,
             solubility: null,
             color: ['#1a1a1a', '#0f0f0f', '#252525'],
-            immovable: true,
+            immovable: false,
             liquidForm: 'lava',
             // v5.0: Universal chemistry properties
             oxidizer: false,
@@ -6637,7 +6637,7 @@ class PixelPhysics {
             reactivity: 0.4, // reacts with acids
             solubility: null,
             color: ['#888888', '#999999', '#777777'],
-            immovable: true,
+            immovable: false,
             metal: true,
             // v5.0: Universal chemistry properties
             oxidizer: false,
@@ -6720,7 +6720,7 @@ class PixelPhysics {
             reactivity: 0,
             solubility: null,
             color: ['#8b4513', '#a0522d', '#7a3f0f', '#9a5523'],
-            immovable: true,
+            immovable: false,
             combustionProducts: ['smoke', 'fire', 'ash', 'co2'],
             combustionEnergy: 16, // MJ/kg
             decompositionProducts: ['charcoal'],
@@ -6763,7 +6763,7 @@ class PixelPhysics {
             reactivity: 0.2,
             solubility: null,
             color: ['#1a1a1a', '#2a2a2a', '#0f0f0f'],
-            immovable: true,
+            immovable: false,
             combustionProducts: ['smoke', 'fire', 'ash', 'co2'],
             combustionEnergy: 24,
             // v5.0: Universal chemistry properties
@@ -6929,7 +6929,7 @@ class PixelPhysics {
             reactivity: 0.2,
             solubility: null,
             color: ['#1a1a1a', '#252525', '#0f0f0f', '#202020'],
-            immovable: true,
+            immovable: false,
             combustionProducts: ['fire', 'smoke', 'ash'],
             combustionEnergy: 30, // Higher than wood
             // v5.0: Universal chemistry properties
@@ -8966,8 +8966,44 @@ class PixelPhysics {
                         } else if (state === 3) { // gas
                             this.simulateGas(x, y, mat, id);
                         } else if (state === 1) { // solid
-                            // Solids mostly don't move
-                            // But check for reactions
+                            // v5.4: Solids fall with gravity unless immovable or supported
+                            if (!mat.immovable) {
+                                // Try to fall straight down
+                                const below = y + 1;
+                                if (this.inBounds(x, below)) {
+                                    const belowIdx = this.index(x, below);
+                                    const belowId = this.grid[belowIdx];
+                                    if (belowId === 0) {
+                                        // Empty below — fall
+                                        this.grid[belowIdx] = id;
+                                        this.temperatureGrid[belowIdx] = this.temperatureGrid[idx];
+                                        this.lifetimeGrid[belowIdx] = this.lifetimeGrid[idx];
+                                        this.grid[idx] = 0;
+                                        this.temperatureGrid[idx] = this.ambientTemp;
+                                        this.lifetimeGrid[idx] = 0;
+                                        this.activateChunk(x, below);
+                                        this.activateChunk(x, y);
+                                        continue; // skip reactions for this frame
+                                    }
+                                    // Can also displace liquids and gases (density-based)
+                                    const belowState = this.stateArr[belowId];
+                                    if ((belowState === 2 || belowState === 3) && this.densityArr[id] > this.densityArr[belowId]) {
+                                        // Swap with lighter material below
+                                        const tempTemp = this.temperatureGrid[idx];
+                                        const tempLife = this.lifetimeGrid[idx];
+                                        this.grid[idx] = belowId;
+                                        this.temperatureGrid[idx] = this.temperatureGrid[belowIdx];
+                                        this.lifetimeGrid[idx] = this.lifetimeGrid[belowIdx];
+                                        this.grid[belowIdx] = id;
+                                        this.temperatureGrid[belowIdx] = tempTemp;
+                                        this.lifetimeGrid[belowIdx] = tempLife;
+                                        this.activateChunk(x, below);
+                                        this.activateChunk(x, y);
+                                        continue;
+                                    }
+                                }
+                            }
+                            // Check for reactions
                             this.checkReactions(x, y, mat, idx, id);
                         }
                         
