@@ -7803,6 +7803,7 @@ class PixelPhysics {
         });
         */
 
+        /* v5.5: creatures disabled
         // ANT (v4.5 - social builder, carries dirt, constructs tunnels)
         this.material('ant', {
             state: 'solid',
@@ -8971,7 +8972,6 @@ class PixelPhysics {
                             // Keep chunk alive while creatures exist in it
                             this.activateChunk(x, y);
                         }
-                        */
                         */
                         
                         // v3.9: Ecosystem simulation (enhanced biology)
