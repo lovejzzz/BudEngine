@@ -8065,6 +8065,31 @@ class PixelPhysics {
         // ========== 9. THERMAL DECOMPOSITION: handled in temperature update loop, not here ==========
         // (This reaction doesn't need a neighbor, just high temperature)
 
+        // ========== 9b. WATER EXTINGUISHES FIRE: liquid + hot gas → steam (fire goes out) ==========
+        this.reactionRules.push({
+            condition: (matA, matB) => {
+                // Liquid (low boiling point like water) touching hot gas (fire/flame)
+                return (matA.state === 'liquid' && matA.boilingPoint <= 100 && matB.state === 'gas' && matB.heatEmission > 0) ||
+                       (matB.state === 'liquid' && matB.boilingPoint <= 100 && matA.state === 'gas' && matA.heatEmission > 0);
+            },
+            react: (x, y, matA, matB, idxA, idxB) => {
+                // Water extinguishes fire on contact — always
+                const fireIdx = (matA.state === 'gas' && matA.heatEmission > 0) ? idxA : idxB;
+                const waterIdx = (matA.state === 'gas' && matA.heatEmission > 0) ? idxB : idxA;
+                const waterMat = (matA.state === 'gas' && matA.heatEmission > 0) ? matB : matA;
+                
+                // Fire → steam
+                this.grid[fireIdx] = this.getMaterialId(waterMat.gasForm || 'steam');
+                this.temperatureGrid[fireIdx] = 100;
+                this.lifetimeGrid[fireIdx] = 1.0 + Math.random() * 1.5;
+                
+                // Cool surrounding area
+                this.temperatureGrid[waterIdx] = Math.max(this.temperatureGrid[waterIdx] - 200, 0);
+                this.heatSources.delete(fireIdx);
+                this.activateChunk(x, y);
+            }
+        });
+
         // ========== 10. WATER + LAVA type: liquid with low boilingPoint + very hot material ==========
         this.reactionRules.push({
             condition: (matA, matB) => {
