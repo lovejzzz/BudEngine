@@ -5897,6 +5897,9 @@ class PixelPhysics {
         this.nextMaterialId = 1;
         this.MAX_MATERIALS = 256; // Max material types (Uint8)
         
+        // v4.6: Pre-cached RGB values for materials (performance optimization)
+        this.materialRGBCache = new Map(); // materialId -> [{r, g, b, a}, ...]
+        
         // Simulation grids (typed arrays for performance)
         this.grid = null;              // Uint8Array - material IDs
         this.temperatureGrid = null;   // Float32Array - temperature in °C
@@ -6107,6 +6110,10 @@ class PixelPhysics {
         console.log(`[PixelPhysics v3.5] Cell-based lighting system initialized: ${this.gridWidth}x${this.gridHeight} light map`);
         
         this.initialized = true;
+        
+        // v4.6: Build RGB cache for all materials
+        this.buildMaterialRGBCache();
+        
         console.log(`[PixelPhysics v3.5] Initialized ${this.gridWidth}x${this.gridHeight} grid (cell size: ${cellSize}px)`);
         console.log('[PixelPhysics v3.5] Property-based emergent physics enabled');
         console.log('[PixelPhysics v3.5] Temperature simulation active');
@@ -7463,6 +7470,33 @@ class PixelPhysics {
             diesInWater: true,
             consumesO2: true
         });
+    }
+
+    /**
+     * Build pre-cached RGB values for all materials (performance optimization)
+     * Converts hex colors to {r, g, b, a} objects to avoid repeated parsing in render loop
+     * @private
+     */
+    buildMaterialRGBCache() {
+        this.materialRGBCache.clear();
+        
+        for (const [id, mat] of this.materials) {
+            const rgbColors = [];
+            
+            for (const hexColor of mat.color) {
+                const hex = hexColor.replace('#', '');
+                const r = parseInt(hex.slice(0, 2), 16);
+                const g = parseInt(hex.slice(2, 4), 16);
+                const b = parseInt(hex.slice(4, 6), 16);
+                const a = hex.length === 8 ? parseInt(hex.slice(6, 8), 16) : 255;
+                
+                rgbColors.push({ r, g, b, a });
+            }
+            
+            this.materialRGBCache.set(id, rgbColors);
+        }
+        
+        console.log(`[PixelPhysics v4.6] Pre-cached RGB colors for ${this.materialRGBCache.size} materials`);
     }
 
     /**
@@ -10202,6 +10236,9 @@ class PixelPhysics {
         // Update image data from grid WITH LIGHTING applied directly
         const pixels = this.imageData.data;
         
+        // v4.6: Collect creature positions during render (avoid second grid scan for glow)
+        const creaturePositions = [];
+        
         for (let y = 0; y < this.gridHeight; y++) {
             for (let x = 0; x < this.gridWidth; x++) {
                 const idx = this.index(x, y);
@@ -10221,14 +10258,14 @@ class PixelPhysics {
                 } else if (mat && mat.name !== 'air') {
                     // Normal material rendering
                     const colorIdx = Math.abs(Math.floor(Math.sin(x * 12.9898 + y * 78.233) * 43758.5453)) % mat.color.length;
-                    const color = mat.color[colorIdx];
                     
-                    // Parse hex color
-                    const hex = color.replace('#', '');
-                    let r = parseInt(hex.slice(0, 2), 16);
-                    let g = parseInt(hex.slice(2, 4), 16);
-                    let b = parseInt(hex.slice(4, 6), 16);
-                    const a = hex.length === 8 ? parseInt(hex.slice(6, 8), 16) : 255;
+                    // v4.6: Use pre-cached RGB values (no hex parsing!)
+                    const rgbCache = this.materialRGBCache.get(id);
+                    const cachedColor = rgbCache[colorIdx];
+                    let r = cachedColor.r;
+                    let g = cachedColor.g;
+                    let b = cachedColor.b;
+                    const a = cachedColor.a;
                     
                     // v4.3: Enhanced fertile soil visualization - blend toward target colors
                     if (mat.name === 'dirt' && this.fertilityGrid) {
@@ -10283,6 +10320,9 @@ class PixelPhysics {
                     // v4.2: Multi-pixel rendering for creatures (make them VISIBLE!)
                     if (mat.creature) {
                         const creatureType = mat.creatureType;
+                        
+                        // v4.6: Collect position for glow effect (avoid second grid scan)
+                        creaturePositions.push({ x, y, creatureType });
                         
                         if (creatureType === 'worm') {
                             // Draw worm as 2 pixels: current + 1 to the right (or left at edge)
@@ -10385,38 +10425,29 @@ class PixelPhysics {
         // Put image data to offscreen canvas
         this.offscreenCtx.putImageData(this.imageData, 0, 0);
         
-        // v4.3.2: Creature glow effect for better visibility
+        // v4.6: Creature glow effect using pre-collected positions (no second grid scan!)
         this.offscreenCtx.save();
-        for (let y = 0; y < this.gridHeight; y++) {
-            for (let x = 0; x < this.gridWidth; x++) {
-                const idx = this.index(x, y);
-                const id = this.grid[idx];
-                const mat = this.getMaterial(id);
-                
-                if (mat && mat.creature) {
-                    const creatureType = mat.creatureType;
-                    let glowColor;
-                    
-                    // Assign glow colors based on creature type
-                    if (creatureType === 'worm') {
-                        glowColor = 'rgba(255, 136, 119, 0.3)';
-                    } else if (creatureType === 'fish') {
-                        glowColor = 'rgba(255, 170, 51, 0.3)';
-                    } else if (creatureType === 'bug') {
-                        glowColor = 'rgba(102, 255, 68, 0.3)';
-                    } else if (creatureType === 'bird') {
-                        glowColor = 'rgba(68, 136, 255, 0.4)'; // Birds are brighter
-                    } else if (creatureType === 'ant') {
-                        glowColor = 'rgba(139, 69, 19, 0.3)'; // Brown glow
-                    }
-                    
-                    if (glowColor) {
-                        this.offscreenCtx.fillStyle = glowColor;
-                        this.offscreenCtx.beginPath();
-                        this.offscreenCtx.arc(x, y, 3.5, 0, Math.PI * 2);
-                        this.offscreenCtx.fill();
-                    }
-                }
+        for (const { x, y, creatureType } of creaturePositions) {
+            let glowColor;
+            
+            // Assign glow colors based on creature type
+            if (creatureType === 'worm') {
+                glowColor = 'rgba(255, 136, 119, 0.3)';
+            } else if (creatureType === 'fish') {
+                glowColor = 'rgba(255, 170, 51, 0.3)';
+            } else if (creatureType === 'bug') {
+                glowColor = 'rgba(102, 255, 68, 0.3)';
+            } else if (creatureType === 'bird') {
+                glowColor = 'rgba(68, 136, 255, 0.4)'; // Birds are brighter
+            } else if (creatureType === 'ant') {
+                glowColor = 'rgba(139, 69, 19, 0.3)'; // Brown glow
+            }
+            
+            if (glowColor) {
+                this.offscreenCtx.fillStyle = glowColor;
+                this.offscreenCtx.beginPath();
+                this.offscreenCtx.arc(x, y, 3.5, 0, Math.PI * 2);
+                this.offscreenCtx.fill();
             }
         }
         this.offscreenCtx.restore();
@@ -13387,18 +13418,23 @@ class CompositionGame {
      * @param {number} dt - Delta time
      */
     update(dt) {
-        // Update active materials analysis
-        this.analysis.activeMaterials.clear();
+        // v4.6: Update active materials analysis (throttled to every 60 frames for performance)
         const physics = this.physics;
-        if (physics.grid) {
-            for (let i = 0; i < physics.grid.length; i++) {
-                const id = physics.grid[i];
-                if (id !== 0) {
-                    const mat = physics.getMaterial(id);
-                    if (mat) this.analysis.activeMaterials.add(mat.name);
+        if (!this.materialScanFrame) this.materialScanFrame = 0;
+        
+        if (this.materialScanFrame % 60 === 0) {
+            this.analysis.activeMaterials.clear();
+            if (physics.grid) {
+                for (let i = 0; i < physics.grid.length; i++) {
+                    const id = physics.grid[i];
+                    if (id !== 0) {
+                        const mat = physics.getMaterial(id);
+                        if (mat) this.analysis.activeMaterials.add(mat.name);
+                    }
                 }
             }
         }
+        this.materialScanFrame++;
         
         // Check for epoch transitions
         this.updateEpoch();
