@@ -7756,30 +7756,32 @@ class PixelPhysics {
      * @private
      */
     registerReactionRules() {
-        // ========== 1. COMBUSTION: flammable + oxidizer + heat → combustionProducts + energy ==========
+        // ========== 1. COMBUSTION: flammable + oxidizer → combustionProducts + energy ==========
+        // NOTE: condition is checked at table-build time with STATIC properties only.
+        // Temperature check must be in react() since it's dynamic.
         this.reactionRules.push({
             condition: (matA, matB) => {
-                const temp = Math.max(
-                    this.temperatureGrid?.[this.index(0,0)] || 20, 
-                    this.temperatureGrid?.[this.index(0,0)] || 20
-                );
-                return (matA.flammability > 0 && matB.oxidizer && temp > (matA.ignitionPoint || 999)) ||
-                       (matB.flammability > 0 && matA.oxidizer && temp > (matB.ignitionPoint || 999));
+                return (matA.flammability > 0 && matB.oxidizer) ||
+                       (matB.flammability > 0 && matA.oxidizer);
             },
             react: (x, y, matA, matB, idxA, idxB) => {
                 const fuelMat = matA.flammability > 0 ? matA : matB;
                 const fuelIdx = matA.flammability > 0 ? idxA : idxB;
-                const chance = fuelMat.flammability * 0.25; // 0.8 flammability = 20% chance
+                
+                // Runtime temperature check — must be hot enough to ignite
+                const temp = this.temperatureGrid[fuelIdx];
+                if (temp < (fuelMat.ignitionPoint || 999)) return;
+                
+                const chance = fuelMat.flammability * 0.25;
                 
                 if (Math.random() < chance && fuelMat.combustionProducts && fuelMat.combustionProducts.length > 0) {
-                    // Convert fuel to combustion product
                     const product = fuelMat.combustionProducts[Math.floor(Math.random() * fuelMat.combustionProducts.length)];
                     this.grid[fuelIdx] = this.getMaterialId(product);
                     
-                    // Add heat from combustion
                     const energy = fuelMat.combustionEnergy || 10;
-                    this.temperatureGrid[fuelIdx] += energy * 30; // Scale to useful temp rise
+                    this.temperatureGrid[fuelIdx] += energy * 30;
                     this.temperatureGrid[fuelIdx] = Math.min(this.temperatureGrid[fuelIdx], 1500);
+                    this.heatSources.add(fuelIdx);
                 }
             }
         });
