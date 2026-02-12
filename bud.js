@@ -10830,12 +10830,12 @@ class PixelPhysics {
                 if (!nmat) continue;
                 // Directly heat flammable neighbors aggressively
                 if (nmat.flammability > 0) {
-                    this.temperatureGrid[nidx] += mat.heatEmission * 0.08; // 8% heat transfer per frame
+                    this.temperatureGrid[nidx] += mat.heatEmission * 0.2; // 20% heat transfer per frame — must be fast since fire rises away
                     this.heatSources.add(nidx);
-                    // Ignite if above 70% of ignition point — fire IS the oxygen source
+                    // Ignite if above 50% of ignition point — fire IS the oxygen source
                     const ignPt = this.ignitionPointArr[nid];
-                    if (ignPt < 999999 && this.temperatureGrid[nidx] >= ignPt * 0.7) {
-                        if (Math.random() < nmat.flammability * 0.25) {
+                    if (ignPt < 999999 && this.temperatureGrid[nidx] >= ignPt * 0.5) {
+                        if (Math.random() < nmat.flammability * 0.35) {
                             this.igniteMaterial(nx, ny, nmat, nidx);
                             this.activateChunk(nx, ny);
                         }
