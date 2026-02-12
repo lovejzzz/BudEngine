@@ -145,7 +145,7 @@
         </div>
     </div>
 
-    <script src="bud.js?v=79"></script>
+    <script src="bud.js?v=80"></script>
     <script>
         // The Composition v4.6
         // Your instrument is the Earth
@@ -298,6 +298,16 @@
             const radius = pixelUI.brushSize || 8;
             const selectedMaterial = pixelUI.getSelectedMaterial();
             engine.physics.circle(x, y, radius, selectedMaterial);
+            
+            // v5.6: Play placement sound
+            if (engine.physics.acoustics && engine.physics.acoustics.ctx) {
+                const matId = engine.physics.getMaterialId(selectedMaterial);
+                const mat = engine.physics.getMaterial(matId);
+                if (mat) {
+                    const soundType = mat.impactSound || 'thud';
+                    engine.physics.acoustics.playImpact(soundType, mat, 0.3, x, y);
+                }
+            }
         }
 
         // Touch events

@@ -7582,6 +7582,8 @@ class PixelPhysics {
 
         // ========== CREATURES (v4.1) ==========
 
+        // v5.5: CREATURES DISABLED — Focus on nature physics first
+        /*
         // WORM (lives in dirt, eats decay, enriches soil)
         this.material('worm', {
             state: 'solid',
@@ -7845,6 +7847,7 @@ class PixelPhysics {
             diesInWater: true,
             consumesO2: true
         });
+        */
     }
 
     /**
@@ -8718,6 +8721,8 @@ class PixelPhysics {
         
         this.frameCount++;
         
+        // v5.5: CREATURES DISABLED — creature counter reset and scanning commented out
+        /*
         // v4.1: Reset creature population counters and wake creature chunks every 60 frames
         if (this.frameCount % 60 === 0) {
             this.creaturePopulation.worm = 0;
@@ -8742,6 +8747,7 @@ class PixelPhysics {
                 }
             }
         }
+        */
         
         // v4.3: Update day/night cycle
         this.dayTime = (this.dayTime + 0.00002 * this.timeScale) % 1;
@@ -8750,6 +8756,8 @@ class PixelPhysics {
         // v4.3: Dynamic ambient temperature based on day/night
         this.ambientTemp = 15 + 10 * this.dayBrightness;
         
+        // v5.5: CREATURES DISABLED — epoch progression counters commented out
+        /*
         // v4.3: Update epoch progression counters
         if (this.totalCreatures > 0) {
             this.creatureMaxAge++;
@@ -8762,10 +8770,16 @@ class PixelPhysics {
         } else {
             this.sustainedTime = 0;
         }
+        */
         
         // v3.9: Update seasonal cycle and weather
         this.updateSeasons(dt);
         this.applyWeather();
+        
+        // v5.6: Ambient wind variation
+        this.windTimer = (this.windTimer || 0) + dt;
+        this.wind.x = Math.sin(this.windTimer * 0.3) * 0.8; // gentle oscillation
+        this.wind.y = Math.sin(this.windTimer * 0.5) * 0.1; // slight vertical
         
         // v3.9: Trigger geological events (rare)
         if (this.frameCount % 60 === 0) {
@@ -8932,6 +8946,8 @@ class PixelPhysics {
                             this.activateChunk(x, y);
                         }
                         
+                        // v5.5: CREATURES DISABLED — counting and simulation commented out
+                        /*
                         // v4.1: Count creatures (every 60 frames)
                         if (mat.creature && this.frameCount % 60 === 0) {
                             if (mat.creatureType === 'worm') this.creaturePopulation.worm++;
@@ -8946,6 +8962,7 @@ class PixelPhysics {
                             // Keep chunk alive while creatures exist in it
                             this.activateChunk(x, y);
                         }
+                        */
                         
                         // v3.9: Ecosystem simulation (enhanced biology)
                         if (mat.living || mat.organic) {
@@ -9692,10 +9709,12 @@ class PixelPhysics {
         }
     }
 
+    // v5.5: CREATURES DISABLED — simulateCreature function commented out
+    /*
     /**
      * v4.1: Simulate creatures (worms, fish, bugs)
      * @private
-     */
+     *\/
     simulateCreature(x, y, mat, idx) {
         if (!mat.creature) return;
         
@@ -10178,6 +10197,7 @@ class PixelPhysics {
             }
         }
     }
+    */
 
     /**
      * v4.1: Check if material is nearby
@@ -10552,6 +10572,8 @@ class PixelPhysics {
             const [min, max] = fireMat.lifetime;
             this.lifetimeGrid[idx] = min + Math.random() * (max - min);
         }
+        // v5.6: Activate chunk so solids above can fall
+        this.activateChunk(x, y);
         
         // v5.0: Spawn fire in adjacent empty cells (fire spreads outward from fuel)
         const dirs = [
@@ -10691,20 +10713,46 @@ class PixelPhysics {
      * @private
      */
     simulateLiquid(x, y, mat, id) {
-        // Try to fall
+        // 1. Fall down (gravity)
         if (this.tryMove(x, y, x, y + 1, id)) return;
         
-        // Try to fall diagonally
+        // 2. Fall diagonally
         const dir = Math.random() < 0.5 ? -1 : 1;
         if (this.tryMove(x, y, x + dir, y + 1, id)) return;
         if (this.tryMove(x, y, x - dir, y + 1, id)) return;
         
-        // v3.2: Spread horizontally (with viscosity from flat array)
+        // 3. v5.6: Pressure-based horizontal flow
+        // Water tries to equalize — flow toward the side with less water above
         const viscosity = this.viscosityArr[id];
         if (Math.random() > viscosity) {
-            const spreadDir = Math.random() < 0.5 ? -1 : 1;
-            if (this.tryMove(x, y, x + spreadDir, y, id)) return;
-            if (this.tryMove(x, y, x - spreadDir, y, id)) return;
+            // Count water column height on each side
+            let leftHeight = 0, rightHeight = 0;
+            for (let dy = 0; dy >= -10; dy--) {
+                if (this.inBounds(x - 1, y + dy)) {
+                    const nid = this.grid[this.index(x - 1, y + dy)];
+                    if (nid !== 0 && this.stateArr[nid] === 2) leftHeight++;
+                    else break;
+                }
+            }
+            for (let dy = 0; dy >= -10; dy--) {
+                if (this.inBounds(x + 1, y + dy)) {
+                    const nid = this.grid[this.index(x + 1, y + dy)];
+                    if (nid !== 0 && this.stateArr[nid] === 2) rightHeight++;
+                    else break;
+                }
+            }
+            
+            // Flow toward the lower side (equalization)
+            if (leftHeight < rightHeight) {
+                if (this.tryMove(x, y, x - 1, y, id)) return;
+            } else if (rightHeight < leftHeight) {
+                if (this.tryMove(x, y, x + 1, y, id)) return;
+            } else {
+                // Equal — random spread
+                const spreadDir = Math.random() < 0.5 ? -1 : 1;
+                if (this.tryMove(x, y, x + spreadDir, y, id)) return;
+                if (this.tryMove(x, y, x - spreadDir, y, id)) return;
+            }
         }
     }
 
@@ -11018,11 +11066,21 @@ class PixelPhysics {
                         b = Math.floor(b + (200 - b) * glowIntensity * 0.3); // Less blue in glow
                     }
                     
+                    // v5.6: Cold materials frost (blend toward white/blue for sub-zero temps)
+                    if (temp < 0) {
+                        const frostBlend = Math.min(1, Math.abs(temp) / 50); // Full frost at -50°C
+                        r = Math.floor(r + (200 - r) * frostBlend * 0.3);
+                        g = Math.floor(g + (220 - g) * frostBlend * 0.3);
+                        b = Math.floor(b + (255 - b) * frostBlend * 0.4); // More blue
+                    }
+                    
                     pixels[pixelIdx] = r;
                     pixels[pixelIdx + 1] = g;
                     pixels[pixelIdx + 2] = b;
                     pixels[pixelIdx + 3] = mat.alpha !== undefined ? mat.alpha * 255 : a;
                     
+                    // v5.5: CREATURES DISABLED — multi-pixel creature rendering commented out
+                    /*
                     // v4.2: Multi-pixel rendering for creatures (make them VISIBLE!)
                     if (mat.creature) {
                         const creatureType = mat.creatureType;
@@ -11118,6 +11176,7 @@ class PixelPhysics {
                             }
                         }
                     }
+                    */
                 } else {
                     // Empty - transparent
                     pixels[pixelIdx] = 0;
@@ -11131,6 +11190,36 @@ class PixelPhysics {
         // Put image data to offscreen canvas
         this.offscreenCtx.putImageData(this.imageData, 0, 0);
         
+        // v5.6: Heat shimmer effect above hot materials
+        this.offscreenCtx.save();
+        for (let y = 0; y < this.gridHeight - 3; y++) {
+            for (let x = 0; x < this.gridWidth; x++) {
+                const idx = this.index(x, y);
+                const temp = this.temperatureGrid[idx];
+                
+                // If this cell is hot (> 300°C), add shimmer to cells 1-3 rows above
+                if (temp > 300 && Math.random() < 0.1) {
+                    const shimmerIntensity = Math.min(1, (temp - 300) / 500) * 0.15;
+                    
+                    // Apply warm tint to 1-3 cells above
+                    for (let dy = 1; dy <= 3; dy++) {
+                        if (y - dy < 0) break;
+                        const aboveIdx = this.index(x, y - dy);
+                        const pixelIdx = aboveIdx * 4;
+                        const pixels = this.imageData.data;
+                        
+                        // Subtle warm shift (add orange tint)
+                        pixels[pixelIdx] = Math.min(255, pixels[pixelIdx] + shimmerIntensity * 30);
+                        pixels[pixelIdx + 1] = Math.min(255, pixels[pixelIdx + 1] + shimmerIntensity * 15);
+                    }
+                }
+            }
+        }
+        this.offscreenCtx.putImageData(this.imageData, 0, 0); // Re-apply with shimmer
+        this.offscreenCtx.restore();
+        
+        // v5.5: CREATURES DISABLED — creature glow effect commented out
+        /*
         // v4.6: Creature glow effect using pre-collected positions (no second grid scan!)
         this.offscreenCtx.save();
         for (const { x, y, creatureType } of creaturePositions) {
@@ -11157,6 +11246,7 @@ class PixelPhysics {
             }
         }
         this.offscreenCtx.restore();
+        */
         
         // Draw scaled to game canvas (respecting camera)
         ctx.save();
@@ -13545,11 +13635,13 @@ class PixelUI {
         const epoch = state.epoch.toUpperCase();
         this.drawText(ctx, epoch, 10, 8, '#ffffff', 3);
         
-        // Creature counts with icons (second row)
+        // v5.5: Stats row (creature counts removed, O₂ and health remain)
         let creatureX = 10;
         const creatureY = 30;
-        const cs = 2; // creature stat scale
+        const cs = 2; // stat scale
         
+        // v5.5: CREATURES DISABLED — creature count display commented out
+        /*
         // Worm
         this.drawCreatureIcon(ctx, creatureX, creatureY, 'worm', cs);
         this.drawText(ctx, '' + (eco.creatures.worm || 0), creatureX + 14, creatureY, '#ff8877', cs);
@@ -13574,6 +13666,7 @@ class PixelUI {
         this.drawCreatureIcon(ctx, creatureX, creatureY, 'ant', cs);
         this.drawText(ctx, '' + (eco.creatures.ant || 0), creatureX + 14, creatureY, '#8B4513', cs);
         creatureX += 45;
+        */
         
         // O₂ percentage
         const o2Val = parseFloat(eco.atmosphere.oxygen) || 0;
@@ -13581,20 +13674,13 @@ class PixelUI {
         this.drawText(ctx, 'O:' + o2Pct + '%', creatureX, creatureY, '#88ccff', cs);
         creatureX += 60;
         
-        // Health indicator (heart with color)
-        const creatureTypes = [
-            eco.creatures.worm > 0,
-            eco.creatures.fish > 0,
-            eco.creatures.bug > 0,
-            eco.creatures.bird > 0,
-            eco.creatures.ant > 0
-        ].filter(Boolean).length;
+        // v5.5: Health indicator (updated to use non-creature metrics)
         const fertility = parseFloat(eco.soilFertility) || 0;
         
         let heartColor = '#ff4444'; // Red (dying)
-        if (creatureTypes >= 3 && o2Pct > 60 && fertility > 0.4) {
+        if (o2Pct > 60 && fertility > 0.4) {
             heartColor = '#44ff44'; // Green (healthy)
-        } else if (creatureTypes >= 2 || (o2Pct >= 40 && o2Pct <= 60)) {
+        } else if ((o2Pct >= 40 && o2Pct <= 60) || (fertility >= 0.3 && fertility <= 0.4)) {
             heartColor = '#ffff44'; // Yellow (stressed)
         }
         this.drawText(ctx, '♥', creatureX, creatureY, heartColor, cs);
@@ -14290,16 +14376,17 @@ class CompositionGame {
             }
         }
         
-        // Transcendence: ecosystem self-sustaining for 5 minutes (300 sec = 18000 frames at 60fps)
+        // v5.5: Epoch progression updated — creature-based milestones replaced with nature physics
+        // Transcendence: ecosystem self-sustaining (unchanged)
         if (physics.sustainedTime >= 18000) {
             this.epoch = 'transcendence';
         }
-        // Civilization: total creatures > 50
-        else if (physics.totalCreatures > 50) {
+        // Civilization: >5000 non-air cells (complex world)
+        else if (nonAirCells > 5000) {
             this.epoch = 'civilization';
         }
-        // Life: any creature survived for 60+ seconds (3600 frames at 60fps)
-        else if (physics.creatureMaxAge >= 3600) {
+        // Life: >2000 non-air cells (world is alive with nature)
+        else if (nonAirCells > 2000) {
             this.epoch = 'life';
         }
         // Formation: >500 non-air cells (terrain built)
