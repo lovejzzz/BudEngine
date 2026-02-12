@@ -6022,9 +6022,6 @@ class PixelPhysics {
      * engine.physics.init(640, 360, 2); // 320x180 simulation grid
      */
     init(width, height, cellSize = 2) {
-        const stack = new Error().stack;
-        console.log('[PHYSICS DEBUG] init() called from:');
-        console.log(stack);
         this.width = width;
         this.height = height;
         this.cellSize = cellSize;
