@@ -11200,33 +11200,7 @@ class PixelPhysics {
         // Put image data to offscreen canvas
         this.offscreenCtx.putImageData(this.imageData, 0, 0);
         
-        // v5.6: Heat shimmer effect above hot materials
-        this.offscreenCtx.save();
-        for (let y = 0; y < this.gridHeight - 3; y++) {
-            for (let x = 0; x < this.gridWidth; x++) {
-                const idx = this.index(x, y);
-                const temp = this.temperatureGrid[idx];
-                
-                // If this cell is hot (> 300°C), add shimmer to cells 1-3 rows above
-                if (temp > 300 && Math.random() < 0.1) {
-                    const shimmerIntensity = Math.min(1, (temp - 300) / 500) * 0.15;
-                    
-                    // Apply warm tint to 1-3 cells above
-                    for (let dy = 1; dy <= 3; dy++) {
-                        if (y - dy < 0) break;
-                        const aboveIdx = this.index(x, y - dy);
-                        const pixelIdx = aboveIdx * 4;
-                        const pixels = this.imageData.data;
-                        
-                        // Subtle warm shift (add orange tint)
-                        pixels[pixelIdx] = Math.min(255, pixels[pixelIdx] + shimmerIntensity * 30);
-                        pixels[pixelIdx + 1] = Math.min(255, pixels[pixelIdx + 1] + shimmerIntensity * 15);
-                    }
-                }
-            }
-        }
-        this.offscreenCtx.putImageData(this.imageData, 0, 0); // Re-apply with shimmer
-        this.offscreenCtx.restore();
+        // v5.6: Heat shimmer removed (was causing artifacts at ceiling)
         
         // v5.5: CREATURES DISABLED — creature glow effect commented out
         /*
