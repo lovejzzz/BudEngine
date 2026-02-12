@@ -12079,13 +12079,13 @@ class PixelUI {
         this.swatchSize = 20;
         
         // UI layout (dimensions in pixels)
-        this.gridCols = 4;
-        this.gridRows = Math.ceil(this.materials.length / this.gridCols); // 4 rows for 16 materials
-        this.paletteHeight = this.gridRows * (this.swatchSize + this.swatchGap) + 8; // grid height + padding
-        this.buttonHeight = 28;
-        this.paletteOpen = true; // palette grid visible by default
-        this.hudHeight = 40;
         this.swatchGap = 2;
+        this.gridCols = 4;
+        this.gridRows = Math.ceil(this.materials.length / this.gridCols);
+        this.paletteHeight = this.gridRows * (this.swatchSize + this.swatchGap) + 8;
+        this.buttonHeight = 28;
+        this.paletteOpen = true;
+        this.hudHeight = 40;
         
         // Touch state
         this.lastTouchX = 0;
