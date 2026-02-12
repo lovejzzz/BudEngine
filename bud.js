@@ -8479,9 +8479,11 @@ class PixelPhysics {
      * Canvas pixel coords can be passed directly — do NOT pre-divide by cellSize.
      */
     circle(cx, cy, radius, material) {
+        console.log(`[DEBUG] circle() called: pixel(${cx},${cy}) r=${radius} mat=${material} cellSize=${this.cellSize}`);
         const gcx = Math.floor(cx / this.cellSize);
         const gcy = Math.floor(cy / this.cellSize);
         const gr = Math.ceil(radius / this.cellSize);
+        console.log(`[DEBUG] circle() grid center: (${gcx},${gcy}) gr=${gr}`);
         
         for (let gy = gcy - gr; gy <= gcy + gr; gy++) {
             for (let gx = gcx - gr; gx <= gcx + gr; gx++) {
@@ -8901,6 +8903,7 @@ class PixelPhysics {
                                             }
                                             this.heatSources.add(eidx);
                                             this.activateChunk(ex, ey);
+                                            console.log(`[DEBUG] Fire spawned at grid(${ex},${ey}) pixel(${ex*this.cellSize},${ey*this.cellSize}) from burning at grid(${x},${y})`);
                                         }
                                     }
                                     
