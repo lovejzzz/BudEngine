@@ -1,11 +1,28 @@
 /**
- * BUD ENGINE v4.5
+ * BUD ENGINE v4.6
  * A 2D web game engine designed for AI-human collaboration
  * 
  * Philosophy: AI can write, TEST, and iterate on games independently.
  * Killer feature: AI Testing API + auto-playtest bot
  * 
  * Architecture: Single-file, no build tools, runs in browser
+ * 
+ * v4.6 PHASE 2+3 REDESIGN — RELEASE MODE (THE GAME), SELF-TESTING API, DEBUG OVERLAY:
+ * - RELEASE MODE: The core game mechanic — "Can you build a world that sustains itself after you stop touching it?"
+ * - Release button replaces Conduct: Tap to start 3-second countdown → palette disappears, input disabled, timer starts counting up
+ * - Survival tracking: If all creatures die, release FAILS (shows "YOUR WORLD LASTED X:XX" in red). If creatures survive 5 minutes, release SUCCEEDS (shows "YOUR COMPOSITION LIVES" in green)
+ * - Release stats: Peak creature count, time survived, creature types that survived — displayed for 5 seconds after result
+ * - Enhanced soundscape during release: 2x creature sound chance (listening to your composition is the point)
+ * - SELF-TESTING API: Canvas inspection tools for AI iteration without screenshots
+ *   - engine.test.snapshot() — full canvas as base64 PNG
+ *   - engine.test.snapshotRegion(x, y, w, h) — region snapshot
+ *   - engine.test.pixelAt(x, y) — returns {r, g, b, a} of pixel at canvas coordinates
+ *   - engine.test.creatureCount() — returns {worm, fish, bug, bird, ant, total}
+ *   - engine.test.worldStats() — returns {totalCells, materials, fertility, oxygen}
+ *   - engine.test.eval(code) — evaluate arbitrary code in engine context for hot reload
+ * - DEBUG OVERLAY: engine.debug.overlay toggle shows FPS, active chunks, creature counts by type, memory usage, creature positions (tiny dots on canvas)
+ * - engine.debug.toggle() method to enable/disable overlay
+ * - Release mode makes The Composition a complete game: build → release → watch → iterate
  * 
  * v4.5 PHASE 1 REDESIGN — TRIM BLOAT, ANTS, ROOT SYSTEMS:
  * - TRIM: Removed Neon Ronin demo references, conducting mode gestures, score system (replaced with ecosystem milestones), non-ecosystem biome scenarios
@@ -4494,6 +4511,127 @@ class TestingAPI {
         }
         this.engine.composition.setMode(mode);
     }
+
+    /**
+     * v4.6: Get canvas snapshot of a specific region as base64 PNG
+     * @param {number} x - X position
+     * @param {number} y - Y position
+     * @param {number} w - Width
+     * @param {number} h - Height
+     * @returns {string} Base64 PNG data URL
+     */
+    snapshotRegion(x, y, w, h) {
+        if (!this.engine.canvas) return null;
+        
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = w;
+        tempCanvas.height = h;
+        const tempCtx = tempCanvas.getContext('2d');
+        
+        tempCtx.drawImage(this.engine.canvas, x, y, w, h, 0, 0, w, h);
+        return tempCanvas.toDataURL('image/png');
+    }
+
+    /**
+     * v4.6: Get pixel color at canvas coordinates
+     * @param {number} x - Canvas x coordinate
+     * @param {number} y - Canvas y coordinate
+     * @returns {object} {r, g, b, a}
+     */
+    pixelAt(x, y) {
+        if (!this.engine.ctx) return {r: 0, g: 0, b: 0, a: 0};
+        
+        const imageData = this.engine.ctx.getImageData(x, y, 1, 1);
+        const data = imageData.data;
+        return {
+            r: data[0],
+            g: data[1],
+            b: data[2],
+            a: data[3]
+        };
+    }
+
+    /**
+     * v4.6: Get creature counts by type
+     * @returns {object} {worm: N, fish: N, bug: N, bird: N, ant: N, total: N}
+     */
+    creatureCount() {
+        if (!this.engine.physics.initialized) {
+            return {worm: 0, fish: 0, bug: 0, bird: 0, ant: 0, total: 0};
+        }
+
+        const physics = this.engine.physics;
+        const pop = physics.creaturePopulation || {};
+        
+        return {
+            worm: pop.worm || 0,
+            fish: pop.fish || 0,
+            bug: pop.bug || 0,
+            bird: pop.bird || 0,
+            ant: pop.ant || 0,
+            total: physics.totalCreatures || 0
+        };
+    }
+
+    /**
+     * v4.6: Get comprehensive world statistics
+     * @returns {object} World stats including material counts, fertility, oxygen
+     */
+    worldStats() {
+        if (!this.engine.physics.initialized) {
+            return {error: 'PixelPhysics not initialized'};
+        }
+
+        const physics = this.engine.physics;
+        
+        // Count materials
+        const materialCounts = {};
+        let totalCells = 0;
+        for (let i = 0; i < physics.grid.length; i++) {
+            const matId = physics.grid[i];
+            if (matId > 0) {
+                const matName = physics.getMaterialName(matId);
+                materialCounts[matName] = (materialCounts[matName] || 0) + 1;
+                totalCells++;
+            }
+        }
+
+        // Average fertility
+        let avgFertility = 0;
+        if (physics.fertilityGrid) {
+            const sum = physics.fertilityGrid.reduce((a, b) => a + b, 0);
+            avgFertility = sum / physics.fertilityGrid.length;
+        }
+
+        // Oxygen percentage
+        const o2Val = physics.oxygenLevel || 0;
+        const oxygenPct = (o2Val / 600) * 100;
+
+        return {
+            totalCells: totalCells,
+            materials: materialCounts,
+            fertility: parseFloat(avgFertility.toFixed(3)),
+            oxygen: parseFloat(oxygenPct.toFixed(1))
+        };
+    }
+
+    /**
+     * v4.6: Evaluate arbitrary code in engine context for hot reload and testing
+     * @param {string} code - JavaScript code to execute
+     * @returns {*} Result of evaluation
+     */
+    eval(code) {
+        try {
+            const engine = this.engine;
+            const physics = this.engine.physics;
+            const composition = this.engine.composition;
+            const result = eval(code);
+            return result;
+        } catch (e) {
+            console.error('[TestingAPI.eval] Error:', e);
+            return {error: e.message, stack: e.stack};
+        }
+    }
 }
 
 // ===== ANIMATION SYSTEM (P1) =====
@@ -4739,6 +4877,7 @@ class DebugSystem {
         this.logs = [];
         this.maxLogs = 50;
         this.watchedProperties = new Map(); // property name -> last value
+        this.overlay = false; // v4.6: Debug overlay toggle
     }
 
     /**
@@ -4806,12 +4945,15 @@ class DebugSystem {
     }
 
     render(ctx) {
-        if (!this.enabled) return;
+        // v4.6: Check overlay flag instead of enabled
+        if (!this.enabled && !this.overlay) return;
 
         const e = this.engine;
         
         // Update watched properties
-        this.updateWatched();
+        if (this.enabled) {
+            this.updateWatched();
+        }
 
         // ========== PIXEL PHYSICS DEBUG OVERLAY ==========
         if (e.physics && e.physics.initialized) {
@@ -4872,12 +5014,39 @@ class DebugSystem {
         }
 
         // BOTTOM-LEFT: Chunk Stats & Frame
-        let bottomY = e.canvas.height - 70;
+        let bottomY = e.canvas.height - 130;
         this.drawTextWithBackground(ctx, `Frame: ${physics.frameCount}`, 10, bottomY, '#00ffcc');
         bottomY += 20;
         this.drawTextWithBackground(ctx, `Active Chunks: ${activeChunks} / ${physics.chunksWide * physics.chunksHigh}`, 10, bottomY, '#00ffcc');
         bottomY += 20;
         this.drawTextWithBackground(ctx, `Grid: ${physics.gridWidth}x${physics.gridHeight}`, 10, bottomY, '#888888');
+        
+        // v4.6: Creature counts by type
+        if (physics.creaturePopulation) {
+            const pop = physics.creaturePopulation;
+            bottomY += 20;
+            const creatureText = `Creatures: W:${pop.worm||0} F:${pop.fish||0} B:${pop.bug||0} Br:${pop.bird||0} A:${pop.ant||0}`;
+            this.drawTextWithBackground(ctx, creatureText, 10, bottomY, '#88ff88');
+        }
+        
+        // v4.6: Memory usage estimate (grid arrays)
+        const gridMemory = physics.grid ? physics.grid.byteLength : 0;
+        const tempMemory = physics.temperatureGrid ? physics.temperatureGrid.byteLength : 0;
+        const totalMemory = (gridMemory + tempMemory) / 1024; // KB
+        bottomY += 20;
+        this.drawTextWithBackground(ctx, `Memory: ${totalMemory.toFixed(1)} KB`, 10, bottomY, '#cccccc');
+
+        // v4.6: Draw creature positions as tiny dots
+        if (this.overlay && physics.creaturePositions) {
+            ctx.fillStyle = 'rgba(255, 255, 0, 0.6)';
+            for (let i = 0; i < physics.creaturePositions.length; i += 2) {
+                const cx = physics.creaturePositions[i];
+                const cy = physics.creaturePositions[i + 1];
+                if (cx >= 0 && cy >= 0) {
+                    ctx.fillRect(cx - 1, cy - 1, 2, 2);
+                }
+            }
+        }
 
         ctx.restore();
     }
@@ -4990,6 +5159,14 @@ class DebugSystem {
         // Draw text
         ctx.fillStyle = color;
         ctx.fillText(text, x, y);
+    }
+
+    /**
+     * v4.6: Toggle debug overlay
+     */
+    toggle() {
+        this.overlay = !this.overlay;
+        console.log('[Debug] Overlay:', this.overlay ? 'ON' : 'OFF');
     }
 }
 
@@ -11455,6 +11632,9 @@ class AcousticEngine {
         this.regionSize = 32; // Group sounds by 32x32 regions
         this.regionSounds = new Map(); // region key -> sound data
         
+        // v4.6: Release mode flag (2x creature sound chance)
+        this.releaseMode = false;
+        
         console.log('[AcousticEngine v4.3] Scientific Acoustic Physics - Sounds from Real Material Properties');
     }
 
@@ -12411,10 +12591,23 @@ class PixelUI {
         // UI state
         this.selectedMaterial = 'stone';
         this.paletteScrollOffset = 0;
-        this.mode = 'creation'; // 'creation', 'listening', 'conducting'
+        this.mode = 'creation'; // 'creation', 'listening', 'release'
         this.showTooltip = false;
         this.tooltipText = '';
         this.tooltipTimer = 0;
+        
+        // v4.6: Release mode state
+        this.releaseMode = false;
+        this.releaseTimer = 0;
+        this.releaseCountdown = 0; // 180 frames = 3 seconds
+        this.releasePeakCreatures = 0;
+        this.releaseResult = null; // 'success' | 'fail' | null
+        this.releaseResultTimer = 0;
+        this.releaseStartCreatures = {}; // Track creature types at release start
+        
+        // v4.6: Debug overlay toggle (tap epoch 3x)
+        this.epochTapCount = 0;
+        this.epochTapTimeout = 0;
         
         // Material swatches (pre-rendered for performance)
         this.materialSwatches = new Map();
@@ -12734,11 +12927,11 @@ class PixelUI {
         ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
         ctx.fillRect(0, buttonY, width, this.buttonHeight);
         
-        // Button configuration
+        // Button configuration (v4.6: RELEASE replaces CONDUCT)
         const buttons = [
             { mode: 'creation', label: 'CREATE', emoji: '🎨' },
             { mode: 'listening', label: 'LISTEN', emoji: '👂' },
-            { mode: 'conducting', label: 'CONDUCT', emoji: '🎵' },
+            { mode: 'release', label: 'RELEASE', emoji: '🚀' },
             { mode: 'garden', label: 'GARDEN', emoji: '🌿' }
         ];
         
@@ -12793,10 +12986,16 @@ class PixelUI {
      * Main render method - called every frame
      */
     render(ctx) {
+        // v4.6: Update release mode
+        this.updateRelease();
+        
         this.renderHUD(ctx);
         this.renderPalette(ctx);
         this.renderButtons(ctx);
         this.renderTooltip(ctx);
+        
+        // v4.6: Render release overlay (countdown, timer, results)
+        this.renderRelease(ctx);
         
         // Update tooltip timer
         if (this.showTooltip) {
@@ -12815,13 +13014,34 @@ class PixelUI {
         const width = this.engine.config.width;
         const height = this.engine.config.height;
         
-        // Check HUD area (top 40px) - toggle stats
+        // v4.6: Block all input during release mode
+        if (this.releaseMode || this.releaseCountdown > 0) {
+            return true; // Consume input, don't pass to game
+        }
+        
+        // Check HUD area (top 40px) - tap epoch to toggle debug
         if (y < this.hudHeight) {
             if (isStart) {
-                // Toggle sparkline/stats panel (future feature)
-                console.log('[PixelUI] HUD tapped');
+                // v4.6: Tap epoch text 3x to toggle debug overlay
+                if (x < 200) { // Epoch text area (left side)
+                    this.epochTapCount++;
+                    this.epochTapTimeout = 180; // 3 seconds to triple-tap
+                    
+                    if (this.epochTapCount >= 3) {
+                        this.engine.debugSystem.toggle();
+                        this.epochTapCount = 0;
+                    }
+                }
             }
             return true;
+        }
+        
+        // Timeout for epoch tap counter
+        if (this.epochTapTimeout > 0) {
+            this.epochTapTimeout--;
+            if (this.epochTapTimeout === 0) {
+                this.epochTapCount = 0;
+            }
         }
         
         // Check palette area (grid)
@@ -12861,6 +13081,9 @@ class PixelUI {
                         // Load garden scenario
                         this.engine.test.clearWorld();
                         this.engine.test.loadScenario('garden');
+                    } else if (mode === 'release') {
+                        // v4.6: Start release mode countdown
+                        this.startRelease();
                     } else {
                         this.mode = mode;
                         this.engine.composition.setMode(mode);
@@ -12879,6 +13102,190 @@ class PixelUI {
      */
     getSelectedMaterial() {
         return this.selectedMaterial;
+    }
+
+    /**
+     * v4.6: Start release mode with countdown
+     */
+    startRelease() {
+        if (this.releaseMode) return; // Already in release mode
+        
+        console.log('[PixelUI] Starting Release countdown...');
+        this.releaseCountdown = 180; // 3 seconds at 60fps
+        this.releaseTimer = 0;
+        this.releaseResult = null;
+        this.releaseResultTimer = 0;
+        this.releasePeakCreatures = this.physics.totalCreatures || 0;
+        
+        // Track starting creature counts
+        const pop = this.physics.creaturePopulation || {};
+        this.releaseStartCreatures = {
+            worm: pop.worm || 0,
+            fish: pop.fish || 0,
+            bug: pop.bug || 0,
+            bird: pop.bird || 0,
+            ant: pop.ant || 0
+        };
+    }
+
+    /**
+     * v4.6: Update release mode logic (called every frame)
+     */
+    updateRelease() {
+        // Countdown phase
+        if (this.releaseCountdown > 0) {
+            this.releaseCountdown--;
+            if (this.releaseCountdown === 0) {
+                // Countdown finished, start release!
+                this.releaseMode = true;
+                this.paletteOpen = false; // Hide palette
+                console.log('[PixelUI] RELEASED! Watching ecosystem...');
+                
+                // v4.6C: Enhance soundscape during release (2x creature sound chance)
+                if (this.physics.acoustics) {
+                    this.physics.acoustics.releaseMode = true;
+                }
+            }
+            return;
+        }
+
+        // Not in release mode yet
+        if (!this.releaseMode) return;
+
+        // Release mode active - track survival
+        this.releaseTimer++;
+        
+        const totalCreatures = this.physics.totalCreatures || 0;
+        if (totalCreatures > this.releasePeakCreatures) {
+            this.releasePeakCreatures = totalCreatures;
+        }
+
+        // Check every second (60 frames) for failure
+        if (this.releaseTimer % 60 === 0) {
+            if (totalCreatures === 0) {
+                // FAIL: All creatures died
+                this.releaseResult = 'fail';
+                this.releaseResultTimer = 300; // 5 seconds at 60fps
+                this.endRelease();
+                console.log('[PixelUI] Release FAILED - ecosystem collapsed');
+                return;
+            }
+        }
+
+        // Check for success: 5 minutes = 300 seconds = 18000 frames
+        if (this.releaseTimer >= 18000) {
+            // SUCCESS: Creatures survived 5 minutes!
+            this.releaseResult = 'success';
+            this.releaseResultTimer = 300; // 5 seconds at 60fps
+            this.endRelease();
+            console.log('[PixelUI] Release SUCCESS - your composition LIVES!');
+        }
+    }
+
+    /**
+     * v4.6: End release mode
+     */
+    endRelease() {
+        this.releaseMode = false;
+        
+        // Disable enhanced soundscape
+        if (this.physics.acoustics) {
+            this.physics.acoustics.releaseMode = false;
+        }
+        
+        // Re-enable palette after result timer expires
+        // (result message will stay on screen during resultTimer countdown)
+    }
+
+    /**
+     * v4.6: Render release countdown, timer, and results
+     */
+    renderRelease(ctx) {
+        const width = ctx.canvas.width;
+        const height = ctx.canvas.height;
+        
+        // Countdown phase
+        if (this.releaseCountdown > 0) {
+            const secondsLeft = Math.ceil(this.releaseCountdown / 60);
+            const text = 'RELEASING IN ' + secondsLeft + '...';
+            const textWidth = this.measureText(text, 3);
+            const x = (width - textWidth) / 2;
+            const y = height / 2 - 20;
+            
+            this.drawText(ctx, text, x, y, '#ffff00', 3);
+            return;
+        }
+
+        // Release mode active - show timer
+        if (this.releaseMode) {
+            const seconds = Math.floor(this.releaseTimer / 60);
+            const minutes = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            const timeStr = minutes + ':' + (secs < 10 ? '0' : '') + secs;
+            const text = 'HANDS OFF: ' + timeStr;
+            const textWidth = this.measureText(text, 3);
+            const x = (width - textWidth) / 2;
+            const y = 60;
+            
+            this.drawText(ctx, text, x, y, '#00ffff', 3);
+        }
+
+        // Result display
+        if (this.releaseResultTimer > 0) {
+            this.releaseResultTimer--;
+            
+            // Re-enable palette when result timer ends
+            if (this.releaseResultTimer === 0) {
+                this.paletteOpen = true;
+            }
+            
+            const seconds = Math.floor(this.releaseTimer / 60);
+            const minutes = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            const timeStr = minutes + ':' + (secs < 10 ? '0' : '') + secs;
+            
+            if (this.releaseResult === 'success') {
+                // SUCCESS message
+                const msg1 = 'YOUR COMPOSITION LIVES';
+                const w1 = this.measureText(msg1, 3);
+                this.drawText(ctx, msg1, (width - w1) / 2, height / 2 - 40, '#00ff00', 3);
+            } else if (this.releaseResult === 'fail') {
+                // FAIL message
+                const msg1 = 'YOUR WORLD LASTED ' + timeStr;
+                const w1 = this.measureText(msg1, 3);
+                this.drawText(ctx, msg1, (width - w1) / 2, height / 2 - 40, '#ff0000', 3);
+            }
+            
+            // Stats below main message (after 1 second)
+            if (this.releaseResultTimer < 240) {
+                const statsY = height / 2 + 20;
+                
+                // Peak creatures
+                const peakText = 'PEAK: ' + this.releasePeakCreatures + ' CREATURES';
+                const pw = this.measureText(peakText, 2);
+                this.drawText(ctx, peakText, (width - pw) / 2, statsY, '#ffffff', 2);
+                
+                // Time survived
+                const timeText = 'TIME: ' + timeStr;
+                const tw = this.measureText(timeText, 2);
+                this.drawText(ctx, timeText, (width - tw) / 2, statsY + 25, '#ffffff', 2);
+                
+                // Survivor types
+                const pop = this.physics.creaturePopulation || {};
+                const survivors = [];
+                if (pop.worm > 0) survivors.push('WORMS');
+                if (pop.fish > 0) survivors.push('FISH');
+                if (pop.bug > 0) survivors.push('BUGS');
+                if (pop.bird > 0) survivors.push('BIRDS');
+                if (pop.ant > 0) survivors.push('ANTS');
+                
+                if (survivors.length > 0) {
+                    const survText = 'SURVIVORS: ' + survivors.join(' ');
+                    const sw = this.measureText(survText, 2);
+                    this.drawText(ctx, survText, (width - sw) / 2, statsY + 50, '#00ff88', 2);
+                }
+            }
+        }
     }
 }
 

@@ -7,6 +7,22 @@ A single-file 2D web game engine with pixel physics, procedural sound, and emerg
 
 A god-simulation where building the world = composing music. Your instrument is the Earth.
 
+## v4.6 — Phase 2+3 Redesign
+**Focus: Release mode (the game), self-testing API, debug overlay**
+
+New in v4.6:
+- **Release Mode** 🚀: The core game mechanic — "Can you build a world that sustains itself after you stop touching it?" Tap RELEASE button → 3-second countdown → palette disappears, input disabled, timer counts up. If all creatures die: release FAILS (red message shows how long your world lasted). If creatures survive 5 minutes: release SUCCEEDS (green "YOUR COMPOSITION LIVES" message). Stats displayed: peak creatures, time survived, survivor types
+- **Enhanced Soundscape During Release**: 2x creature sound chance — listening to your composition is the point of release mode
+- **Self-Testing API**: Canvas inspection tools for AI iteration without screenshots
+  - `engine.test.snapshot()` — full canvas as base64 PNG
+  - `engine.test.snapshotRegion(x, y, w, h)` — region snapshot
+  - `engine.test.pixelAt(x, y)` — returns `{r, g, b, a}` at canvas coordinates
+  - `engine.test.creatureCount()` — returns `{worm, fish, bug, bird, ant, total}`
+  - `engine.test.worldStats()` — returns `{totalCells, materials, fertility, oxygen}`
+  - `engine.test.eval(code)` — evaluate code in engine context for hot reload
+- **Debug Overlay**: `engine.debug.overlay` toggle shows FPS, active chunks, creature counts by type, memory usage, creature positions (tiny yellow dots). Toggle via `engine.debug.toggle()` or by tapping epoch text 3x quickly
+- Release mode transforms The Composition into a complete game loop: build → release → watch → learn → iterate
+
 ## v4.5 — Phase 1 Redesign
 **Focus: Trim bloat, add ants (social builders), add root systems**
 

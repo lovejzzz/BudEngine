@@ -136,11 +136,11 @@
         </div>
     </div>
 
-    <script src="bud.js?v=62"></script>
+    <script src="bud.js?v=63"></script>
     <script>
-        // The Composition v4.4
+        // The Composition v4.6
         // Your instrument is the Earth
-        // v4.4: Pixel-art UI — everything rendered as pixel art on canvas
+        // v4.6: Release mode (the game), self-testing API, debug overlay
 
         // Initialize engine
         const canvas = document.getElementById('gameCanvas');
@@ -293,6 +293,12 @@
                 ctx.globalCompositeOperation = 'source-over';
                 pixelUI.render(ctx);
                 ctx.restore();
+                
+                // v4.6: Render debug overlay (if enabled)
+                ctx.save();
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                engine.debugSystem.render(ctx);
+                ctx.restore();
             }
         });
 
@@ -376,8 +382,8 @@
             }
         }, { once: true });
 
-        console.log('[The Composition v4.4] Pixel-art UI — all buttons, palette, HUD rendered as pixel art on canvas');
+        console.log('[The Composition v4.6] Release mode (the game), self-testing API, debug overlay');
     </script>
-    <div id="version-stamp">v4.4</div>
+    <div id="version-stamp">v4.6</div>
 </body>
 </html>
