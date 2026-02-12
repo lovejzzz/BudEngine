@@ -6850,9 +6850,9 @@ class PixelPhysics {
             reactivity: 1.0,
             solubility: null,
             color: ['#ff4400', '#ff8800', '#ffcc00', '#ff6600', '#ff2200'],
-            lifetime: [1.0, 2.5],
+            lifetime: [1.5, 3.5],
             produces: 'smoke',
-            heatEmission: 800, // °C per second to neighbors
+            heatEmission: 1200, // °C per second to neighbors
             // v5.0: Universal chemistry properties
             oxidizer: true,  // Fire is oxidizing
             reducer: false,
@@ -8698,14 +8698,59 @@ class PixelPhysics {
                             }
                         }
                         
-                        // v3.2: Check for ignition using flat array (faster)
+                        // v5.0: Combustion — solids burn slowly, emitting fire; liquids/gases ignite instantly
                         const ignitionPoint = this.ignitionPointArr[id];
                         if (ignitionPoint < 999999 && this.temperatureGrid[idx] >= ignitionPoint) {
-                            // Check if there's oxygen/air nearby
                             if (this.hasOxygenNearby(x, y)) {
-                                this.igniteMaterial(x, y, mat, idx);
-                                this.activateChunk(x, y); // Material changed
-                                continue;
+                                if (mat.state === 'solid' || mat.immovable) {
+                                    // Solid fuel: emit fire into adjacent empty cells, self-heat, slowly consume
+                                    this.temperatureGrid[idx] += (mat.combustionEnergy || 10) * 5; // self-heat
+                                    this.heatSources.add(idx);
+                                    
+                                    // Spawn fire in nearby empty cells (especially above)
+                                    const fireId = this.getMaterialId('fire');
+                                    const fireMat = this.getMaterial(fireId);
+                                    const emitDirs = [[x,y-1],[x-1,y-1],[x+1,y-1],[x-1,y],[x+1,y]];
+                                    for (const [ex, ey] of emitDirs) {
+                                        if (!this.inBounds(ex, ey)) continue;
+                                        const eidx = this.index(ex, ey);
+                                        if (this.grid[eidx] === 0 && Math.random() < 0.3) {
+                                            this.grid[eidx] = fireId;
+                                            this.temperatureGrid[eidx] = 700 + Math.random() * 200;
+                                            if (fireMat && fireMat.lifetime) {
+                                                const [min, max] = fireMat.lifetime;
+                                                this.lifetimeGrid[eidx] = min + Math.random() * (max - min);
+                                            }
+                                            this.heatSources.add(eidx);
+                                            this.activateChunk(ex, ey);
+                                        }
+                                    }
+                                    
+                                    // Heat all 8 neighbors to spread the burn
+                                    for (let dy = -1; dy <= 1; dy++) {
+                                        for (let dx = -1; dx <= 1; dx++) {
+                                            if (dx === 0 && dy === 0) continue;
+                                            const nx = x + dx, ny = y + dy;
+                                            if (!this.inBounds(nx, ny)) continue;
+                                            const nidx = this.index(nx, ny);
+                                            this.temperatureGrid[nidx] += (mat.combustionEnergy || 10) * 3;
+                                            this.heatSources.add(nidx);
+                                        }
+                                    }
+                                    
+                                    // Slowly consume fuel (chance to turn to fire/smoke per frame)
+                                    if (Math.random() < mat.flammability * 0.08) {
+                                        this.igniteMaterial(x, y, mat, idx);
+                                        this.activateChunk(x, y);
+                                        continue;
+                                    }
+                                    this.activateChunk(x, y);
+                                } else {
+                                    // Gas/liquid fuel: ignite immediately
+                                    this.igniteMaterial(x, y, mat, idx);
+                                    this.activateChunk(x, y);
+                                    continue;
+                                }
                             }
                         }
                         
