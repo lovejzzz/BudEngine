@@ -13365,6 +13365,20 @@ class CompositionGame {
             type: null // 'tap', 'swipe', 'longpress'
         };
         
+        // Analysis state (tracks active materials in the world)
+        this.analysis = {
+            activeMaterials: new Set()
+        };
+        
+        // Score/metrics (referenced in getState)
+        this.score = 0;
+        this.harmony = 0;
+        this.complexity = 0;
+        this.rhythm = 0;
+        this.dynamics = 0;
+        this.texture = 0;
+        this.melody = 0;
+        
         console.log('[CompositionGame v4.0] The Composition - Your instrument is the Earth');
     }
 
@@ -13373,6 +13387,19 @@ class CompositionGame {
      * @param {number} dt - Delta time
      */
     update(dt) {
+        // Update active materials analysis
+        this.analysis.activeMaterials.clear();
+        const physics = this.physics;
+        if (physics.grid) {
+            for (let i = 0; i < physics.grid.length; i++) {
+                const id = physics.grid[i];
+                if (id !== 0) {
+                    const mat = physics.getMaterial(id);
+                    if (mat) this.analysis.activeMaterials.add(mat.name);
+                }
+            }
+        }
+        
         // Check for epoch transitions
         this.updateEpoch();
     }
