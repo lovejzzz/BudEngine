@@ -1,11 +1,18 @@
 /**
- * BUD ENGINE v4.3
+ * BUD ENGINE v4.3.2
  * A 2D web game engine designed for AI-human collaboration
  * 
  * Philosophy: AI can write, TEST, and iterate on games independently.
  * Killer feature: AI Testing API + auto-playtest bot
  * 
  * Architecture: Single-file, no build tools, runs in browser
+ * 
+ * v4.3.2 CREATURE GLOW, AUTO-GARDEN, PINCH ZOOM, MATERIAL TOOLTIPS, ECOSYSTEM HEALTH:
+ * - Creature glow effect: Semi-transparent colored halos around creatures for better visibility (worm=pink, fish=orange, bug=green, bird=blue brighter)
+ * - Auto-garden on every page load: Garden scenario loads automatically after 1.5s, not just first visit — returning visitors always start with a living world
+ * - Pinch-to-zoom for mobile: Two-finger pinch gesture zooms camera 0.5x-3.0x with zoom level indicator
+ * - Material info tooltips: Tap a material in palette to see name and key properties (density/temperature for materials, ecological role for creatures), 2-second auto-dismiss
+ * - Ecosystem health indicator: Color-coded heart ❤️ shows ecosystem balance — green (healthy: 3+ types, O₂ >60%, fertility >0.4), yellow (stressed: 2 types or moderate), red (dying: <2 types or critical)
  * 
  * v4.3 DAY/NIGHT CYCLE, BIRDS, FERTILE SOIL VIZ, POPULATION GRAPH, EPOCH MILESTONES:
  * - Day/night cycle: 14-minute cycle, smooth sinusoidal brightness (0.15-1.0), dims whole scene at night
@@ -9849,6 +9856,40 @@ class PixelPhysics {
         
         // Put image data to offscreen canvas
         this.offscreenCtx.putImageData(this.imageData, 0, 0);
+        
+        // v4.3.2: Creature glow effect for better visibility
+        this.offscreenCtx.save();
+        for (let y = 0; y < this.gridHeight; y++) {
+            for (let x = 0; x < this.gridWidth; x++) {
+                const idx = this.index(x, y);
+                const id = this.grid[idx];
+                const mat = this.getMaterial(id);
+                
+                if (mat && mat.creature) {
+                    const creatureType = mat.creatureType;
+                    let glowColor;
+                    
+                    // Assign glow colors based on creature type
+                    if (creatureType === 'worm') {
+                        glowColor = 'rgba(255, 136, 119, 0.3)';
+                    } else if (creatureType === 'fish') {
+                        glowColor = 'rgba(255, 170, 51, 0.3)';
+                    } else if (creatureType === 'bug') {
+                        glowColor = 'rgba(102, 255, 68, 0.3)';
+                    } else if (creatureType === 'bird') {
+                        glowColor = 'rgba(68, 136, 255, 0.4)'; // Birds are brighter
+                    }
+                    
+                    if (glowColor) {
+                        this.offscreenCtx.fillStyle = glowColor;
+                        this.offscreenCtx.beginPath();
+                        this.offscreenCtx.arc(x, y, 3.5, 0, Math.PI * 2);
+                        this.offscreenCtx.fill();
+                    }
+                }
+            }
+        }
+        this.offscreenCtx.restore();
         
         // Draw scaled to game canvas (respecting camera)
         ctx.save();

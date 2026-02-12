@@ -10,10 +10,15 @@ A god-simulation where building the world = composing music. Your instrument is 
 ## Features
 - **Pixel Physics**: 30+ materials with real scientific properties — emergent reactions, no hardcoded interactions
 - **Living Ecosystem**: Worms 🪱, fish 🐟, bugs 🐛, birds 🐦 — visible multi-pixel creatures that eat, reproduce, and die. Soil fertility, O₂/CO₂ balance, food chains. Birds are apex predators (eat bugs, disperse seeds)
+- **Creature Glow Effect** (v4.3.2): Semi-transparent colored halos around creatures for better visibility. Worm=pink, fish=orange, bug=green, bird=blue (brighter). Makes creatures visible even in complex terrain
 - **Day/Night Cycle** (v4.3): 14-minute day/night cycle with smooth sinusoidal brightness. Temperature drops at night, worms surface, bugs chirp more. Sun ☀️ and moon 🌙 indicators in HUD
 - **Fertile Soil Visualization** (v4.3): Dirt color reflects fertility — rich dark-green for fertile (>0.7), grayish for depleted (<0.3). Worms enrich soil by eating decay, plants deplete it
 - **Population Dynamics Graph** (v4.3): Real-time sparkline chart shows last 60 seconds of population history. Toggle with 📊 button. Worm=pink, fish=orange, bug=green, bird=blue
 - **Epoch Progression** (v4.3): Genesis → Formation (terrain built) → Life (creatures survive 60s) → Civilization (50+ creatures) → Transcendence (self-sustaining 5 min)
+- **Auto-Garden** (v4.3.2): Garden scenario loads automatically 1.5s after page load — every visitor starts with a living world. No more empty void on arrival
+- **Pinch-to-Zoom** (v4.3.2): Mobile pinch gesture zooms camera 0.5x-3.0x. Zoom level indicator shows current scale. Explore ecosystems up close
+- **Material Tooltips** (v4.3.2): Tap a material in the palette to see its name and key properties. Stone shows density/melting point, creatures show ecological role. 2-second auto-dismiss
+- **Ecosystem Health Indicator** (v4.3.2): Color-coded heart ❤️ shows ecosystem balance. Green (healthy) = 3+ creature types, O₂ >60%, fertility >0.4. Yellow (stressed) = 2 types or moderate vitals. Red (dying) = <2 types or critical vitals
 - **Scientific Acoustic Physics**: ALL sounds derived from real physics formulas, not arbitrary frequencies. Impact sounds use f = (1/(2*L)) * sqrt(E/ρ) with actual Young's modulus and density. Water splashes use real bubble acoustics. Fire sounds from turbulent combustion. Creature bioacoustics (worms: 20-60Hz infrasound, fish: swim bladder resonance 100-500Hz, bugs: stridulation 1000-4000Hz, birds: high-pitched tweets 2000Hz). Sounds are what physics predicts they should be
 - **Conducting Mode**: Become a god — swipe for wind, tap for rain, long-press for warmth. Shape the ecosystem with gestures
 - **Biology**: Plants → vegetation → wood lifecycle. Seeds spread with wind (and by birds). Decay composts into fertile soil
@@ -27,7 +32,7 @@ A god-simulation where building the world = composing music. Your instrument is 
 ## Quick Start
 **Play online:** [https://lovejzzz.github.io/BudEngine/](https://lovejzzz.github.io/BudEngine/)
 
-First visit shows a welcome screen — tap to begin. The Garden ecosystem loads automatically with worms in dirt, fish in water, bugs on surfaces, birds flying above, and plants growing. Watch the day/night cycle (14 min), observe dirt color change as worms enrich it, see population dynamics in the 📊 sparkline graph. Switch to 🎵 Conduct mode to interact with gestures.
+First visit shows a welcome screen — tap to begin. The Garden ecosystem loads automatically (v4.3.2: now on EVERY page load, not just first visit) with worms in dirt, fish in water, bugs on surfaces, birds flying above, and plants growing. Creatures now have glowing halos for visibility. Tap materials in the palette to see tooltips with properties. Watch the colored heart ❤️ indicator to monitor ecosystem health. Pinch to zoom on mobile. Observe the day/night cycle (14 min), dirt color changing as worms enrich it, and population dynamics in the 📊 sparkline graph. Switch to 🎵 Conduct mode to interact with gestures.
 
 Or run locally — open `composition.html` in any browser (mobile or desktop).
 
