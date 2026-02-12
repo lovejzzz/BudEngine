@@ -7,10 +7,23 @@ A single-file 2D web game engine with pixel physics, procedural sound, and emerg
 
 A god-simulation where building the world = composing music. Your instrument is the Earth.
 
+## v4.5 — Phase 1 Redesign
+**Focus: Trim bloat, add ants (social builders), add root systems**
+
+New in v4.5:
+- **Ants** 🐜: Social creatures that CONSTRUCT. Colony builders that carry dirt/sand, dig tunnels, cluster together into emergent colonies. Population cap: 30. Tiny high-pitched clicks (3000 Hz). Brown glow for visibility.
+- **Ant Colony AI**: Ants bias movement toward nearby ants (within 10 cells), creating natural clustering. 5% chance to pick up dirt/sand, 3% chance to drop (prefers placing next to solid blocks — builds ant hills!)
+- **Ant Tunneling**: 2% chance to dig through adjacent dirt, converts it to air and starts carrying
+- **Root Systems**: Plants grow underground root networks (woody brown, darker than dirt). Roots spread downward/sideways through dirt, absorb water, boost fertility in 5-cell radius
+- **Root Growth**: 0.5% chance per frame (2% near water), max depth 15 cells below surface plant
+- **Root Death**: When plant is cut/dies, roots die after 180 frames (~3 seconds) and convert to decay — cutting down a plant kills its root system
+- **TRIMMED**: Removed score system (epoch progression now purely ecosystem milestones), removed conducting mode gestures (CONDUCT button is placeholder), removed Neon Ronin demo references, removed non-ecosystem biome scenarios
+
 ## Features
 - **Pixel-Art UI** (v4.4): ALL UI elements rendered as pixel art on the main canvas. No HTML overlays — everything is part of the pixel world. 3x5 bitmap font, material palette with actual material color swatches, mode buttons, HUD with creature icons, O₂ bars, health indicators, day/night icons. Material tooltips with 2-second auto-dismiss. Touch-routed through pixel UI for seamless interaction. "Everything on the UI will be pixel using our engine, no more normal buttons, this is its own world and art" — SKYX
 - **Pixel Physics**: 30+ materials with real scientific properties — emergent reactions, no hardcoded interactions
-- **Living Ecosystem**: Worms 🪱, fish 🐟, bugs 🐛, birds 🐦 — visible multi-pixel creatures that eat, reproduce, and die. Soil fertility, O₂/CO₂ balance, food chains. Birds are apex predators (eat bugs, disperse seeds)
+- **Living Ecosystem**: Worms 🪱, fish 🐟, bugs 🐛, birds 🐦, **ants** 🐜 — visible multi-pixel creatures that eat, reproduce, and die. Soil fertility, O₂/CO₂ balance, food chains. Birds are apex predators (eat bugs, disperse seeds). **Ants are colony builders** (carry dirt, dig tunnels, construct ant hills)
+- **Root Systems** (v4.5): Plants grow underground root networks (woody brown, visible). Roots spread through dirt, absorb water, boost fertility. When plant dies, roots die too — realistic plant ecology
 - **Creature Glow Effect** (v4.3.2): Semi-transparent colored halos around creatures for better visibility. Worm=pink, fish=orange, bug=green, bird=blue (brighter). Makes creatures visible even in complex terrain
 - **Day/Night Cycle** (v4.3): 14-minute day/night cycle with smooth sinusoidal brightness. Temperature drops at night, worms surface, bugs chirp more. Sun ☀️ and moon 🌙 indicators in HUD
 - **Fertile Soil Visualization** (v4.3): Dirt color reflects fertility — rich dark-green for fertile (>0.7), grayish for depleted (<0.3). Worms enrich soil by eating decay, plants deplete it
@@ -20,8 +33,7 @@ A god-simulation where building the world = composing music. Your instrument is 
 - **Pinch-to-Zoom** (v4.3.2): Mobile pinch gesture zooms camera 0.5x-3.0x. Zoom level indicator shows current scale. Explore ecosystems up close
 - **Material Tooltips** (v4.3.2): Tap a material in the palette to see its name and key properties. Stone shows density/melting point, creatures show ecological role. 2-second auto-dismiss
 - **Ecosystem Health Indicator** (v4.3.2): Color-coded heart ❤️ shows ecosystem balance. Green (healthy) = 3+ creature types, O₂ >60%, fertility >0.4. Yellow (stressed) = 2 types or moderate vitals. Red (dying) = <2 types or critical vitals
-- **Scientific Acoustic Physics**: ALL sounds derived from real physics formulas, not arbitrary frequencies. Impact sounds use f = (1/(2*L)) * sqrt(E/ρ) with actual Young's modulus and density. Water splashes use real bubble acoustics. Fire sounds from turbulent combustion. Creature bioacoustics (worms: 20-60Hz infrasound, fish: swim bladder resonance 100-500Hz, bugs: stridulation 1000-4000Hz, birds: high-pitched tweets 2000Hz). Sounds are what physics predicts they should be
-- **Conducting Mode**: Become a god — swipe for wind, tap for rain, long-press for warmth. Shape the ecosystem with gestures
+- **Scientific Acoustic Physics**: ALL sounds derived from real physics formulas, not arbitrary frequencies. Impact sounds use f = (1/(2*L)) * sqrt(E/ρ) with actual Young's modulus and density. Water splashes use real bubble acoustics. Fire sounds from turbulent combustion. Creature bioacoustics (worms: 20-60Hz infrasound, fish: swim bladder resonance 100-500Hz, bugs: stridulation 1000-4000Hz, birds: high-pitched tweets 2000Hz, **ants: tiny clicks 3000Hz**). Sounds are what physics predicts they should be
 - **Biology**: Plants → vegetation → wood lifecycle. Seeds spread with wind (and by birds). Decay composts into fertile soil
 - **Seasons & Weather**: Spring/Summer/Fall/Winter with rain, snow, wind
 - **Erosion**: Water, wind, and thermal erosion reshape terrain over geological time
@@ -33,7 +45,7 @@ A god-simulation where building the world = composing music. Your instrument is 
 ## Quick Start
 **Play online:** [https://lovejzzz.github.io/BudEngine/](https://lovejzzz.github.io/BudEngine/)
 
-First visit shows a welcome screen — tap to begin. The Garden ecosystem loads automatically (v4.3.2: now on EVERY page load, not just first visit) with worms in dirt, fish in water, bugs on surfaces, birds flying above, and plants growing. Creatures now have glowing halos for visibility. Tap materials in the palette to see tooltips with properties. Watch the colored heart ❤️ indicator to monitor ecosystem health. Pinch to zoom on mobile. Observe the day/night cycle (14 min), dirt color changing as worms enrich it, and population dynamics in the 📊 sparkline graph. Switch to 🎵 Conduct mode to interact with gestures.
+First visit shows a welcome screen — tap to begin. The Garden ecosystem loads automatically (v4.3.2: now on EVERY page load, not just first visit) with worms in dirt, fish in water, bugs on surfaces, birds flying above, **ants building colonies on the dirt surface**, and plants growing **underground root systems**. Creatures now have glowing halos for visibility. Tap materials in the palette to see tooltips with properties. Watch the colored heart ❤️ indicator to monitor ecosystem health. Pinch to zoom on mobile. Observe the day/night cycle (14 min), dirt color changing as worms enrich it, **root networks spreading underground**, **ants carrying dirt to build ant hills**, and population dynamics in the 📊 sparkline graph.
 
 Or run locally — open `composition.html` in any browser (mobile or desktop).
 
@@ -67,6 +79,7 @@ Every sound in Bud Engine is derived from real physics, not arbitrary frequency 
 - Fish: Swim bladder resonance 100-500 Hz, short pulsed sounds
 - Bugs: Stridulation 1000-4000 Hz, rapid click series (temperature affects chirp rate via Dolbear's law)
 - Birds (v4.3): High-pitched tweets 2000 Hz, fly horizontally with slight vertical drift, glide down gradually, RARE (max 10 population cap), disperse plant seeds
+- **Ants (v4.5)**: Tiny high-pitched clicks 3000 Hz (resonance dampening 0.8), colony builders that carry dirt/sand and construct ant hills, cluster together using emergent colony AI
 
 All frequencies calculated from material properties: `youngsModulus`, `density`, `dampening`, `speedOfSound`, `acousticImpedance`. The Composition sounds like Earth should.
 

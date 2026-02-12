@@ -1,11 +1,33 @@
 /**
- * BUD ENGINE v4.4
+ * BUD ENGINE v4.5
  * A 2D web game engine designed for AI-human collaboration
  * 
  * Philosophy: AI can write, TEST, and iterate on games independently.
  * Killer feature: AI Testing API + auto-playtest bot
  * 
  * Architecture: Single-file, no build tools, runs in browser
+ * 
+ * v4.5 PHASE 1 REDESIGN — TRIM BLOAT, ANTS, ROOT SYSTEMS:
+ * - TRIM: Removed Neon Ronin demo references, conducting mode gestures, score system (replaced with ecosystem milestones), non-ecosystem biome scenarios
+ * - ANTS (🐜): New social creature that BUILDS. Colony builders that carry dirt/sand, construct ant hills, dig tunnels, cluster together
+ * - Ant behavior: Walks on surfaces in air (like bugs), has gravity, carries materials (5% pickup, 3% drop), prefers placing blocks next to solids (creates structures)
+ * - Ant colony AI: Biases movement toward other ants within 10 cells (50% chance), creates natural clustering and emergent colony patterns
+ * - Ant tunneling: 2% chance to dig through adjacent dirt, converts to air and starts carrying the dirt
+ * - Ant population cap: max 30, reproduces when hunger > 25000
+ * - Ant rendering: 2-pixel multi-pixel rendering (body + head offset by direction), brown glow (rgba(139, 69, 19, 0.3))
+ * - Ant acoustics: Tiny high-pitched clicks (3000 Hz resonance frequency, dampening 0.8)
+ * - carryGrid: New Uint8Array stores what material each creature is carrying (0 = nothing, >0 = material ID)
+ * - ROOT SYSTEMS: Plants now grow underground root networks (woody brown color #4a3520, darker than dirt)
+ * - Root growth: Plants have 0.5% chance per frame to grow roots into dirt below, diagonally-below, max depth 15 cells
+ * - Root growth boosted near water: 2% chance instead of 0.5% when adjacent to water
+ * - Root spreading: Roots slowly spread horizontally and downward through dirt (0.1% chance per frame)
+ * - Root water absorption: 1% chance to absorb adjacent water (converts to air), boosts fertility in 5-cell radius by 0.02
+ * - Root death: When plant above is cut/dies, roots die after 180 frames (~3 seconds), convert to decay — cutting down a plant kills its root system
+ * - Roots visible in render: Woody brown color differentiates from dirt, underground networks are visible
+ * - Conducting mode: CONDUCT button is now a placeholder (gestures removed, reserved for future redesign)
+ * - Score removed from HUD: Epoch progression now purely ecosystem-driven (milestones, not points)
+ * - Ecosystem health now includes ants in creature type count
+ * - Garden scenario: Now spawns 10 ants on dirt surface alongside other creatures
  * 
  * v4.4 PIXEL-ART UI — EVERYTHING IS PIXEL:
  * - Complete replacement of HTML UI with pixel-art canvas rendering (PixelUI class)
@@ -193,28 +215,6 @@
  * - Asset unloading and memory management
  * - Full JSDoc documentation
  * 
- * v2.6 Improvements (Neon Ronin - Systems):
- * - Enhanced scene transitions (fade/wipe/flash with callbacks)
- * - Room/Level management system (engine.room API)
- * - Lightweight state machine system for AI (engine.stateMachine)
- * - Game polish and improvements
- * 
- * v2.5 Improvements (Neon Ronin - Camera & Feel):
- * - Native camera lookahead system (cameraLookahead)
- * - Lookahead can use target rotation or manual {x,y} offset
- * - Scene transitions with automatic fade (goTo with fade parameter improved)
- * - Combat impact helper (impact) - unified shake + freeze + flash
- * - Particle presets system for common patterns
- * 
- * v2.4 Improvements (Neon Ronin Polish):
- * - Freeze frames / hit pause (freezeFrame)
- * - Sprite effects: flash, alpha, scale on entities
- * - Automatic flash decay system
- * - Better hit feedback foundation
- * 
- * v2.3 Improvements (Neon Ronin):
- * - Screen flash effects (screenFlash, screenFade)
- * - Impact feedback for damage/hits
  * 
  * v2.2 Improvements:
  * - Virtual joystick for mobile (on-screen controls)
@@ -4148,47 +4148,6 @@ class TestingAPI {
         const h = this.engine.canvas.height;
         
         switch(name) {
-            case 'volcano':
-                this.engine.physics.fill(0, h*0.92, w, h, 'stone');
-                this.engine.physics.fill(w*0.15, h*0.7, w*0.85, h*0.92, 'stone');
-                this.engine.physics.fill(w*0.25, h*0.55, w*0.75, h*0.7, 'stone');
-                this.engine.physics.fill(w*0.35, h*0.45, w*0.65, h*0.55, 'stone');
-                this.engine.physics.fill(w*0.35, h*0.55, w*0.65, h*0.85, 'lava');
-                this.engine.physics.fill(w*0.42, h*0.45, w*0.58, h*0.55, 'lava');
-                this.engine.physics.fill(w*0.02, h*0.85, w*0.12, h*0.92, 'water');
-                break;
-            
-            case 'lab':
-                this.engine.physics.fill(0, h*0.92, w, h, 'stone');
-                const tubes = [
-                    {x: 0.12, mat: 'acid'}, {x: 0.27, mat: 'water'},
-                    {x: 0.42, mat: 'oil'}, {x: 0.57, mat: 'lava'}, {x: 0.72, mat: 'salt'}
-                ];
-                tubes.forEach(t => {
-                    const tx = w*t.x;
-                    const tw = w*0.06;
-                    this.engine.physics.fill(tx, h*0.6, tx+4, h*0.92, 'glass');
-                    this.engine.physics.fill(tx+tw, h*0.6, tx+tw+4, h*0.92, 'glass');
-                    this.engine.physics.fill(tx, h*0.88, tx+tw, h*0.92, 'glass');
-                    this.engine.physics.fill(tx+4, h*0.7, tx+tw, h*0.88, t.mat);
-                });
-                this.engine.physics.fill(w*0.87, h*0.85, w*0.93, h*0.92, 'iron');
-                this.engine.physics.circle(w*0.05, h*0.88, 15, 'gunpowder');
-                break;
-            
-            case 'forest':
-                const treeCount = Math.min(8, Math.floor(w / 100));
-                for (let i = 0; i < treeCount; i++) {
-                    const x = (w * 0.1) + (i * (w * 0.8 / treeCount));
-                    this.engine.physics.fill(x, h*0.55, x + (w*0.05), h*0.9, 'wood');
-                }
-                this.engine.physics.fill(0, h*0.9, w, h, 'dirt');
-                for (let i = 0; i < 10; i++) {
-                    this.engine.physics.circle(Math.random() * w, h*0.88, 10, 'vegetation');
-                }
-                this.engine.physics.circle(w*0.15, h*0.6, 15, 'fire');
-                break;
-            
             case 'garden':
                 // Bottom 30% dirt
                 this.engine.physics.fill(0, h*0.7, w, h, 'dirt');
@@ -4245,6 +4204,13 @@ class TestingAPI {
                     this.engine.physics.spawnCreature('bird', birdX, birdY);
                 }
                 
+                // v4.5: Ants on the dirt surface (colony builders)
+                for (let i = 0; i < 10; i++) {
+                    const antX = Math.random() * w * 0.75;
+                    const antY = h*0.68; // On dirt surface
+                    this.engine.physics.spawnCreature('ant', antX, antY);
+                }
+                
                 // Activate all chunks
                 for (let gx = 0; gx < this.engine.physics.gridWidth; gx += this.engine.physics.chunkSize) {
                     for (let gy = 0; gy < this.engine.physics.gridHeight; gy += this.engine.physics.chunkSize) {
@@ -4252,25 +4218,6 @@ class TestingAPI {
                     }
                 }
                 break;
-            
-            case 'underwater':
-                this.engine.physics.fill(0, h*0.15, w, h, 'water');
-                this.engine.physics.fill(0, h*0.92, w, h, 'sand');
-                this.engine.physics.fill(w*0.4, h*0.83, w*0.6, h*0.92, 'stone');
-                this.engine.physics.circle(w*0.5, h*0.87, w*0.04, 'lava');
-                break;
-            
-            case 'arctic':
-                this.engine.physics.fill(0, h*0.4, w, h*0.6, 'ice');
-                this.engine.physics.fill(0, h*0.6, w, h, 'water');
-                this.engine.physics.circle(w*0.5, h*0.5, w*0.05, 'lava');
-                break;
-            
-            case 'procedural':
-                // Use default seed and temperate biome
-                // (Real generation controlled via generateWorld() API)
-                const seed = Date.now();
-                return this.engine.physics.worldGenerator.generate(seed, 'temperate');
             
             default:
                 console.error(`Unknown scenario: ${name}`);
@@ -5907,6 +5854,9 @@ class PixelPhysics {
         // v4.1: Soil fertility system
         this.fertilityGrid = new Float32Array(this.gridWidth * this.gridHeight);
         
+        // v4.5: Ant carrying system (stores material ID being carried, 0 = nothing)
+        this.carryGrid = new Uint8Array(this.gridWidth * this.gridHeight);
+        
         // v4.1: O2/CO2 balance (global counters)
         this.oxygenLevel = 500;
         this.co2Level = 100;
@@ -5916,19 +5866,22 @@ class PixelPhysics {
             worm: 0,
             fish: 0,
             bug: 0,
-            bird: 0
+            bird: 0,
+            ant: 0
         };
         this.creatureBirths = {
             worm: 0,
             fish: 0,
             bug: 0,
-            bird: 0
+            bird: 0,
+            ant: 0
         };
         this.creatureDeaths = {
             worm: 0,
             fish: 0,
             bug: 0,
-            bird: 0
+            bird: 0,
+            ant: 0
         };
         this.totalCreatures = 0;
         this.maxCreatures = 200;
@@ -7059,6 +7012,45 @@ class PixelPhysics {
             produces: 'dirt'
         });
 
+        // ROOT (v4.5 - plant root systems that grow underground)
+        this.material('root', {
+            state: 'solid',
+            density: 800,
+            temperature: 20,
+            meltingPoint: null,
+            boilingPoint: null,
+            ignitionPoint: 220,
+            thermalConductivity: 0.25,
+            specificHeat: 2.4,
+            flammability: false,
+            hardness: 0.4,
+            electricConductivity: 0,
+            pH: 7,
+            reactivity: 0,
+            solubility: null,
+            color: ['#4a3520', '#3d2a18', '#5a4030'],
+            immovable: false,
+            organic: true,
+            living: true,
+            combustionProducts: ['smoke'],
+            combustionEnergy: 5,
+            // Acoustic properties
+            speedOfSound: 1050,
+            acousticImpedance: 0.84,
+            absorptionCoeff: 0.25,
+            youngsModulus: 0.5e9,
+            resonanceFreq: 180,
+            dampening: 0.65,
+            brightness: 0.15,
+            impactSound: 'thud',
+            flowSound: null,
+            ambientSound: null,
+            phaseChangeSound: null,
+            // Root properties
+            plantRoot: true,
+            deathForm: 'decay'
+        });
+
         // ========== CREATURES (v4.1) ==========
 
         // WORM (lives in dirt, eats decay, enriches soil)
@@ -7243,6 +7235,53 @@ class PixelPhysics {
             needsEnvironment: null, // Flies in air, doesn't need specific environment
             minTemp: 0,
             maxTemp: 45,
+            deathForm: 'decay',
+            diesInWater: true,
+            consumesO2: true
+        });
+
+        // ANT (v4.5 - social builder, carries dirt, constructs tunnels)
+        this.material('ant', {
+            state: 'solid',
+            density: 500,
+            temperature: 25,
+            meltingPoint: null,
+            boilingPoint: null,
+            ignitionPoint: 140,
+            thermalConductivity: 0.3,
+            specificHeat: 2.5,
+            flammability: 0.4,
+            hardness: 0.3,
+            electricConductivity: 0,
+            pH: 7,
+            reactivity: 0,
+            solubility: null,
+            color: ['#1a0a00', '#2a1500'],
+            immovable: false,
+            organic: true,
+            living: true,
+            creature: true,
+            combustionProducts: ['smoke'],
+            combustionEnergy: 3,
+            // Acoustic properties - tiny high-pitched clicks
+            speedOfSound: 900,
+            acousticImpedance: 0.45,
+            absorptionCoeff: 0.35,
+            youngsModulus: 0.2e9,
+            resonanceFreq: 3000,
+            dampening: 0.8,
+            brightness: 0.5,
+            impactSound: 'click',
+            flowSound: null,
+            ambientSound: null,
+            phaseChangeSound: null,
+            // Creature properties
+            creatureType: 'ant',
+            moveSpeed: 0.8,
+            eatsFood: ['plant', 'decay'],
+            needsEnvironment: null, // Walks on surfaces in air
+            minTemp: 5,
+            maxTemp: 40,
             deathForm: 'decay',
             diesInWater: true,
             consumesO2: true
@@ -7832,6 +7871,18 @@ class PixelPhysics {
                     if (id === 0) {
                         isValid = true;
                     }
+                } else if (type === 'ant') {
+                    // v4.5: Ants need air with solid below (like bugs)
+                    if (id === 0) {
+                        const belowIdx = this.index(gx, gy + 1);
+                        if (this.inBounds(gx, gy + 1)) {
+                            const belowId = this.grid[belowIdx];
+                            const belowMat = this.getMaterial(belowId);
+                            if (belowMat && belowMat.state === 'solid') {
+                                isValid = true;
+                            }
+                        }
+                    }
                 }
                 
                 if (isValid && dist < bestDist) {
@@ -8001,9 +8052,10 @@ class PixelPhysics {
             var fishId = this.getMaterialId('fish');
             var bugId = this.getMaterialId('bug');
             var birdId = this.getMaterialId('bird');
+            var antId = this.getMaterialId('ant');
             for (var i = 0; i < this.grid.length; i++) {
                 var mid = this.grid[i];
-                if (mid === wormId || mid === fishId || mid === bugId || mid === birdId) {
+                if (mid === wormId || mid === fishId || mid === bugId || mid === birdId || mid === antId) {
                     var gx = i % this.gridWidth;
                     var gy = Math.floor(i / this.gridWidth);
                     this.activateChunk(gx, gy);
@@ -8679,6 +8731,141 @@ class PixelPhysics {
             }
         }
         
+        // v4.5: ROOT GROWTH - Plants grow root systems underground
+        if ((mat.name === 'plant' || mat.name === 'vegetation') && Math.random() < 0.005) {
+            // Check cells below and diagonally-below for dirt
+            const rootCandidates = [
+                [x, y + 1],      // directly below
+                [x - 1, y + 1],  // diagonally below-left
+                [x + 1, y + 1]   // diagonally below-right
+            ];
+            
+            for (const [rx, ry] of rootCandidates) {
+                if (!this.inBounds(rx, ry)) continue;
+                
+                const ridx = this.index(rx, ry);
+                const rid = this.grid[ridx];
+                const rmat = this.getMaterial(rid);
+                
+                // Check if we can grow root here (dirt only)
+                if (rmat && rmat.name === 'dirt') {
+                    // Check max depth (15 cells below surface plant)
+                    const depth = ry - y;
+                    if (depth <= 15) {
+                        // Higher chance near water (2% instead of 0.5%)
+                        const nearWater = this.hasWaterNearby(rx, ry, 3);
+                        const growthChance = nearWater ? 0.02 : 0.005;
+                        
+                        if (Math.random() < growthChance) {
+                            this.grid[ridx] = this.getMaterialId('root');
+                            this.temperatureGrid[ridx] = 20;
+                            this.activateChunk(rx, ry);
+                            break; // Only one root per frame
+                        }
+                    }
+                }
+            }
+        }
+        
+        // v4.5: ROOT SPREADING - Roots slowly spread through dirt
+        if (mat.plantRoot && Math.random() < 0.001) {
+            const spreadCandidates = [
+                [x - 1, y],  // left
+                [x + 1, y],  // right
+                [x, y + 1]   // down (prefer downward growth)
+            ];
+            
+            for (const [sx, sy] of spreadCandidates) {
+                if (!this.inBounds(sx, sy)) continue;
+                
+                const sidx = this.index(sx, sy);
+                const sid = this.grid[sidx];
+                const smat = this.getMaterial(sid);
+                
+                if (smat && smat.name === 'dirt') {
+                    this.grid[sidx] = this.getMaterialId('root');
+                    this.temperatureGrid[sidx] = 20;
+                    this.activateChunk(sx, sy);
+                    break;
+                }
+            }
+        }
+        
+        // v4.5: ROOT WATER ABSORPTION - Roots absorb nearby water
+        if (mat.plantRoot && Math.random() < 0.01) {
+            const neighbors = [
+                [x - 1, y], [x + 1, y],
+                [x, y - 1], [x, y + 1]
+            ];
+            
+            for (const [nx, ny] of neighbors) {
+                if (!this.inBounds(nx, ny)) continue;
+                
+                const nidx = this.index(nx, ny);
+                const nid = this.grid[nidx];
+                const nmat = this.getMaterial(nid);
+                
+                if (nmat && nmat.name === 'water') {
+                    // Absorb water (convert to air)
+                    this.grid[nidx] = 0;
+                    
+                    // Boost fertility in 5-cell radius
+                    for (let dy = -5; dy <= 5; dy++) {
+                        for (let dx = -5; dx <= 5; dx++) {
+                            const fx = nx + dx;
+                            const fy = ny + dy;
+                            if (!this.inBounds(fx, fy)) continue;
+                            
+                            const dist = Math.sqrt(dx * dx + dy * dy);
+                            if (dist <= 5 && this.fertilityGrid) {
+                                const fidx = this.index(fx, fy);
+                                this.fertilityGrid[fidx] = Math.min(1.0, this.fertilityGrid[fidx] + 0.02);
+                            }
+                        }
+                    }
+                    
+                    this.activateChunk(nx, ny);
+                    break; // Only absorb one water cell per frame
+                }
+            }
+        }
+        
+        // v4.5: ROOT DEATH - Roots die when plant above is gone
+        if (mat.plantRoot) {
+            // Track upward to find plant within 15 cells
+            let foundPlant = false;
+            for (let dy = 1; dy <= 15; dy++) {
+                const checkY = y - dy;
+                if (!this.inBounds(x, checkY)) break;
+                
+                const checkIdx = this.index(x, checkY);
+                const checkId = this.grid[checkIdx];
+                const checkMat = this.getMaterial(checkId);
+                
+                if (checkMat && (checkMat.name === 'plant' || checkMat.name === 'vegetation')) {
+                    foundPlant = true;
+                    break;
+                }
+            }
+            
+            // If no plant found, increment death timer
+            if (!foundPlant) {
+                let deathTimer = this.lifetimeGrid[idx];
+                deathTimer++;
+                this.lifetimeGrid[idx] = deathTimer;
+                
+                // After 180 frames (~3 seconds at 60fps), die
+                if (deathTimer >= 180) {
+                    this.grid[idx] = this.getMaterialId('decay');
+                    this.lifetimeGrid[idx] = 0;
+                    this.activateChunk(x, y);
+                }
+            } else {
+                // Reset death timer if plant is found
+                this.lifetimeGrid[idx] = 0;
+            }
+        }
+        
         // 4. TREE GROWTH - Vegetation columns harden into wood
         if (mat.name === 'vegetation') {
             // Check if there's a tall column (5+ cells high)
@@ -8893,6 +9080,8 @@ class PixelPhysics {
                 if (creatureType === 'bug' && nid === 0) canReproduce = true;
                 // v4.3: Birds reproduce only when well-fed and population < 10
                 if (creatureType === 'bird' && nid === 0 && hunger > 40000 && this.creaturePopulation.bird < 10) canReproduce = true;
+                // v4.5: Ants reproduce into air when population < 30
+                if (creatureType === 'ant' && nid === 0 && hunger > 25000 && this.creaturePopulation.ant < 30) canReproduce = true;
                 
                 if (canReproduce) {
                     this.grid[nidx] = this.getMaterialId(mat.name);
@@ -9029,6 +9218,135 @@ class PixelPhysics {
                     if (nid === 0) {
                         canMove = true;
                     }
+                } else if (creatureType === 'ant') {
+                    // v4.5: Ants walk through AIR only (like bugs)
+                    if (nid === 0) {
+                        canMove = true;
+                    }
+                    // Ants can also tunnel through dirt (2% chance when adjacent)
+                    if (nmat && nmat.name === 'dirt' && Math.random() < 0.02) {
+                        const carrying = this.carryGrid[idx];
+                        if (carrying === 0) {
+                            // Dig: convert dirt to air and start carrying
+                            canMove = true;
+                            this.carryGrid[nidx] = this.getMaterialId('dirt');
+                        }
+                    }
+                }
+                
+                // v4.5: ANT SPECIAL BEHAVIORS (before movement execution)
+                if (creatureType === 'ant') {
+                    // CARRYING behavior: pick up nearby dirt/sand
+                    if (Math.random() < 0.05 && this.carryGrid[idx] === 0) {
+                        const neighbors = [
+                            [x - 1, y], [x + 1, y],
+                            [x, y - 1], [x, y + 1]
+                        ];
+                        for (const [nx2, ny2] of neighbors) {
+                            if (!this.inBounds(nx2, ny2)) continue;
+                            const nidx2 = this.index(nx2, ny2);
+                            const nid2 = this.grid[nidx2];
+                            const nmat2 = this.getMaterial(nid2);
+                            if (nmat2 && (nmat2.name === 'dirt' || nmat2.name === 'sand')) {
+                                // Pick up: convert to air, store in carryGrid
+                                this.grid[nidx2] = 0;
+                                this.carryGrid[idx] = nid2;
+                                this.activateChunk(nx2, ny2);
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // DROPPING behavior: place carried material
+                    if (Math.random() < 0.03 && this.carryGrid[idx] !== 0) {
+                        const neighbors = [
+                            [x - 1, y], [x + 1, y],
+                            [x, y - 1], [x, y + 1]
+                        ];
+                        // Prefer placing next to other solid blocks (creates ant hills)
+                        let bestDrop = null;
+                        let maxSolidNeighbors = 0;
+                        for (const [nx2, ny2] of neighbors) {
+                            if (!this.inBounds(nx2, ny2)) continue;
+                            const nidx2 = this.index(nx2, ny2);
+                            const nid2 = this.grid[nidx2];
+                            if (nid2 === 0) {
+                                // Count solid neighbors of this position
+                                let solidCount = 0;
+                                const checkNeighbors = [
+                                    [nx2 - 1, ny2], [nx2 + 1, ny2],
+                                    [nx2, ny2 - 1], [nx2, ny2 + 1]
+                                ];
+                                for (const [cx, cy] of checkNeighbors) {
+                                    if (!this.inBounds(cx, cy)) continue;
+                                    const cidx = this.index(cx, cy);
+                                    const cmat = this.getMaterial(this.grid[cidx]);
+                                    if (cmat && cmat.state === 'solid') solidCount++;
+                                }
+                                if (solidCount > maxSolidNeighbors) {
+                                    maxSolidNeighbors = solidCount;
+                                    bestDrop = nidx2;
+                                }
+                            }
+                        }
+                        if (bestDrop !== null) {
+                            // Drop the material
+                            this.grid[bestDrop] = this.carryGrid[idx];
+                            this.carryGrid[idx] = 0;
+                            this.activateChunk(bestDrop % this.gridWidth, Math.floor(bestDrop / this.gridWidth));
+                        }
+                    }
+                    
+                    // COLONY behavior: bias movement toward other ants
+                    if (Math.random() < 0.5) {
+                        // Scan for ants within 10 cells
+                        let antDir = null;
+                        let minDist = 10;
+                        const antId = this.getMaterialId('ant');
+                        for (let dy = -10; dy <= 10; dy++) {
+                            for (let dx = -10; dx <= 10; dx++) {
+                                if (dx === 0 && dy === 0) continue;
+                                const sx = x + dx;
+                                const sy = y + dy;
+                                if (!this.inBounds(sx, sy)) continue;
+                                const sidx = this.index(sx, sy);
+                                if (this.grid[sidx] === antId) {
+                                    const dist = Math.sqrt(dx * dx + dy * dy);
+                                    if (dist < minDist) {
+                                        minDist = dist;
+                                        // Calculate direction toward this ant
+                                        const angle = Math.atan2(dy, dx);
+                                        const dirIdx = Math.round((angle / (Math.PI * 2)) * 8) % 8;
+                                        antDir = (dirIdx + 8) % 8;
+                                    }
+                                }
+                            }
+                        }
+                        if (antDir !== null) {
+                            newDirection = antDir;
+                        }
+                    }
+                    
+                    // GRAVITY: fall if no solid below (like bugs)
+                    const belowY = y + 1;
+                    if (this.inBounds(x, belowY)) {
+                        const belowIdx = this.index(x, belowY);
+                        const belowId = this.grid[belowIdx];
+                        if (belowId === 0) {
+                            // Fall!
+                            this.grid[belowIdx] = this.grid[idx];
+                            this.temperatureGrid[belowIdx] = this.temperatureGrid[idx];
+                            this.lifetimeGrid[belowIdx] = this.lifetimeGrid[idx];
+                            this.carryGrid[belowIdx] = this.carryGrid[idx];
+                            this.grid[idx] = 0;
+                            this.temperatureGrid[idx] = this.ambientTemp;
+                            this.lifetimeGrid[idx] = 0;
+                            this.carryGrid[idx] = 0;
+                            this.activateChunk(x, y);
+                            this.activateChunk(x, belowY);
+                            return; // Skip normal movement this frame
+                        }
+                    }
                 }
                 
                 if (canMove) {
@@ -9037,12 +9355,18 @@ class PixelPhysics {
                     var restoreMat = 0; // default: air
                     if (creatureType === 'worm') restoreMat = this.getMaterialId('dirt');
                     else if (creatureType === 'fish') restoreMat = this.getMaterialId('water');
-                    // bugs and birds walk/fly on air, so leave air behind
+                    // bugs, birds, and ants walk/fly on air, so leave air behind
                     
                     // Move creature
                     this.grid[nidx] = this.grid[idx];
                     this.temperatureGrid[nidx] = this.temperatureGrid[idx];
                     this.lifetimeGrid[nidx] = newHunger | (newDirection << 16) | (newMoveTimer << 24);
+                    
+                    // v4.5: Move ant carry state
+                    if (creatureType === 'ant') {
+                        this.carryGrid[nidx] = this.carryGrid[idx];
+                        this.carryGrid[idx] = 0;
+                    }
                     
                     this.grid[idx] = restoreMat;
                     this.temperatureGrid[idx] = this.ambientTemp;
@@ -9854,6 +10178,21 @@ class PixelPhysics {
                                 pixels[urPixelIdx + 2] = b;
                                 pixels[urPixelIdx + 3] = 255;
                             }
+                        } else if (creatureType === 'ant') {
+                            // v4.5: Draw ant as 2 pixels: current + 1 to the right (body + head)
+                            // Get direction from lifetime grid to offset head
+                            const state = this.lifetimeGrid[idx];
+                            const direction = (Math.floor(state) >> 16) & 0xFF;
+                            const dx = [0, 1, 1, 1, 0, -1, -1, -1][direction % 8];
+                            const headX = x + dx;
+                            if (headX >= 0 && headX < this.gridWidth) {
+                                const headIdx = this.index(headX, y);
+                                const headPixelIdx = headIdx * 4;
+                                pixels[headPixelIdx] = r;
+                                pixels[headPixelIdx + 1] = g;
+                                pixels[headPixelIdx + 2] = b;
+                                pixels[headPixelIdx + 3] = 255;
+                            }
                         }
                     }
                 } else {
@@ -9890,6 +10229,8 @@ class PixelPhysics {
                         glowColor = 'rgba(102, 255, 68, 0.3)';
                     } else if (creatureType === 'bird') {
                         glowColor = 'rgba(68, 136, 255, 0.4)'; // Birds are brighter
+                    } else if (creatureType === 'ant') {
+                        glowColor = 'rgba(139, 69, 19, 0.3)'; // Brown glow
                     }
                     
                     if (glowColor) {
@@ -12063,7 +12404,8 @@ class PixelUI {
             { name: 'worm', emoji: '🪱', info: 'Worm — Eats decay, lives in dirt, enriches soil' },
             { name: 'fish', emoji: '🐟', info: 'Fish — Aquatic herbivore, eats plants in water' },
             { name: 'bug', emoji: '🐛', info: 'Bug — Surface herbivore, eats plants in air' },
-            { name: 'bird', emoji: '🐦', info: 'Bird — Apex predator, flies in air, eats bugs' }
+            { name: 'bird', emoji: '🐦', info: 'Bird — Apex predator, flies in air, eats bugs' },
+            { name: 'ant', emoji: '🐜', info: 'Ant — Colony builder, carries dirt, constructs tunnels' }
         ];
         
         // UI state
@@ -12228,14 +12570,16 @@ class PixelUI {
             worm: [[0,2],[1,2],[2,2],[2,1],[3,1],[3,0]], // Squiggle
             fish: [[0,2],[1,1],[1,2],[1,3],[2,0],[2,1],[2,2],[2,3],[2,4],[3,1],[3,3]], // Arrow shape
             bug: [[1,0],[1,4],[2,1],[2,2],[2,3],[3,0],[3,4]], // Legs + body
-            bird: [[1,1],[2,0],[2,1],[2,2],[3,1],[4,2]] // V shape
+            bird: [[1,1],[2,0],[2,1],[2,2],[3,1],[4,2]], // V shape
+            ant: [[0,1],[0,3],[1,2],[2,0],[2,2],[2,4],[3,1],[3,3]] // Ant body + legs
         };
         
         const colors = {
             worm: '#ff8877',
             fish: '#ffaa33',
             bug: '#66ff44',
-            bird: '#4488ff'
+            bird: '#4488ff',
+            ant: '#8B4513'
         };
         
         const pattern = patterns[type] || [];
@@ -12262,10 +12606,6 @@ class PixelUI {
         const epoch = state.epoch.toUpperCase();
         this.drawText(ctx, epoch, 10, 8, '#ffffff', 3);
         
-        // Score
-        const scoreX = 10 + this.measureText(epoch, 3) + 15;
-        this.drawText(ctx, 'SCORE:' + state.score, scoreX, 10, 'rgba(255,255,255,0.8)', 2);
-        
         // Creature counts with icons (second row)
         let creatureX = 10;
         const creatureY = 30;
@@ -12289,6 +12629,11 @@ class PixelUI {
         // Bird
         this.drawCreatureIcon(ctx, creatureX, creatureY, 'bird', cs);
         this.drawText(ctx, '' + (eco.creatures.bird || 0), creatureX + 14, creatureY, '#4488ff', cs);
+        creatureX += 40;
+        
+        // Ant
+        this.drawCreatureIcon(ctx, creatureX, creatureY, 'ant', cs);
+        this.drawText(ctx, '' + (eco.creatures.ant || 0), creatureX + 14, creatureY, '#8B4513', cs);
         creatureX += 45;
         
         // O₂ percentage
@@ -12302,7 +12647,8 @@ class PixelUI {
             eco.creatures.worm > 0,
             eco.creatures.fish > 0,
             eco.creatures.bug > 0,
-            eco.creatures.bird > 0
+            eco.creatures.bird > 0,
+            eco.creatures.ant > 0
         ].filter(Boolean).length;
         const fertility = parseFloat(eco.soilFertility) || 0;
         
@@ -12556,13 +12902,6 @@ class CompositionGame {
         
         // Game state
         this.mode = 'creation'; // 'creation', 'listening', 'conducting'
-        this.score = 0; // Overall musical score
-        this.harmony = 0; // Harmonic consonance (0-100)
-        this.complexity = 0; // Material variety (0-100)
-        this.rhythm = 0; // Rhythmic patterns (0-100)
-        this.dynamics = 0; // Volume variation (0-100)
-        this.texture = 0; // Sound diversity (0-100)
-        this.melody = 0; // Pitch patterns (0-100)
         
         // Epoch progression
         this.epoch = 'genesis'; // 'genesis', 'formation', 'life', 'civilization', 'transcendence'
@@ -12599,15 +12938,7 @@ class CompositionGame {
             this.tutorial.active = true;
         }
         
-        // Musical analysis
-        this.analysis = {
-            activeMaterials: new Set(),
-            recentFrequencies: [], // Recent sound frequencies for melody tracking
-            volumeHistory: [], // For dynamics
-            soundTypes: new Set(), // For texture
-            lastUpdateTime: 0,
-            periodicEvents: new Map() // For rhythm detection
-        };
+        // No longer used - removed in v4.5
         
         // Conducting mode state
         this.conducting = {
@@ -12635,294 +12966,12 @@ class CompositionGame {
      * @param {number} dt - Delta time
      */
     update(dt) {
-        // Update musical analysis
-        this.updateAnalysis(dt);
-        
-        // Calculate scores
-        this.calculateScores();
-        
         // Check for epoch transitions
         this.updateEpoch();
-        
-        // Update tutorial
-        if (this.tutorial.active && !this.tutorial.completed) {
-            this.updateTutorial();
-        }
-        
-        // Apply conducting mode effects
-        if (this.mode === 'conducting') {
-            this.applyConducting(dt);
-        }
     }
 
     /**
      * Update musical analysis from world state
-     * @private
-     */
-    updateAnalysis(dt) {
-        const now = performance.now() / 1000;
-        if (now - this.analysis.lastUpdateTime < 0.1) return; // Update 10x/sec
-        this.analysis.lastUpdateTime = now;
-        
-        // Scan world for active materials
-        this.analysis.activeMaterials.clear();
-        if (this.physics.grid) {
-            for (let i = 0; i < this.physics.grid.length; i++) {
-                const matId = this.physics.grid[i];
-                if (matId > 0) {
-                    const mat = this.physics.materials.get(matId);
-                    if (mat) {
-                        this.analysis.activeMaterials.add(mat.name);
-                    }
-                }
-            }
-        }
-        
-        // Track volume history for dynamics
-        if (this.acoustics.enabled && this.acoustics.activeSounds.size > 0) {
-            const currentVolume = this.acoustics.activeSounds.size / this.acoustics.maxSources;
-            this.analysis.volumeHistory.push(currentVolume);
-            if (this.analysis.volumeHistory.length > 100) {
-                this.analysis.volumeHistory.shift();
-            }
-        }
-        
-        // Detect periodic events for rhythm
-        if (this.physics.worldAge > 0) {
-            const season = this.physics.season;
-            this.analysis.periodicEvents.set('season', season);
-        }
-    }
-
-    /**
-     * Calculate all musical scores
-     * @private
-     */
-    calculateScores() {
-        this.calculateHarmony();
-        this.calculateComplexity();
-        this.calculateRhythm();
-        this.calculateDynamics();
-        this.calculateTexture();
-        this.calculateMelody();
-        
-        // Overall score is weighted average
-        this.score = Math.floor(
-            this.harmony * 0.3 +
-            this.complexity * 0.2 +
-            this.rhythm * 0.15 +
-            this.dynamics * 0.15 +
-            this.texture * 0.1 +
-            this.melody * 0.1
-        );
-    }
-
-    /**
-     * Calculate harmonic score based on frequency relationships
-     * @private
-     */
-    calculateHarmony() {
-        if (!this.physics.grid) {
-            this.harmony = 0;
-            return;
-        }
-        
-        // Sample random positions to find frequency relationships
-        const samples = 50;
-        let consonantPairs = 0;
-        let totalPairs = 0;
-        
-        for (let i = 0; i < samples; i++) {
-            const x1 = Math.floor(Math.random() * this.physics.gridWidth);
-            const y1 = Math.floor(Math.random() * this.physics.gridHeight);
-            const x2 = Math.floor(Math.random() * this.physics.gridWidth);
-            const y2 = Math.floor(Math.random() * this.physics.gridHeight);
-            
-            const dist = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
-            if (dist > 50 || dist < 5) continue; // Only check nearby materials
-            
-            const idx1 = y1 * this.physics.gridWidth + x1;
-            const idx2 = y2 * this.physics.gridWidth + x2;
-            const mat1 = this.physics.materials.get(this.physics.grid[idx1]);
-            const mat2 = this.physics.materials.get(this.physics.grid[idx2]);
-            
-            if (mat1 && mat2 && mat1.resonanceFreq && mat2.resonanceFreq) {
-                totalPairs++;
-                const ratio = mat1.resonanceFreq / mat2.resonanceFreq;
-                
-                // Check for consonant intervals (music theory)
-                if (this.isConsonant(ratio)) {
-                    consonantPairs++;
-                }
-            }
-        }
-        
-        this.harmony = totalPairs > 0 ? (consonantPairs / totalPairs) * 100 : 0;
-    }
-
-    /**
-     * Check if frequency ratio is consonant (music theory)
-     * @private
-     * @param {number} ratio - Frequency ratio
-     * @returns {boolean} True if consonant
-     */
-    isConsonant(ratio) {
-        const intervals = [
-            1.0,   // unison
-            2.0,   // octave
-            1.5,   // fifth (3:2)
-            1.333, // fourth (4:3)
-            1.25,  // major third (5:4)
-            1.2    // minor third (6:5)
-        ];
-        
-        // Check both directions
-        const normalized = ratio > 1 ? ratio : 1 / ratio;
-        
-        for (const interval of intervals) {
-            if (Math.abs(normalized - interval) < 0.1) {
-                return true;
-            }
-            // Check octave equivalents
-            if (Math.abs(normalized - interval * 2) < 0.1) {
-                return true;
-            }
-            if (Math.abs(normalized - interval / 2) < 0.1) {
-                return true;
-            }
-        }
-        
-        return false;
-    }
-
-    /**
-     * Calculate complexity score based on material variety
-     * @private
-     */
-    calculateComplexity() {
-        const uniqueMaterials = this.analysis.activeMaterials.size;
-        const totalMaterials = this.physics.materials.size;
-        
-        // More unique materials = higher complexity
-        this.complexity = Math.min(100, (uniqueMaterials / totalMaterials) * 200);
-    }
-
-    /**
-     * Calculate rhythm score based on periodic events
-     * @private
-     */
-    calculateRhythm() {
-        // Detect rhythmic patterns: seasons, flowing water, etc.
-        let rhythmicScore = 0;
-        
-        // Seasonal rhythm
-        if (this.physics.worldAge > 0) {
-            rhythmicScore += 20;
-        }
-        
-        // Water flow creates rhythm
-        if (this.analysis.activeMaterials.has('water')) {
-            rhythmicScore += 30;
-        }
-        
-        // Fire flicker creates rhythm
-        if (this.analysis.activeMaterials.has('fire')) {
-            rhythmicScore += 20;
-        }
-        
-        // Steam/gas movement creates rhythm
-        if (this.analysis.activeMaterials.has('steam') || this.analysis.activeMaterials.has('smoke')) {
-            rhythmicScore += 15;
-        }
-        
-        // Living materials create biological rhythms
-        if (this.analysis.activeMaterials.has('plant') || this.analysis.activeMaterials.has('vegetation')) {
-            rhythmicScore += 15;
-        }
-        
-        this.rhythm = Math.min(100, rhythmicScore);
-    }
-
-    /**
-     * Calculate dynamics score based on volume variation
-     * @private
-     */
-    calculateDynamics() {
-        if (this.analysis.volumeHistory.length < 10) {
-            this.dynamics = 0;
-            return;
-        }
-        
-        // Calculate variance in volume
-        const avg = this.analysis.volumeHistory.reduce((a, b) => a + b, 0) / this.analysis.volumeHistory.length;
-        const variance = this.analysis.volumeHistory.reduce((sum, v) => sum + (v - avg) ** 2, 0) / this.analysis.volumeHistory.length;
-        
-        // Higher variance = better dynamics (but not too high)
-        this.dynamics = Math.min(100, variance * 500);
-    }
-
-    /**
-     * Calculate texture score based on sound diversity
-     * @private
-     */
-    calculateTexture() {
-        // Count different sound types present
-        this.analysis.soundTypes.clear();
-        
-        for (const matName of this.analysis.activeMaterials) {
-            const matId = this.physics.materialIdMap.get(matName);
-            const mat = this.physics.materials.get(matId);
-            
-            if (mat) {
-                if (mat.impactSound) this.analysis.soundTypes.add('impact');
-                if (mat.flowSound) this.analysis.soundTypes.add('flow');
-                if (mat.ambientSound) this.analysis.soundTypes.add('ambient');
-            }
-        }
-        
-        // More sound types = richer texture
-        this.texture = (this.analysis.soundTypes.size / 3) * 100;
-    }
-
-    /**
-     * Calculate melody score based on pitch patterns
-     * @private
-     */
-    calculateMelody() {
-        // Track frequency changes over time
-        // For now, simple: materials with different resonance frequencies
-        const frequencies = [];
-        
-        for (const matName of this.analysis.activeMaterials) {
-            const matId = this.physics.materialIdMap.get(matName);
-            const mat = this.physics.materials.get(matId);
-            if (mat && mat.resonanceFreq) {
-                frequencies.push(mat.resonanceFreq);
-            }
-        }
-        
-        if (frequencies.length < 2) {
-            this.melody = 0;
-            return;
-        }
-        
-        // Sort frequencies
-        frequencies.sort((a, b) => a - b);
-        
-        // Check for rising/falling patterns
-        let melodicScore = 0;
-        for (let i = 1; i < frequencies.length; i++) {
-            const ratio = frequencies[i] / frequencies[i - 1];
-            if (ratio > 1.05 && ratio < 2.5) { // Meaningful pitch change
-                melodicScore += 20;
-            }
-        }
-        
-        this.melody = Math.min(100, melodicScore);
-    }
-
-    /**
-     * Update epoch based on score
      * @private
      */
     updateEpoch() {
@@ -13102,126 +13151,30 @@ class CompositionGame {
     }
 
     /**
-     * Handle touch/mouse gesture start
+     * Handle touch/mouse gesture start (placeholder - conducting mode removed)
      * @param {number} x - Screen X
      * @param {number} y - Screen Y
      */
     onGestureStart(x, y) {
-        this.gesture.startX = x;
-        this.gesture.startY = y;
-        this.gesture.currentX = x;
-        this.gesture.currentY = y;
-        this.gesture.startTime = performance.now();
-        this.gesture.active = true;
-        this.gesture.type = null;
+        // Conducting mode gestures removed in v4.5
     }
 
     /**
-     * Handle touch/mouse gesture move
+     * Handle touch/mouse gesture move (placeholder - conducting mode removed)
      * @param {number} x - Screen X
      * @param {number} y - Screen Y
      */
     onGestureMove(x, y) {
-        if (!this.gesture.active) return;
-        
-        this.gesture.currentX = x;
-        this.gesture.currentY = y;
-        
-        const dx = x - this.gesture.startX;
-        const dy = y - this.gesture.startY;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        
-        // Detect swipe
-        if (dist > 20 && this.mode === 'conducting') {
-            this.gesture.type = 'swipe';
-            
-            // Apply conducting gestures
-            if (Math.abs(dx) > Math.abs(dy)) {
-                // v4.2: Horizontal swipe: create wind burst for seed dispersal
-                const swipeVelocity = dx / 100;
-                this.conducting.wind.x = Math.max(-1, Math.min(1, swipeVelocity));
-                this.physics.wind.x = swipeVelocity * 0.5;
-            } else {
-                // Vertical swipe: temperature
-                this.conducting.tempModifier = Math.max(-1, Math.min(1, -dy / 100));
-            }
-        }
+        // Conducting mode gestures removed in v4.5
     }
 
     /**
-     * Handle touch/mouse gesture end
+     * Handle touch/mouse gesture end (placeholder - conducting mode removed)
      * @param {number} x - Screen X
      * @param {number} y - Screen Y
      */
     onGestureEnd(x, y) {
-        if (!this.gesture.active) return;
-        
-        const duration = (performance.now() - this.gesture.startTime) / 1000;
-        const dx = x - this.gesture.startX;
-        const dy = y - this.gesture.startY;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        
-        // Detect tap vs long press
-        if (dist < 10) {
-            if (duration > 0.5) {
-                this.gesture.type = 'longpress';
-                // v4.2: Long press in conducting mode: warmth burst (increase temperature)
-                if (this.mode === 'conducting') {
-                    this.spawnWarmth(x, y);
-                }
-            } else {
-                this.gesture.type = 'tap';
-                // v4.2: Tap in conducting mode: trigger rain at tap position
-                if (this.mode === 'conducting') {
-                    this.spawnRain(x, y);
-                }
-            }
-        }
-        
-        this.gesture.active = false;
-    }
-
-    /**
-     * v4.2: Spawn rain at tap position (conducting mode)
-     * @private
-     */
-    spawnRain(tapX, tapY) {
-        // Spawn 20 water drops in a line above the tap point
-        // CRITICAL: physics.set() takes PIXEL coordinates, NOT grid coordinates
-        for (let i = 0; i < 20; i++) {
-            const x = tapX + (Math.random() - 0.5) * 50;
-            const y = tapY - 50 - Math.random() * 30;
-            this.physics.set(x, y, 'water');
-        }
-    }
-
-    /**
-     * v4.2: Spawn warmth burst at long press position (conducting mode)
-     * @private
-     */
-    spawnWarmth(pressX, pressY) {
-        // Increase temperature in a radius around the press point
-        const gx = Math.floor(pressX / this.physics.cellSize);
-        const gy = Math.floor(pressY / this.physics.cellSize);
-        const radius = 10; // grid cells
-        
-        for (let dy = -radius; dy <= radius; dy++) {
-            for (let dx = -radius; dx <= radius; dx++) {
-                const dist = Math.sqrt(dx * dx + dy * dy);
-                if (dist > radius) continue;
-                
-                const x = gx + dx;
-                const y = gy + dy;
-                
-                if (!this.physics.inBounds(x, y)) continue;
-                
-                const idx = this.physics.index(x, y);
-                // Add +5 to temperature, stronger at center
-                const heatBoost = 5 * (1 - dist / radius);
-                this.physics.temperatureGrid[idx] += heatBoost;
-                this.physics.activateChunk(x, y);
-            }
-        }
+        // Conducting mode gestures removed in v4.5
     }
 
     /**
