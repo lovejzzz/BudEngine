@@ -145,7 +145,7 @@
         </div>
     </div>
 
-    <script src="bud.js?v=78"></script>
+    <script src="bud.js?v=79"></script>
     <script>
         // The Composition v4.6
         // Your instrument is the Earth
@@ -346,12 +346,25 @@
         engine.goTo('main');
         engine.start();
 
-        // Auto-garden on EVERY page load (not just first visit)
+        // Simple soil ground on page load
         setTimeout(() => {
             engine.test.clearWorld();
-            engine.test.loadScenario('garden');
-            pixelUI.mode = 'creation'; // Reset to creation mode after garden loads
-        }, 1500);
+            const p = engine.physics;
+            const groundY = Math.floor(p.gridHeight * 0.75); // bottom 25% is soil
+            const dirtId = p.getMaterialId('dirt');
+            for (let y = groundY; y < p.gridHeight; y++) {
+                for (let x = 0; x < p.gridWidth; x++) {
+                    const idx = p.index(x, y);
+                    p.grid[idx] = dirtId;
+                    p.temperatureGrid[idx] = 15;
+                }
+            }
+            // Activate all chunks
+            for (let cy = 0; cy < p.chunksHigh; cy++)
+                for (let cx = 0; cx < p.chunksWide; cx++)
+                    p.chunks[cy][cx].active = true;
+            pixelUI.mode = 'creation';
+        }, 500);
 
         // First visit: show welcome overlay
         if (!localStorage.getItem('composition_visited')) {
