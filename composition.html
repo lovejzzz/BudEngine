@@ -85,7 +85,15 @@
             font-weight: 300;
             letter-spacing: 2px;
             color: rgba(255,255,255,0.8);
-            margin-bottom: 60px;
+            margin-bottom: 30px;
+        }
+
+        #welcome-desc {
+            font-size: 14px;
+            font-weight: 300;
+            color: rgba(255,255,255,0.6);
+            margin-bottom: 40px;
+            line-height: 1.6;
         }
 
         #welcome-tap {
@@ -132,11 +140,12 @@
         <div id="welcome-overlay" style="display: none;">
             <div id="welcome-title">THE COMPOSITION</div>
             <div id="welcome-subtitle">Your instrument is the Earth</div>
+            <div id="welcome-desc">Place materials. Watch them react. Listen to the physics.</div>
             <div id="welcome-tap">[Tap to Begin]</div>
         </div>
     </div>
 
-    <script src="bud.js?v=73"></script>
+    <script src="bud.js?v=74"></script>
     <script>
         // The Composition v4.6
         // Your instrument is the Earth
@@ -175,6 +184,37 @@
         // v4.4: Initialize PixelUI (replaces ALL HTML UI)
         const pixelUI = new PixelUI(engine);
         window.pixelUI = pixelUI; // expose for debugging
+
+        // Save/Load functions
+        function saveComposition() {
+            const data = {
+                grid: Array.from(engine.physics.grid),
+                temp: Array.from(engine.physics.temperatureGrid),
+                width: engine.physics.gridWidth,
+                height: engine.physics.gridHeight
+            };
+            localStorage.setItem('composition_save', JSON.stringify(data));
+            console.log('[Save] Composition saved');
+            return true;
+        }
+
+        function loadComposition() {
+            const json = localStorage.getItem('composition_save');
+            if (!json) return false;
+            const data = JSON.parse(json);
+            if (data.width !== engine.physics.gridWidth || data.height !== engine.physics.gridHeight) return false;
+            engine.physics.grid.set(new Uint8Array(data.grid));
+            engine.physics.temperatureGrid.set(new Float32Array(data.temp));
+            // Activate all chunks
+            for (let cy = 0; cy < engine.physics.chunksHigh; cy++)
+                for (let cx = 0; cx < engine.physics.chunksWide; cx++)
+                    engine.physics.chunks[cy][cx].active = true;
+            console.log('[Load] Composition loaded');
+            return true;
+        }
+
+        window.saveComposition = saveComposition;
+        window.loadComposition = loadComposition;
 
         // Touch/mouse input state
         let isDrawing = false;
@@ -255,7 +295,7 @@
 
         function placeMaterial(x, y) {
             // physics.circle() takes PIXEL coordinates
-            const radius = 8;
+            const radius = pixelUI.brushSize || 8;
             const selectedMaterial = pixelUI.getSelectedMaterial();
             engine.physics.circle(x, y, radius, selectedMaterial);
         }

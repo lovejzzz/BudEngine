@@ -6721,8 +6721,10 @@ class PixelPhysics {
             solubility: null,
             color: ['#8b4513', '#a0522d', '#7a3f0f', '#9a5523'],
             immovable: true,
-            combustionProducts: ['smoke', 'fire', 'co2'],
+            combustionProducts: ['smoke', 'fire', 'ash', 'co2'],
             combustionEnergy: 16, // MJ/kg
+            decompositionProducts: ['charcoal'],
+            decompositionTemp: 250, // pyrolysis: wood → charcoal without oxygen
             // v5.0: Universal chemistry properties
             oxidizer: false,
             reducer: false,
@@ -6762,7 +6764,7 @@ class PixelPhysics {
             solubility: null,
             color: ['#1a1a1a', '#2a2a2a', '#0f0f0f'],
             immovable: true,
-            combustionProducts: ['smoke', 'fire', 'co2'],
+            combustionProducts: ['smoke', 'fire', 'ash', 'co2'],
             combustionEnergy: 24,
             // v5.0: Universal chemistry properties
             oxidizer: false,
@@ -6869,6 +6871,86 @@ class PixelPhysics {
             flowSound: 'rush',
             ambientSound: null,
             phaseChangeSound: 'pop'
+        });
+
+        // ASH (combustion residue)
+        this.material('ash', {
+            state: 'powder',
+            density: 700,
+            temperature: 200,
+            meltingPoint: 600,
+            boilingPoint: null,
+            ignitionPoint: null,
+            thermalConductivity: 0.08,
+            specificHeat: 0.8,
+            flammability: 0,
+            hardness: 0.5,
+            electricConductivity: 0,
+            pH: 10, // alkaline
+            reactivity: 0,
+            solubility: null,
+            color: ['#808080', '#909090', '#707070', '#858585'],
+            friction: 0.4,
+            // v5.0: Universal chemistry properties
+            oxidizer: false,
+            reducer: false,
+            organic: false,
+            mineral: true,
+            noble: true, // doesn't react further
+            volatile: false,
+            // Acoustic properties (similar to sand)
+            speedOfSound: 480,
+            acousticImpedance: 0.34,
+            absorptionCoeff: 0.35,
+            youngsModulus: 0.08e9,
+            resonanceFreq: 140,
+            dampening: 0.85,
+            brightness: 0.08,
+            impactSound: 'crunch',
+            flowSound: 'rush',
+            ambientSound: null,
+            phaseChangeSound: null
+        });
+
+        // CHARCOAL (pyrolysis product of wood)
+        this.material('charcoal', {
+            state: 'solid',
+            density: 250,
+            temperature: 20,
+            meltingPoint: null,
+            boilingPoint: null,
+            ignitionPoint: 350,
+            thermalConductivity: 0.18,
+            specificHeat: 1.0,
+            flammability: 0.9,
+            hardness: 2,
+            electricConductivity: 0,
+            pH: null,
+            reactivity: 0.2,
+            solubility: null,
+            color: ['#1a1a1a', '#252525', '#0f0f0f', '#202020'],
+            immovable: true,
+            combustionProducts: ['fire', 'smoke', 'ash'],
+            combustionEnergy: 30, // Higher than wood
+            // v5.0: Universal chemistry properties
+            oxidizer: false,
+            reducer: true, // can smelt metals
+            organic: true, // carbon-based
+            mineral: false,
+            noble: false,
+            volatile: false,
+            // Acoustic properties (similar to coal)
+            speedOfSound: 2500,
+            acousticImpedance: 0.63,
+            absorptionCoeff: 0.15,
+            youngsModulus: 2.5e9,
+            resonanceFreq: 330,
+            dampening: 0.25,
+            brightness: 0.22,
+            impactSound: 'crack',
+            flowSound: null,
+            ambientSound: null,
+            phaseChangeSound: 'crack'
         });
 
         // ========== GASES ==========
@@ -8823,6 +8905,22 @@ class PixelPhysics {
                                     this.igniteMaterial(x, y, mat, idx);
                                     this.activateChunk(x, y);
                                     continue;
+                                }
+                            }
+                        }
+                        
+                        // v5.2: Thermal decomposition (pyrolysis) — wood → charcoal without oxygen
+                        if (mat.decompositionTemp && mat.decompositionProducts && mat.decompositionProducts.length > 0) {
+                            if (this.temperatureGrid[idx] >= mat.decompositionTemp) {
+                                // Only decompose if no oxygen nearby (pyrolysis = no-oxygen breakdown)
+                                // OR if decomposition temp is below ignition (prefer decomposition to burning)
+                                if (!this.hasOxygenNearby(x, y) || mat.decompositionTemp < mat.ignitionPoint) {
+                                    const product = mat.decompositionProducts[Math.floor(Math.random() * mat.decompositionProducts.length)];
+                                    if (Math.random() < 0.05) { // Slow reaction, 5% per frame
+                                        this.grid[idx] = this.getMaterialId(product);
+                                        this.activateChunk(x, y);
+                                        continue;
+                                    }
                                 }
                             }
                         }
@@ -13118,6 +13216,9 @@ class PixelUI {
         this.showTooltip = false;
         this.tooltipText = '';
         this.tooltipTimer = 0;
+        this.brushSize = 8; // Default brush size (S=3, M=8, L=15)
+        this.feedbackMessage = ''; // For SAVED!/LOADED! messages
+        this.feedbackTimer = 0;
         
         // v4.6: Release mode state
         this.releaseMode = false;
@@ -13317,6 +13418,12 @@ class PixelUI {
         // Semi-transparent background strip
         ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
         ctx.fillRect(0, 0, width, this.hudHeight);
+        
+        // FPS counter (top-right)
+        const fps = Math.round(this.engine.fps || 0);
+        const fpsText = 'FPS:' + fps;
+        const fpsWidth = this.measureText(fpsText, 1);
+        this.drawText(ctx, fpsText, width - fpsWidth - 5, 8, 'rgba(255, 255, 255, 0.5)', 1);
         
         // Epoch name (large)
         const epoch = state.epoch.toUpperCase();
