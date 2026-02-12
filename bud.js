@@ -6850,7 +6850,7 @@ class PixelPhysics {
             reactivity: 1.0,
             solubility: null,
             color: ['#ff4400', '#ff8800', '#ffcc00', '#ff6600', '#ff2200'],
-            lifetime: [1.5, 3.5],
+            lifetime: [2.0, 4.0],
             produces: 'smoke',
             heatEmission: 1200, // °C per second to neighbors
             // v5.0: Universal chemistry properties
@@ -7866,14 +7866,17 @@ class PixelPhysics {
         // ========== 7. OXIDATION/RUST: reducer + oxidizer at low temp → slow degradation ==========
         this.reactionRules.push({
             condition: (matA, matB) => {
-                const temp = Math.max(
-                    this.temperatureGrid?.[this.index(0,0)] || 20,
-                    this.temperatureGrid?.[this.index(0,0)] || 20
-                );
-                return (matA.reducer && matB.oxidizer && temp < 100) ||
-                       (matB.reducer && matA.oxidizer && temp < 100);
+                return (matA.reducer && matB.oxidizer) ||
+                       (matB.reducer && matA.oxidizer);
             },
             react: (x, y, matA, matB, idxA, idxB) => {
+                // Check temperature dynamically
+                const temp = Math.max(
+                    this.temperatureGrid[idxA] || 20,
+                    this.temperatureGrid[idxB] || 20
+                );
+                if (temp >= 100) return;
+                
                 if (Math.random() < 0.005) { // Very slow
                     const metalMat = matA.reducer ? matA : matB;
                     const metalIdx = matA.reducer ? idxA : idxB;
@@ -7890,15 +7893,18 @@ class PixelPhysics {
         // ========== 8. EXPLOSIVE DECOMPOSITION: explosive + heat/fire → explosion ==========
         this.reactionRules.push({
             condition: (matA, matB) => {
-                const temp = Math.max(
-                    this.temperatureGrid?.[this.index(0,0)] || 20,
-                    this.temperatureGrid?.[this.index(0,0)] || 20
-                );
-                const hotEnough = temp > 250;
-                return (matA.explosive && (hotEnough || matB.temperature > 500)) ||
-                       (matB.explosive && (hotEnough || matA.temperature > 500));
+                return (matA.explosive) || (matB.explosive);
             },
             react: (x, y, matA, matB, idxA, idxB) => {
+                // Check temperature dynamically
+                const temp = Math.max(
+                    this.temperatureGrid[idxA] || 20,
+                    this.temperatureGrid[idxB] || 20
+                );
+                const hotEnough = temp > 250;
+                if (!((matA.explosive && (hotEnough || matB.temperature > 500)) ||
+                      (matB.explosive && (hotEnough || matA.temperature > 500)))) return;
+                
                 const explosiveMat = matA.explosive ? matA : matB;
                 const explosiveIdx = matA.explosive ? idxA : idxB;
                 
@@ -7977,16 +7983,17 @@ class PixelPhysics {
         // ========== 12. ORGANIC DECAY: organic + water + warm temp → methane + dirt ==========
         this.reactionRules.push({
             condition: (matA, matB) => {
-                const temp = Math.max(
-                    this.temperatureGrid?.[this.index(0,0)] || 20,
-                    this.temperatureGrid?.[this.index(0,0)] || 20
-                );
-                const warmEnough = temp >= 10 && temp <= 60;
-                return warmEnough && 
-                       ((matA.organic && matA.state === 'solid' && matB.state === 'liquid') ||
+                return ((matA.organic && matA.state === 'solid' && matB.state === 'liquid') ||
                         (matB.organic && matB.state === 'solid' && matA.state === 'liquid'));
             },
             react: (x, y, matA, matB, idxA, idxB) => {
+                // Check temperature dynamically
+                const temp = Math.max(
+                    this.temperatureGrid[idxA] || 20,
+                    this.temperatureGrid[idxB] || 20
+                );
+                if (temp < 10 || temp > 60) return;
+                
                 if (Math.random() < 0.001) { // Very slow biological process
                     const organicIdx = (matA.organic && matA.state === 'solid') ? idxA : idxB;
                     this.grid[organicIdx] = this.getMaterialId('dirt');
@@ -8009,15 +8016,17 @@ class PixelPhysics {
         // ========== 13. REDUCTION (smelting): reducer + oxidized metal at high temp → pure metal ==========
         this.reactionRules.push({
             condition: (matA, matB) => {
-                const temp = Math.max(
-                    this.temperatureGrid?.[this.index(0,0)] || 20,
-                    this.temperatureGrid?.[this.index(0,0)] || 20
-                );
-                return temp > 500 &&
-                       ((matA.reducer && !matA.metal && matB.oxidationProduct) ||
+                return ((matA.reducer && !matA.metal && matB.oxidationProduct) ||
                         (matB.reducer && !matB.metal && matA.oxidationProduct));
             },
             react: (x, y, matA, matB, idxA, idxB) => {
+                // Check temperature dynamically
+                const temp = Math.max(
+                    this.temperatureGrid[idxA] || 20,
+                    this.temperatureGrid[idxB] || 20
+                );
+                if (temp <= 500) return;
+                
                 if (Math.random() < 0.02) {
                     // This is a placeholder - full implementation would require reverse lookup
                     // For now, just produce smoke as a product
@@ -10356,7 +10365,7 @@ class PixelPhysics {
         for (const [nx, ny] of dirs) {
             if (!this.inBounds(nx, ny)) continue;
             const nidx = this.index(nx, ny);
-            if (this.grid[nidx] === 0 && Math.random() < 0.5) {
+            if (this.grid[nidx] === 0 && Math.random() < 0.7) {
                 // Spawn fire in empty neighbor
                 this.grid[nidx] = fireId;
                 this.temperatureGrid[nidx] = 700;
@@ -10495,7 +10504,7 @@ class PixelPhysics {
                 if (!nmat) continue;
                 // Directly heat flammable neighbors aggressively
                 if (nmat.flammability > 0) {
-                    this.temperatureGrid[nidx] += mat.heatEmission * 0.05; // 5% heat transfer per frame
+                    this.temperatureGrid[nidx] += mat.heatEmission * 0.08; // 8% heat transfer per frame
                     this.heatSources.add(nidx);
                     // Ignite if above 70% of ignition point — fire IS the oxygen source
                     const ignPt = this.ignitionPointArr[nid];
