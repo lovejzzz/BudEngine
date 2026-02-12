@@ -10413,7 +10413,8 @@ class PixelPhysics {
      */
     simulateGas(x, y, mat, id) {
         // v5.0: Hot gas (fire) actively spreads to adjacent flammable materials
-        if (mat.heatEmission > 0 && this.temperatureGrid[this.index(x, y)] > 400) {
+        const myIdx = this.index(x, y);
+        if (mat.heatEmission > 0 && this.temperatureGrid[myIdx] > 400) {
             const spreadDirs = [
                 [x-1,y], [x+1,y], [x,y-1], [x,y+1],
                 [x-1,y-1], [x+1,y-1], [x-1,y+1], [x+1,y+1]
@@ -10425,14 +10426,14 @@ class PixelPhysics {
                 if (nid === 0) continue;
                 const nmat = this.getMaterial(nid);
                 if (!nmat) continue;
-                // Directly heat flammable neighbors
+                // Directly heat flammable neighbors aggressively
                 if (nmat.flammability > 0) {
-                    this.temperatureGrid[nidx] += mat.heatEmission * 0.02;
+                    this.temperatureGrid[nidx] += mat.heatEmission * 0.05; // 5% heat transfer per frame
                     this.heatSources.add(nidx);
-                    // Chance to ignite based on flammability and proximity to ignition point
+                    // Ignite if above 70% of ignition point — fire IS the oxygen source
                     const ignPt = this.ignitionPointArr[nid];
-                    if (ignPt < 999999 && this.temperatureGrid[nidx] >= ignPt * 0.8) {
-                        if (Math.random() < nmat.flammability * 0.15 && this.hasOxygenNearby(nx, ny)) {
+                    if (ignPt < 999999 && this.temperatureGrid[nidx] >= ignPt * 0.7) {
+                        if (Math.random() < nmat.flammability * 0.25) {
                             this.igniteMaterial(nx, ny, nmat, nidx);
                             this.activateChunk(nx, ny);
                         }
